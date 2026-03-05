@@ -11,7 +11,7 @@ export default function Home() {
 
         <a
           className="inline-flex h-12 w-full items-center justify-center rounded-lg bg-[#dc2626] px-5 text-base font-semibold text-white transition-colors hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1e3a8a] focus-visible:ring-offset-2"
-          href="#"
+          href="/cadastro"
         >
           Acesso ao Portal
         </a>
