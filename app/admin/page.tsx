@@ -1,5 +1,7 @@
 "use client";
 
+export const revalidate = 0;
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { supabase } from "@/lib/supabaseClient";
@@ -27,25 +29,13 @@ export default function AdminPage() {
     setIsLoading(true);
     setErrorMessage(null);
 
-    const [{ data: pendingRows, error: pendingRowsError }, pendingCountRes, activeCountRes] =
-      await Promise.all([
-        supabase
-          .from("profiles")
-          .select("id, full_name, whatsapp, creci, status")
-          .eq("status", "pendente")
-          .order("full_name", { ascending: true }),
-        supabase
-          .from("profiles")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "pendente"),
-        supabase
-          .from("profiles")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "ativo"),
-      ]);
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, full_name, whatsapp, creci, status")
+      .order("full_name", { ascending: true });
 
-    if (pendingRowsError) {
-      setErrorMessage(pendingRowsError.message);
+    if (error) {
+      setErrorMessage(error.message);
       setRows([]);
       setPendingCount(0);
       setActiveCount(0);
@@ -53,9 +43,13 @@ export default function AdminPage() {
       return;
     }
 
-    setRows((pendingRows ?? []) as Profile[]);
-    setPendingCount(pendingCountRes.count ?? 0);
-    setActiveCount(activeCountRes.count ?? 0);
+    const allRows = (data ?? []) as Profile[];
+    const pending = allRows.filter((r) => r.status === "pendente").length;
+    const active = allRows.filter((r) => r.status === "ativo").length;
+
+    setRows(allRows);
+    setPendingCount(pending);
+    setActiveCount(active);
     setPropertiesCount(0);
     setIsLoading(false);
   }, []);
@@ -128,9 +122,9 @@ export default function AdminPage() {
       <section className="flex flex-col gap-4">
         <div className="flex items-end justify-between gap-4">
           <div>
-            <h2 className="text-lg font-semibold text-[#1e3a8a]">Aprovações pendentes</h2>
+            <h2 className="text-lg font-semibold text-[#1e3a8a]">Registros em profiles</h2>
             <p className="text-sm text-zinc-600">
-              Abaixo estão os corretores aguardando liberação.
+              Listagem completa para validar a conexão. Você pode aprovar quem estiver pendente.
             </p>
           </div>
 
@@ -157,6 +151,9 @@ export default function AdminPage() {
                   Nome
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-[#1e3a8a]">
+                  Status
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-[#1e3a8a]">
                   WhatsApp
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-[#1e3a8a]">
@@ -170,7 +167,7 @@ export default function AdminPage() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td className="px-4 py-6 text-sm text-zinc-600" colSpan={4}>
+                  <td className="px-4 py-6 text-sm text-zinc-600" colSpan={5}>
                     Carregando...
                   </td>
                 </tr>
@@ -181,27 +178,34 @@ export default function AdminPage() {
                       {row.full_name ?? "-"}
                     </td>
                     <td className="px-4 py-4 text-sm text-zinc-900">
+                      {row.status ?? "-"}
+                    </td>
+                    <td className="px-4 py-4 text-sm text-zinc-900">
                       {row.whatsapp ?? "-"}
                     </td>
                     <td className="px-4 py-4 text-sm text-zinc-900">
                       {row.creci ?? "-"}
                     </td>
                     <td className="px-4 py-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() => liberarAcesso(row.id)}
-                        disabled={updatingId === row.id}
-                        className="inline-flex h-10 items-center justify-center rounded-lg bg-green-600 px-4 text-sm font-semibold text-white transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {updatingId === row.id ? "Liberando..." : "Liberar Acesso"}
-                      </button>
+                      {row.status === "pendente" ? (
+                        <button
+                          type="button"
+                          onClick={() => liberarAcesso(row.id)}
+                          disabled={updatingId === row.id}
+                          className="inline-flex h-10 items-center justify-center rounded-lg bg-green-600 px-4 text-sm font-semibold text-white transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {updatingId === row.id ? "Liberando..." : "Liberar Acesso"}
+                        </button>
+                      ) : (
+                        <span className="text-sm text-zinc-400">-</span>
+                      )}
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td className="px-4 py-6 text-sm text-zinc-600" colSpan={4}>
-                    Nenhum corretor pendente no momento.
+                  <td className="px-4 py-6 text-sm text-zinc-600" colSpan={5}>
+                    Nenhum registro encontrado.
                   </td>
                 </tr>
               )}
