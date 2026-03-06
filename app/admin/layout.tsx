@@ -11,9 +11,11 @@ export default function AdminLayout({
   const pathname = usePathname();
 
   const items = [
-    { href: "/admin", label: "Visão Geral" },
-    { href: "/admin/aprovar-corretores", label: "Aprovar Corretores" },
-    { href: "/admin/meus-imoveis", label: "Meus Imóveis" },
+    { href: "/admin", label: "Dashboard" },
+    { href: "/admin/empreendimentos", label: "Empreendimentos" },
+    { href: "/admin/avulsos", label: "Imóveis Avulsos" },
+    { href: "/admin/corretores", label: "Gestão de Corretores" },
+    { href: "/admin/leads", label: "Leads/Atendimento" },
   ];
 
   return (
