@@ -24,6 +24,9 @@ export function getSupabaseClient() {
   if (cachedClient && (!isBrowser || cachedClientIsBrowser)) return cachedClient;
 
   const client = createClient(supabaseUrl, supabaseAnonKey, {
+    db: {
+      schema: "public",
+    },
     auth: {
       persistSession: false,
       storage: typeof window === "undefined" ? undefined : (noopStorage as any),
