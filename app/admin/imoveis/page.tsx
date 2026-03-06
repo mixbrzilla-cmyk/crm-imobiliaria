@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { getSupabaseClient } from "@/lib/supabaseClient";
+import { formatBRLInput, formatCurrencyBRL, parseBRLInputToNumber } from "@/lib/brl";
 
 type PropertyStatus =
   | "rascunho"
@@ -84,14 +85,6 @@ function parseOptionalNumber(value: string) {
   if (!trimmed) return null;
   const n = Number(trimmed.replace(/\./g, "").replace(",", "."));
   return Number.isFinite(n) ? n : null;
-}
-
-function formatCurrencyBRL(value: number) {
-  return value.toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    maximumFractionDigits: 0,
-  });
 }
 
 function Badge({ status }: { status: PropertyStatus }) {
@@ -215,7 +208,8 @@ export default function InventarioImoveisPage() {
       title: row.title ?? "",
       property_type: row.property_type ?? "Apartamento",
       purpose: (row.purpose ?? "venda") as PropertyPurpose,
-      price: typeof row.price === "number" ? String(row.price) : "",
+      price:
+        typeof row.price === "number" ? formatCurrencyBRL(row.price, { maximumFractionDigits: 2 }) : "",
       neighborhood: row.neighborhood ?? "",
       city: row.city ?? "",
       bedrooms: row.bedrooms != null ? String(row.bedrooms) : "",
@@ -253,7 +247,7 @@ export default function InventarioImoveisPage() {
       title: form.title.trim() ? form.title.trim() : null,
       property_type: form.property_type.trim() ? form.property_type.trim() : null,
       purpose: form.purpose,
-      price: parseOptionalNumber(form.price),
+      price: parseBRLInputToNumber(form.price),
       neighborhood: form.neighborhood.trim() ? form.neighborhood.trim() : null,
       city: form.city.trim() ? form.city.trim() : null,
       bedrooms: parseOptionalInt(form.bedrooms),
@@ -471,9 +465,11 @@ export default function InventarioImoveisPage() {
                       </span>
                       <input
                         value={form.price}
-                        onChange={(e) => setForm((s) => ({ ...s, price: e.target.value }))}
+                        onChange={(e) =>
+                          setForm((s) => ({ ...s, price: formatBRLInput(e.target.value) }))
+                        }
                         className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
-                        placeholder="Ex: 850000"
+                        placeholder="R$ 0,00"
                         inputMode="decimal"
                       />
                     </label>
@@ -488,7 +484,7 @@ export default function InventarioImoveisPage() {
                           value={form.city}
                           onChange={(e) => setForm((s) => ({ ...s, city: e.target.value }))}
                           className="h-11 w-full rounded-xl bg-white pl-10 pr-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
-                          placeholder="Ex: Porto Alegre"
+                          placeholder="Ex: Marabá"
                         />
                       </div>
                     </label>

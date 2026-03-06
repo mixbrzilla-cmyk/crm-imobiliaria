@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { getSupabaseClient } from "@/lib/supabaseClient";
+import { formatBRLInput, formatCurrencyBRL, parseBRLInputToNumber } from "@/lib/brl";
 
 type OpportunityStatus = "novo" | "avaliando" | "descartado" | "importado";
 
@@ -30,21 +31,6 @@ type LeadImportForm = {
   interest: string;
   source: string;
 };
-
-function parseMoney(input: string) {
-  const normalized = input.replace(/[^0-9.,-]/g, "").replace(",", ".").trim();
-  if (!normalized) return null;
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function formatCurrencyBRL(value: number) {
-  return value.toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    maximumFractionDigits: 0,
-  });
-}
 
 function sanitizePhone(input: string) {
   const digits = (input ?? "").replace(/\D/g, "");
@@ -157,7 +143,7 @@ export default function GpsOpportunitiesPage() {
       id: crypto.randomUUID(),
       title,
       source_url: form.source_url.trim() ? form.source_url.trim() : null,
-      detected_price: parseMoney(form.detected_price),
+      detected_price: parseBRLInputToNumber(form.detected_price),
       status: form.status,
       notes: form.notes.trim() ? form.notes.trim() : null,
     };
@@ -314,9 +300,12 @@ export default function GpsOpportunitiesPage() {
             <label className="text-xs font-semibold text-slate-600">Valor detectado</label>
             <input
               value={form.detected_price}
-              onChange={(e) => setForm((c) => ({ ...c, detected_price: e.target.value }))}
+              onChange={(e) =>
+                setForm((c) => ({ ...c, detected_price: formatBRLInput(e.target.value) }))
+              }
               className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition-all focus:border-[#001f3f] focus:ring-2 focus:ring-[#ff0000]/20"
-              placeholder="R$ 780.000"
+              placeholder="R$ 0,00"
+              inputMode="decimal"
             />
           </div>
 

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { getSupabaseClient } from "@/lib/supabaseClient";
+import { formatBRLInput, formatCurrencyBRL, parseBRLInputToNumber } from "@/lib/brl";
 
 type MaterialStatus = "cotado" | "comprado" | "entregue";
 
@@ -73,21 +74,6 @@ type EntryForm = {
   hours: string;
   notes: string;
 };
-
-function formatCurrencyBRL(value: number) {
-  return value.toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    maximumFractionDigits: 2,
-  });
-}
-
-function parseMoney(input: string) {
-  const normalized = input.replace(/[^0-9.,-]/g, "").replace(",", ".").trim();
-  if (!normalized) return null;
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) ? parsed : null;
-}
 
 function parseNumber(input: string) {
   const normalized = input.replace(/[^0-9.,-]/g, "").replace(",", ".").trim();
@@ -263,7 +249,7 @@ export default function ObrasAdminPage() {
       return;
     }
 
-    const unit = parseMoney(materialsForm.unit_price);
+    const unit = parseBRLInputToNumber(materialsForm.unit_price);
     const qty = parseNumber(materialsForm.quantity);
 
     setIsMaterialSaving(true);
@@ -339,8 +325,8 @@ export default function ObrasAdminPage() {
       return;
     }
 
-    const daily = parseMoney(workerForm.daily_rate);
-    const hourly = parseMoney(workerForm.hourly_rate);
+    const daily = parseBRLInputToNumber(workerForm.daily_rate);
+    const hourly = parseBRLInputToNumber(workerForm.hourly_rate);
 
     setIsWorkerSaving(true);
 
@@ -544,9 +530,12 @@ export default function ObrasAdminPage() {
                     <span className="text-xs font-semibold tracking-wide text-slate-600">Valor Unitário</span>
                     <input
                       value={materialsForm.unit_price}
-                      onChange={(e) => setMaterialsForm((s) => ({ ...s, unit_price: e.target.value }))}
+                      onChange={(e) =>
+                        setMaterialsForm((s) => ({ ...s, unit_price: formatBRLInput(e.target.value) }))
+                      }
                       className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                      placeholder="0,00"
+                      placeholder="R$ 0,00"
+                      inputMode="decimal"
                     />
                   </label>
                   <label className="flex flex-col gap-2">
@@ -576,7 +565,7 @@ export default function ObrasAdminPage() {
                 <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700 ring-1 ring-slate-200/70">
                   <span className="font-semibold text-slate-900">Total:</span>{" "}
                   {(() => {
-                    const unit = parseMoney(materialsForm.unit_price) ?? 0;
+                    const unit = parseBRLInputToNumber(materialsForm.unit_price) ?? 0;
                     const qty = parseNumber(materialsForm.quantity) ?? 0;
                     return formatCurrencyBRL(unit * qty);
                   })()}
@@ -742,18 +731,24 @@ export default function ObrasAdminPage() {
                     <span className="text-xs font-semibold tracking-wide text-slate-600">Diária</span>
                     <input
                       value={workerForm.daily_rate}
-                      onChange={(e) => setWorkerForm((s) => ({ ...s, daily_rate: e.target.value }))}
+                      onChange={(e) =>
+                        setWorkerForm((s) => ({ ...s, daily_rate: formatBRLInput(e.target.value) }))
+                      }
                       className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                      placeholder="0,00"
+                      placeholder="R$ 0,00"
+                      inputMode="decimal"
                     />
                   </label>
                   <label className="flex flex-col gap-2">
                     <span className="text-xs font-semibold tracking-wide text-slate-600">Hora</span>
                     <input
                       value={workerForm.hourly_rate}
-                      onChange={(e) => setWorkerForm((s) => ({ ...s, hourly_rate: e.target.value }))}
+                      onChange={(e) =>
+                        setWorkerForm((s) => ({ ...s, hourly_rate: formatBRLInput(e.target.value) }))
+                      }
                       className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                      placeholder="0,00"
+                      placeholder="R$ 0,00"
+                      inputMode="decimal"
                     />
                   </label>
                 </div>

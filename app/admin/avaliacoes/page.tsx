@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { getSupabaseClient } from "@/lib/supabaseClient";
+import { formatBRLInput, formatCurrencyBRL, parseBRLInputToNumber } from "@/lib/brl";
 
 type AppraisalStatus = "agendada" | "realizada" | "laudo_emitido" | "publicado";
 
@@ -53,14 +54,6 @@ function parseOptionalNumber(value: string) {
   if (!trimmed) return null;
   const n = Number(trimmed.replace(/\./g, "").replace(",", "."));
   return Number.isFinite(n) ? n : null;
-}
-
-function formatCurrencyBRL(value: number) {
-  return value.toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    maximumFractionDigits: 0,
-  });
 }
 
 function safeText(value: string | null | undefined) {
@@ -237,11 +230,11 @@ export default function AvaliacoesAdminPage() {
         address: form.address.trim(),
         neighborhood: form.neighborhood.trim() || null,
         city: form.city.trim() || null,
-        scheduled_at: form.scheduled_at.trim() ? new Date(form.scheduled_at).toISOString() : null,
+        scheduled_at: form.scheduled_at,
         status: form.status,
         area_m2: parseOptionalNumber(form.area_m2),
         condition: form.condition.trim() || null,
-        suggested_price: parseOptionalNumber(form.suggested_price),
+        suggested_price: parseBRLInputToNumber(form.suggested_price),
         notes: form.notes.trim() || null,
         video_call_link: form.video_call_link.trim() || null,
         published_property_id: null,
@@ -462,9 +455,12 @@ export default function AvaliacoesAdminPage() {
                   <span className="text-xs font-semibold tracking-wide text-slate-600">Valor sugerido</span>
                   <input
                     value={form.suggested_price}
-                    onChange={(e) => setForm((s) => ({ ...s, suggested_price: e.target.value }))}
+                    onChange={(e) =>
+                      setForm((s) => ({ ...s, suggested_price: formatBRLInput(e.target.value) }))
+                    }
                     className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                    placeholder="0"
+                    placeholder="R$ 0,00"
+                    inputMode="decimal"
                   />
                 </label>
               </div>
