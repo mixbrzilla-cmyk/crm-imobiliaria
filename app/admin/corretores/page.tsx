@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { getSupabaseClient } from "@/lib/supabaseClient";
 
@@ -10,6 +10,16 @@ type BrokerProfile = {
   email: string | null;
   status: string | null;
   role?: string | null;
+};
+
+type BrokerMonitor = {
+  brokerId: string;
+  leadsInHands: number;
+  propertiesSent: number;
+  developmentsSent: number;
+  whatsClicks: number;
+  visitsMarked: number;
+  meetings: number;
 };
 
 type Development = {
@@ -33,6 +43,8 @@ export default function CorretoresAdminPage() {
 
   const [brokers, setBrokers] = useState<BrokerProfile[]>([]);
   const [selectedBrokerId, setSelectedBrokerId] = useState<string | null>(null);
+
+  const [monitorByBrokerId, setMonitorByBrokerId] = useState<Record<string, BrokerMonitor>>({});
 
   const [developments, setDevelopments] = useState<Development[]>([]);
   const [standalones, setStandalones] = useState<StandaloneProperty[]>([]);
@@ -92,6 +104,8 @@ export default function CorretoresAdminPage() {
     const brokerRows = (brokersRes.data ?? []) as BrokerProfile[];
     setBrokers(brokerRows);
 
+    void loadMonitor(brokerRows.map((b) => b.id));
+
     const devRows = (devRes.data ?? []) as Development[];
     setDevelopments(devRows);
 
@@ -104,6 +118,78 @@ export default function CorretoresAdminPage() {
 
     setIsLoading(false);
   }
+
+  async function loadMonitor(brokerIds: string[]) {
+    if (!supabase) {
+      setMonitorByBrokerId({});
+      return;
+    }
+
+    if (brokerIds.length === 0) {
+      setMonitorByBrokerId({});
+      return;
+    }
+
+    try {
+      const base: Record<string, BrokerMonitor> = {};
+      for (const id of brokerIds) {
+        base[id] = {
+          brokerId: id,
+          leadsInHands: 0,
+          propertiesSent: 0,
+          developmentsSent: 0,
+          whatsClicks: 0,
+          visitsMarked: 0,
+          meetings: 0,
+        };
+      }
+
+      const [leadsRes, standalonesRes, developmentsRes] = await Promise.allSettled([
+        (supabase as any)
+          .from("leads")
+          .select("id, assigned_broker_profile_id"),
+        (supabase as any)
+          .from("standalone_properties")
+          .select("id, assigned_broker_profile_id"),
+        (supabase as any)
+          .from("developments")
+          .select("id, assigned_broker_profile_id"),
+      ]);
+
+      if (leadsRes.status === "fulfilled" && !leadsRes.value.error) {
+        const leads = (leadsRes.value.data ?? []) as Array<{ assigned_broker_profile_id: string | null }>;
+        for (const row of leads) {
+          const id = row.assigned_broker_profile_id ?? "";
+          if (id && base[id]) base[id].leadsInHands += 1;
+        }
+      }
+
+      if (standalonesRes.status === "fulfilled" && !standalonesRes.value.error) {
+        const props = (standalonesRes.value.data ?? []) as Array<{ assigned_broker_profile_id: string | null }>;
+        for (const row of props) {
+          const id = row.assigned_broker_profile_id ?? "";
+          if (id && base[id]) base[id].propertiesSent += 1;
+        }
+      }
+
+      if (developmentsRes.status === "fulfilled" && !developmentsRes.value.error) {
+        const devs = (developmentsRes.value.data ?? []) as Array<{ assigned_broker_profile_id: string | null }>;
+        for (const row of devs) {
+          const id = row.assigned_broker_profile_id ?? "";
+          if (id && base[id]) base[id].developmentsSent += 1;
+        }
+      }
+
+      setMonitorByBrokerId(base);
+    } catch {
+      setMonitorByBrokerId({});
+    }
+  }
+
+  const selectedMonitor = useMemo(() => {
+    if (!selectedBrokerId) return null;
+    return monitorByBrokerId[selectedBrokerId] ?? null;
+  }, [monitorByBrokerId, selectedBrokerId]);
 
   async function loadPermissions(brokerId: string) {
     setErrorMessage(null);
@@ -273,6 +359,7 @@ export default function CorretoresAdminPage() {
                 {brokers.map((b) => {
                   const isActive = selectedBrokerId === b.id;
                   const isOk = b.status === "ativo";
+                  const monitor = monitorByBrokerId[b.id];
 
                   return (
                     <button
@@ -291,6 +378,15 @@ export default function CorretoresAdminPage() {
                           {b.full_name ?? "-"}
                         </div>
                         <div className="mt-0.5 text-xs text-zinc-500">{b.email ?? "-"}</div>
+                        <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-zinc-600">
+                          <div>
+                            Leads em mãos: <span className="font-semibold text-zinc-900">{monitor?.leadsInHands ?? 0}</span>
+                          </div>
+                          <div>
+                            Imóveis enviados:{" "}
+                            <span className="font-semibold text-zinc-900">{monitor?.propertiesSent ?? 0}</span>
+                          </div>
+                        </div>
                       </div>
                       <div
                         className={
@@ -311,6 +407,49 @@ export default function CorretoresAdminPage() {
         </div>
 
         <div className="rounded-xl border border-zinc-200 bg-white lg:col-span-2">
+          <div className="border-b border-zinc-200 px-5 py-4">
+            <div className="text-sm font-semibold text-[#1e3a8a]">Monitoramento (Líder)</div>
+            <div className="mt-0.5 text-xs text-zinc-500">
+              Preparado para o painel do corretor: contagens e interações.
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-3">
+            <div className="rounded-xl border border-zinc-200 bg-white px-4 py-4">
+              <div className="text-xs font-semibold text-zinc-600">Leads em Mãos</div>
+              <div className="mt-2 text-2xl font-semibold text-zinc-900">
+                {selectedMonitor?.leadsInHands ?? 0}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-zinc-200 bg-white px-4 py-4">
+              <div className="text-xs font-semibold text-zinc-600">Imóveis Enviados</div>
+              <div className="mt-2 text-2xl font-semibold text-zinc-900">
+                {(selectedMonitor?.propertiesSent ?? 0) + (selectedMonitor?.developmentsSent ?? 0)}
+              </div>
+              <div className="mt-1 text-[11px] text-zinc-500">
+                Avulsos: {selectedMonitor?.propertiesSent ?? 0} • Empreend.: {selectedMonitor?.developmentsSent ?? 0}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-zinc-200 bg-white px-4 py-4">
+              <div className="text-xs font-semibold text-zinc-600">Interações (Futuro)</div>
+              <div className="mt-2 grid grid-cols-1 gap-1 text-sm text-zinc-700">
+                <div>
+                  Cliques no Whats: <span className="font-semibold text-zinc-900">{selectedMonitor?.whatsClicks ?? 0}</span>
+                </div>
+                <div>
+                  Visitas marcadas: <span className="font-semibold text-zinc-900">{selectedMonitor?.visitsMarked ?? 0}</span>
+                </div>
+                <div>
+                  Encontros: <span className="font-semibold text-zinc-900">{selectedMonitor?.meetings ?? 0}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-zinc-200 bg-white lg:col-span-3">
           <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-4">
             <div>
               <div className="text-sm font-semibold text-[#1e3a8a]">Distribuição de Carga</div>

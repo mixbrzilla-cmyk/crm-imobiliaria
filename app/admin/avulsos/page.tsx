@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { getSupabaseClient } from "@/lib/supabaseClient";
 
@@ -14,7 +14,15 @@ type StandaloneProperty = {
   address: string | null;
   photos_urls: string[] | null;
   description: string | null;
+  assigned_broker_profile_id?: string | null;
   created_at?: string;
+};
+
+type BrokerProfile = {
+  id: string;
+  full_name: string | null;
+  status: string | null;
+  role?: string | null;
 };
 
 type FormState = {
@@ -32,6 +40,17 @@ export default function ImoveisAvulsosPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const [brokers, setBrokers] = useState<BrokerProfile[]>([]);
+  const [dispatchSelectionById, setDispatchSelectionById] = useState<Record<string, string>>({});
+  const [dispatchingId, setDispatchingId] = useState<string | null>(null);
+  const [supportsAssignment, setSupportsAssignment] = useState(true);
+
+  const brokerById = useMemo(() => {
+    const map = new Map<string, BrokerProfile>();
+    for (const b of brokers) map.set(b.id, b);
+    return map;
+  }, [brokers]);
 
   const [form, setForm] = useState<FormState>({
     property_type: "Casa",
@@ -55,27 +74,137 @@ export default function ImoveisAvulsosPage() {
       return;
     }
 
-    const { data, error } = await supabase
-      .from("standalone_properties")
-      .select(
-        "id, property_type, purpose, price, address, photos_urls, description, created_at",
-      )
-      .order("created_at", { ascending: false });
+    try {
+      const res = await supabase
+        .from("standalone_properties")
+        .select(
+          "id, property_type, purpose, price, address, photos_urls, description, assigned_broker_profile_id, created_at",
+        )
+        .order("created_at", { ascending: false });
 
-    if (error) {
-      setErrorMessage(error.message);
-      setRows([]);
-      setIsLoading(false);
+      if (res.error) throw res.error;
+      setSupportsAssignment(true);
+      setRows((res.data ?? []) as StandaloneProperty[]);
+    } catch {
+      const fallbackRes = await supabase
+        .from("standalone_properties")
+        .select(
+          "id, property_type, purpose, price, address, photos_urls, description, created_at",
+        )
+        .order("created_at", { ascending: false });
+
+      if (fallbackRes.error) {
+        setErrorMessage(fallbackRes.error.message);
+        setRows([]);
+        setIsLoading(false);
+        return;
+      }
+
+      setSupportsAssignment(false);
+      setRows((fallbackRes.data ?? []) as StandaloneProperty[]);
+    }
+
+    setIsLoading(false);
+  }
+
+  async function loadBrokers() {
+    if (!supabase) {
+      setBrokers([]);
       return;
     }
 
-    setRows((data ?? []) as StandaloneProperty[]);
-    setIsLoading(false);
+    try {
+      const res = await supabase
+        .from("profiles")
+        .select("id, full_name, status, role")
+        .eq("role", "broker")
+        .order("full_name", { ascending: true });
+
+      if (res.error) {
+        setBrokers([]);
+        return;
+      }
+
+      const all = (res.data ?? []) as BrokerProfile[];
+      const eligible = all.filter((b) => {
+        const s = (b.status ?? "").toLowerCase();
+        return s === "ativo" || s === "aprovado";
+      });
+      setBrokers(eligible);
+    } catch {
+      setBrokers([]);
+    }
+  }
+
+  async function logDispatch(targetType: string, targetId: string, brokerId: string) {
+    if (!supabase) return;
+    try {
+      await (supabase as any).from("interaction_logs").insert({
+        id: crypto.randomUUID(),
+        event_type: "dispatch_to_broker",
+        target_type: targetType,
+        target_id: targetId,
+        broker_profile_id: brokerId,
+        created_at: new Date().toISOString(),
+      });
+    } catch {
+      return;
+    }
+  }
+
+  async function dispatchToBroker(propertyId: string) {
+    setErrorMessage(null);
+
+    if (!supabase) {
+      setErrorMessage(
+        "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+      );
+      return;
+    }
+
+    if (!supportsAssignment) {
+      setErrorMessage(
+        "Distribuição não disponível: adicione a coluna assigned_broker_profile_id em standalone_properties.",
+      );
+      return;
+    }
+
+    const brokerId = (dispatchSelectionById[propertyId] ?? "").trim();
+    if (!brokerId) {
+      setErrorMessage("Selecione um corretor.");
+      return;
+    }
+
+    setDispatchingId(propertyId);
+
+    try {
+      const { error } = await (supabase as any)
+        .from("standalone_properties")
+        .update({ assigned_broker_profile_id: brokerId })
+        .eq("id", propertyId);
+
+      if (error) {
+        setErrorMessage(error.message);
+        setDispatchingId(null);
+        return;
+      }
+
+      void logDispatch("standalone_property", propertyId, brokerId);
+
+      setRows((current) =>
+        current.map((r) => (r.id === propertyId ? { ...r, assigned_broker_profile_id: brokerId } : r)),
+      );
+    } catch {
+      setErrorMessage("Não foi possível enviar ao corretor agora.");
+    } finally {
+      setDispatchingId(null);
+    }
   }
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       void load();
+      void loadBrokers();
     }, 0);
     return () => clearTimeout(timeoutId);
   }, []);
@@ -248,12 +377,13 @@ export default function ImoveisAvulsosPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-[#1e3a8a]">Finalidade</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-[#1e3a8a]">Preço</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-[#1e3a8a]">Endereço</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-[#1e3a8a]">Enviar ao Corretor</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td className="px-4 py-6 text-sm text-zinc-600" colSpan={4}>
+                  <td className="px-4 py-6 text-sm text-zinc-600" colSpan={5}>
                     Carregando...
                   </td>
                 </tr>
@@ -266,11 +396,49 @@ export default function ImoveisAvulsosPage() {
                       {typeof r.price === "number" ? r.price.toLocaleString("pt-BR") : "-"}
                     </td>
                     <td className="px-4 py-4 text-sm text-zinc-900">{r.address ?? "-"}</td>
+                    <td className="px-4 py-4 text-sm">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={dispatchSelectionById[r.id] ?? r.assigned_broker_profile_id ?? ""}
+                            onChange={(e) =>
+                              setDispatchSelectionById((c) => ({ ...c, [r.id]: e.target.value }))
+                            }
+                            disabled={!supportsAssignment}
+                            className="h-10 w-56 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/20 disabled:cursor-not-allowed disabled:bg-zinc-50"
+                          >
+                            <option value="">Selecione</option>
+                            {brokers.map((b) => (
+                              <option key={b.id} value={b.id}>
+                                {b.full_name ?? b.id}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => void dispatchToBroker(r.id)}
+                            disabled={dispatchingId === r.id || !supportsAssignment}
+                            className="inline-flex h-10 items-center justify-center rounded-lg bg-[#001f3f] px-4 text-sm font-semibold text-white hover:bg-[#001a33] disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {dispatchingId === r.id ? "Enviando..." : "Confirmar"}
+                          </button>
+                        </div>
+
+                        {r.assigned_broker_profile_id ? (
+                          <div className="text-xs text-zinc-600">
+                            Enviado para:{" "}
+                            <span className="font-semibold text-zinc-900">
+                              {brokerById.get(r.assigned_broker_profile_id)?.full_name ?? "-"}
+                            </span>
+                          </div>
+                        ) : null}
+                      </div>
+                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td className="px-4 py-6 text-sm text-zinc-600" colSpan={4}>
+                  <td className="px-4 py-6 text-sm text-zinc-600" colSpan={5}>
                     Nenhum imóvel avulso cadastrado.
                   </td>
                 </tr>

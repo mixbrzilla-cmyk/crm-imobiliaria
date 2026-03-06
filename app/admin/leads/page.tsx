@@ -55,10 +55,10 @@ type BrokerProfile = {
   full_name: string | null;
   creci: string | null;
   status: string | null;
+  role?: string | null;
   specialties?: string[] | null;
   regions?: string[] | null;
   avatar_url?: string | null;
-  role?: string | null;
 };
 
 type FormState = {
@@ -169,6 +169,9 @@ export default function LeadsAdminPage() {
   const [selectedLead, setSelectedLead] = useState<LeadRow | null>(null);
   const [leadHistory, setLeadHistory] = useState<LeadEventRow[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+
+  const [dispatchBrokerId, setDispatchBrokerId] = useState<string>("");
+  const [isDispatching, setIsDispatching] = useState(false);
 
   const [form, setForm] = useState<FormState>({
     full_name: "",
@@ -320,10 +323,77 @@ export default function LeadsAdminPage() {
       }
 
       const all = (data ?? []) as BrokerProfile[];
-      const active = all.filter((b) => (b.status ?? "").toLowerCase() === "ativo");
-      setBrokers(active);
+      const eligible = all.filter((b) => {
+        const s = (b.status ?? "").toLowerCase();
+        return s === "ativo" || s === "aprovado";
+      });
+      setBrokers(eligible);
     } catch {
       setBrokers([]);
+    }
+  }
+
+  async function logDispatch(targetType: string, targetId: string, brokerId: string) {
+    if (!supabase) return;
+    try {
+      await (supabase as any).from("interaction_logs").insert({
+        id: crypto.randomUUID(),
+        event_type: "dispatch_to_broker",
+        target_type: targetType,
+        target_id: targetId,
+        broker_profile_id: brokerId,
+        created_at: new Date().toISOString(),
+      });
+    } catch {
+      return;
+    }
+  }
+
+  async function dispatchLeadToBroker() {
+    if (!selectedLead) return;
+
+    setErrorMessage(null);
+
+    if (!supabase) {
+      setErrorMessage(
+        "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+      );
+      return;
+    }
+
+    if (!dispatchBrokerId) {
+      setErrorMessage("Selecione um corretor para enviar.");
+      return;
+    }
+
+    setIsDispatching(true);
+
+    try {
+      const { error } = await (supabase as any)
+        .from("leads")
+        .update({ assigned_broker_profile_id: dispatchBrokerId })
+        .eq("id", selectedLead.id);
+
+      if (error) {
+        setErrorMessage(error.message);
+        setIsDispatching(false);
+        return;
+      }
+
+      void logDispatch("lead", selectedLead.id, dispatchBrokerId);
+
+      setRows((current) =>
+        current.map((l) =>
+          l.id === selectedLead.id ? { ...l, assigned_broker_profile_id: dispatchBrokerId } : l,
+        ),
+      );
+      setSelectedLead((current) =>
+        current ? { ...current, assigned_broker_profile_id: dispatchBrokerId } : current,
+      );
+    } catch {
+      setErrorMessage("Não foi possível enviar ao corretor agora.");
+    } finally {
+      setIsDispatching(false);
     }
   }
 
@@ -464,6 +534,7 @@ export default function LeadsAdminPage() {
 
   async function openLeadModal(lead: LeadRow) {
     setSelectedLead(lead);
+    setDispatchBrokerId(lead.assigned_broker_profile_id ?? "");
     setLeadHistory([]);
     setErrorMessage(null);
 
@@ -750,6 +821,15 @@ export default function LeadsAdminPage() {
                                 <span className="font-semibold text-slate-900">Interesse:</span> {lead.interest}
                               </div>
                             ) : null}
+
+                            {lead.assigned_broker_profile_id ? (
+                              <div className="mt-2 text-[11px] text-slate-500">
+                                Enviado para:{" "}
+                                <span className="font-semibold text-slate-700">
+                                  {brokerById.get(lead.assigned_broker_profile_id)?.full_name ?? "-"}
+                                </span>
+                              </div>
+                            ) : null}
                           </div>
                         </button>
                       ))
@@ -856,6 +936,15 @@ export default function LeadsAdminPage() {
                                 })()}
                               </div>
                             </div>
+
+                            {lead.assigned_broker_profile_id ? (
+                              <div className="mt-2 text-[11px] text-slate-500">
+                                Enviado para:{" "}
+                                <span className="font-semibold text-slate-700">
+                                  {brokerById.get(lead.assigned_broker_profile_id)?.full_name ?? "-"}
+                                </span>
+                              </div>
+                            ) : null}
                           </div>
                         </button>
                       ))
@@ -1031,6 +1120,62 @@ export default function LeadsAdminPage() {
                   <span className="font-semibold text-slate-900">Interesse:</span> {selectedLead.interest}
                 </div>
               ) : null}
+
+              <div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-slate-200/70">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">
+                      GESTÃO DE FLUXO
+                    </div>
+                    <div className="mt-1 text-sm font-semibold text-[#001f3f]">
+                      Enviar ao Corretor
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      Atualiza o lead e registra log do envio.
+                    </div>
+                  </div>
+                  {selectedLead.assigned_broker_profile_id ? (
+                    <span className="inline-flex h-8 items-center justify-center rounded-full bg-slate-50 px-3 text-xs font-semibold text-slate-700 ring-1 ring-slate-200/70">
+                      Enviado
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <select
+                    value={dispatchBrokerId}
+                    onChange={(e) => setDispatchBrokerId(e.target.value)}
+                    className="h-11 w-full rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15 sm:col-span-2"
+                  >
+                    <option value="">Selecione um corretor</option>
+                    {brokers.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.full_name ?? b.id}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={() => void dispatchLeadToBroker()}
+                    disabled={isDispatching || !dispatchBrokerId}
+                    className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-[#001f3f] px-5 text-sm font-semibold text-white shadow-[0_6px_14px_-10px_rgba(15,23,42,0.45)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#001a33] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isDispatching ? "Enviando..." : "Confirmar"}
+                  </button>
+                </div>
+
+                <div className="mt-3 text-xs text-slate-600">
+                  Atual:{" "}
+                  <span className="font-semibold text-slate-900">
+                    {(() => {
+                      const id = selectedLead.assigned_broker_profile_id ?? "";
+                      if (!id) return "-";
+                      return brokerById.get(id)?.full_name ?? id;
+                    })()}
+                  </span>
+                </div>
+              </div>
 
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <a
