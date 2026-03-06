@@ -5,6 +5,8 @@ import { useState } from "react";
 import { getSupabaseClient } from "@/lib/supabaseClient";
 
 type FormState = {
+  email: string;
+  password: string;
   full_name: string;
   whatsapp: string;
   creci: string;
@@ -12,6 +14,8 @@ type FormState = {
 
 export default function CadastroPage() {
   const [form, setForm] = useState<FormState>({
+    email: "",
+    password: "",
     full_name: "",
     whatsapp: "",
     creci: "",
@@ -37,13 +41,31 @@ export default function CadastroPage() {
         return;
       }
 
-      const id = crypto.randomUUID();
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: form.email.trim(),
+        password: form.password,
+      });
+
+      if (authError) {
+        setErrorMessage(authError.message);
+        return;
+      }
+
+      const userId = authData.user?.id;
+      if (!userId) {
+        setErrorMessage(
+          "Não foi possível criar sua conta agora. Tente novamente em instantes.",
+        );
+        return;
+      }
 
       const { error } = await supabase.from("profiles").insert({
-        id,
+        id: userId,
+        email: form.email.trim().toLowerCase(),
         full_name: form.full_name.trim(),
         whatsapp: form.whatsapp.trim(),
         creci: form.creci.trim(),
+        role: "broker",
         status: "pendente",
       });
 
@@ -60,7 +82,7 @@ export default function CadastroPage() {
       }
 
       setSuccessMessage("Cadastro enviado! Aguarde a aprovação do administrador");
-      setForm({ full_name: "", whatsapp: "", creci: "" });
+      setForm({ email: "", password: "", full_name: "", whatsapp: "", creci: "" });
     } catch {
       setErrorMessage("Não foi possível enviar seu cadastro. Tente novamente.");
     } finally {
@@ -81,6 +103,33 @@ export default function CadastroPage() {
         </header>
 
         <form onSubmit={onSubmit} className="flex flex-col gap-5">
+          <label className="flex flex-col gap-2">
+            <span className="text-sm font-medium text-[#1e3a8a]">E-mail</span>
+            <input
+              className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-zinc-900 outline-none focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/20"
+              value={form.email}
+              onChange={(e) => setForm((s) => ({ ...s, email: e.target.value }))}
+              name="email"
+              type="email"
+              required
+              autoComplete="email"
+            />
+          </label>
+
+          <label className="flex flex-col gap-2">
+            <span className="text-sm font-medium text-[#1e3a8a]">Senha</span>
+            <input
+              className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-zinc-900 outline-none focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/20"
+              value={form.password}
+              onChange={(e) => setForm((s) => ({ ...s, password: e.target.value }))}
+              name="password"
+              type="password"
+              required
+              autoComplete="new-password"
+              minLength={6}
+            />
+          </label>
+
           <label className="flex flex-col gap-2">
             <span className="text-sm font-medium text-[#1e3a8a]">Nome completo</span>
             <input
