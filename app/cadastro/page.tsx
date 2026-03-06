@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { supabase } from "@/lib/supabaseClient";
+import { getSupabaseClient } from "@/lib/supabaseClient";
 
 type FormState = {
   full_name: string;
@@ -28,6 +28,15 @@ export default function CadastroPage() {
     setIsSubmitting(true);
 
     try {
+      const supabase = getSupabaseClient();
+
+      if (!supabase) {
+        setErrorMessage(
+          "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+        );
+        return;
+      }
+
       const id = crypto.randomUUID();
 
       const { error } = await supabase.from("profiles").insert({
