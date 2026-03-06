@@ -28,6 +28,13 @@ type TopProperty = {
   address: string | null;
 };
 
+type ObraMaterialRow = {
+  id: string;
+  status: string | null;
+  unit_price: number | null;
+  quantity: number | null;
+};
+
 function formatCurrencyBRL(value: number) {
   return value.toLocaleString("pt-BR", {
     style: "currency",
@@ -96,6 +103,9 @@ export default function AdminDashboardClient() {
   const [activeCount, setActiveCount] = useState<number>(0);
   const [propertiesCount, setPropertiesCount] = useState<number>(0);
 
+  const [obraMaterialsTotal, setObraMaterialsTotal] = useState<number>(0);
+  const [obraPendingDeliveries, setObraPendingDeliveries] = useState<number>(0);
+
   const [leadsTodayCount, setLeadsTodayCount] = useState<number>(0);
   const [leadsWeekCount, setLeadsWeekCount] = useState<number>(0);
   const [leadsWeekTrend, setLeadsWeekTrend] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
@@ -150,7 +160,7 @@ export default function AdminDashboardClient() {
 
       const leadsDailyBuckets = new Array<number>(7).fill(0);
 
-      const [profilesRes, leadsRes, propertiesRes, vgvRes] = await Promise.allSettled([
+      const [profilesRes, leadsRes, propertiesRes, vgvRes, obraMaterialsRes] = await Promise.allSettled([
         supabase
           .from("profiles")
           .select("id, full_name, whatsapp, creci, status")
@@ -169,6 +179,10 @@ export default function AdminDashboardClient() {
           .from("standalone_properties")
           .select("price")
           .not("price", "is", null),
+        (supabase as any)
+          .from("obra_materials")
+          .select("id, status, unit_price, quantity")
+          .order("created_at", { ascending: false }),
       ]);
 
       if (profilesRes.status === "fulfilled") {
@@ -255,6 +269,19 @@ export default function AdminDashboardClient() {
           setVgvValue(sum);
         }
       }
+
+      if (obraMaterialsRes.status === "fulfilled") {
+        if (obraMaterialsRes.value.error) {
+          setObraMaterialsTotal(0);
+          setObraPendingDeliveries(0);
+        } else {
+          const mats = (obraMaterialsRes.value.data ?? []) as ObraMaterialRow[];
+          const total = mats.reduce((acc, m) => acc + (m.unit_price ?? 0) * (m.quantity ?? 0), 0);
+          const pending = mats.filter((m) => (m.status ?? "") !== "entregue").length;
+          setObraMaterialsTotal(total);
+          setObraPendingDeliveries(pending);
+        }
+      }
     } catch {
       console.log("Silenciando erro de auth");
       setRows([]);
@@ -265,6 +292,8 @@ export default function AdminDashboardClient() {
       setLeadsWeekCount(0);
       setLeadsWeekTrend([0, 0, 0, 0, 0, 0, 0]);
       setVgvValue(0);
+      setObraMaterialsTotal(0);
+      setObraPendingDeliveries(0);
       setTrafficBySource({
         meta: 0,
         google: 0,
@@ -354,6 +383,24 @@ export default function AdminDashboardClient() {
             {formatCurrencyBRL(vgvValue)}
           </div>
           <div className="mt-2 text-xs text-slate-500">Somatório dos preços de imóveis avulsos</div>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
+          <div className="text-sm font-medium text-slate-600">Obra: gastos (materiais)</div>
+          <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
+            {formatCurrencyBRL(obraMaterialsTotal)}
+          </div>
+          <div className="mt-2 text-xs text-slate-500">Somatório unitário x quantidade</div>
+        </div>
+
+        <div className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
+          <div className="text-sm font-medium text-slate-600">Obra: pendências de entrega</div>
+          <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
+            {obraPendingDeliveries}
+          </div>
+          <div className="mt-2 text-xs text-slate-500">Materiais ainda não entregues</div>
         </div>
       </section>
 
