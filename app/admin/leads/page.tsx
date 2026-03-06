@@ -614,134 +614,136 @@ export default function LeadsAdminPage() {
         </div>
 
         <div className="lg:col-span-8">
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-7">
-            {stages.map((stage) => {
-              const stageRows = filtered.filter((r) => r.stage === stage.key);
+          <div className="kanban-scroll -mx-2 overflow-x-auto px-2 pb-3">
+            <div className="flex min-w-max gap-6 pr-3">
+              {stages.map((stage) => {
+                const stageRows = filtered.filter((r) => r.stage === stage.key);
 
-              return (
-                <div
-                  key={stage.key}
-                  className="rounded-2xl bg-white p-4 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70"
-                >
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-sm font-semibold text-slate-900">{stage.label}</div>
-                      <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-slate-50 px-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200/70">
-                        {countsByStage[stage.key] ?? 0}
-                      </span>
-                    </div>
-                    <div className="text-xs text-slate-500">{stage.hint}</div>
-                  </div>
-
-                  <div className="mt-4 flex max-h-[68vh] flex-col gap-3 overflow-auto pr-1">
-                    {stageRows.length > 0 ? (
-                      stageRows.map((lead) => {
-                        const canMoveBack = lead.stage !== stages[0]!.key;
-                        const canMoveNext = lead.stage !== stages[stages.length - 1]!.key;
-
-                        return (
-                          <div
-                            key={lead.id}
-                            className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50/70"
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="truncate text-sm font-semibold text-slate-900">
-                                  {lead.full_name}
-                                </div>
-                                <div className="mt-1 text-xs text-slate-600">{lead.phone}</div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span
-                                  className={
-                                    "inline-flex items-center justify-center rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 " +
-                                    sourceBadgeCls(lead.source)
-                                  }
-                                >
-                                  {(lead.source ?? "Outros").slice(0, 18)}
-                                </span>
-                                <span
-                                  className={
-                                    "inline-flex items-center justify-center rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 " +
-                                    stageBadgeCls(lead.stage)
-                                  }
-                                >
-                                  {stage.label}
-                                </span>
-                              </div>
-                            </div>
-
-                            {lead.interest ? (
-                              <div className="mt-3 text-xs text-slate-700">
-                                <span className="font-semibold text-slate-900">Interesse:</span> {lead.interest}
-                              </div>
-                            ) : null}
-
-                            <div className="mt-3 flex items-center justify-between gap-2">
-                              <div className="flex min-w-0 flex-col gap-0.5">
-                                <div className="truncate text-[11px] text-slate-500">
-                                  Corretor: {(() => {
-                                    const id = lead.assigned_broker_profile_id ?? "";
-                                    if (!id) return "-";
-                                    const broker = brokerById.get(id);
-                                    return broker?.full_name ?? id;
-                                  })()}
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  disabled={!canMoveBack || movingLeadId === lead.id}
-                                  onClick={() => moveLead(lead.id, prevStage(lead.stage))}
-                                  className="inline-flex h-9 items-center justify-center rounded-xl bg-white px-3 text-xs font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                  <ArrowLeft className="h-4 w-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={!canMoveNext || movingLeadId === lead.id}
-                                  onClick={() => moveLead(lead.id, nextStage(lead.stage))}
-                                  className="inline-flex h-9 items-center justify-center rounded-xl bg-slate-900 px-3 text-xs font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                  <ArrowRight className="h-4 w-4" />
-                                </button>
-                              </div>
-                            </div>
-
-                            {(() => {
-                              const id = lead.assigned_broker_profile_id ?? "";
-                              const broker = id ? brokerById.get(id) : null;
-                              if (!broker) return null;
-                              const initials = formatInitials(broker.full_name ?? "");
-                              return (
-                                <div className="mt-3 flex items-center justify-between">
-                                  <div className="text-[11px] text-slate-500">Responsável</div>
-                                  {broker.avatar_url ? (
-                                    <img
-                                      src={broker.avatar_url}
-                                      alt={broker.full_name ?? "Corretor"}
-                                      className="h-8 w-8 rounded-full object-cover ring-1 ring-slate-200/70"
-                                    />
-                                  ) : (
-                                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-xs font-semibold text-slate-700 ring-1 ring-slate-200/70">
-                                      {initials}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })()}
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <div className="rounded-xl bg-slate-50 px-4 py-6 text-xs text-slate-600 ring-1 ring-slate-200/70">
-                        Sem leads nesta etapa.
+                return (
+                  <div
+                    key={stage.key}
+                    className="w-[300px] shrink-0 rounded-2xl bg-white p-5 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70 sm:w-[320px] lg:w-[340px]"
+                  >
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm font-semibold text-slate-900">{stage.label}</div>
+                        <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-slate-50 px-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200/70">
+                          {countsByStage[stage.key] ?? 0}
+                        </span>
                       </div>
-                    )}
+                      <div className="text-xs text-slate-500">{stage.hint}</div>
+                    </div>
+
+                    <div className="mt-4 flex max-h-[68vh] flex-col gap-3 overflow-auto pr-1">
+                      {stageRows.length > 0 ? (
+                        stageRows.map((lead) => {
+                          const canMoveBack = lead.stage !== stages[0]!.key;
+                          const canMoveNext = lead.stage !== stages[stages.length - 1]!.key;
+
+                          return (
+                            <div
+                              key={lead.id}
+                              className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50/70"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="truncate text-sm font-semibold text-slate-900">
+                                    {lead.full_name}
+                                  </div>
+                                  <div className="mt-1 text-xs text-slate-600">{lead.phone}</div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className={
+                                      "inline-flex items-center justify-center rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 " +
+                                      sourceBadgeCls(lead.source)
+                                    }
+                                  >
+                                    {(lead.source ?? "Outros").slice(0, 18)}
+                                  </span>
+                                  <span
+                                    className={
+                                      "inline-flex items-center justify-center rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 " +
+                                      stageBadgeCls(lead.stage)
+                                    }
+                                  >
+                                    {stage.label}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {lead.interest ? (
+                                <div className="mt-3 text-xs text-slate-700">
+                                  <span className="font-semibold text-slate-900">Interesse:</span> {lead.interest}
+                                </div>
+                              ) : null}
+
+                              <div className="mt-3 flex items-center justify-between gap-2">
+                                <div className="flex min-w-0 flex-col gap-0.5">
+                                  <div className="truncate text-[11px] text-slate-500">
+                                    Corretor: {(() => {
+                                      const id = lead.assigned_broker_profile_id ?? "";
+                                      if (!id) return "-";
+                                      const broker = brokerById.get(id);
+                                      return broker?.full_name ?? id;
+                                    })()}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={!canMoveBack || movingLeadId === lead.id}
+                                    onClick={() => moveLead(lead.id, prevStage(lead.stage))}
+                                    className="inline-flex h-9 items-center justify-center rounded-xl bg-white px-3 text-xs font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    <ArrowLeft className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={!canMoveNext || movingLeadId === lead.id}
+                                    onClick={() => moveLead(lead.id, nextStage(lead.stage))}
+                                    className="inline-flex h-9 items-center justify-center rounded-xl bg-slate-900 px-3 text-xs font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    <ArrowRight className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              {(() => {
+                                const id = lead.assigned_broker_profile_id ?? "";
+                                const broker = id ? brokerById.get(id) : null;
+                                if (!broker) return null;
+                                const initials = formatInitials(broker.full_name ?? "");
+                                return (
+                                  <div className="mt-3 flex items-center justify-between">
+                                    <div className="text-[11px] text-slate-500">Responsável</div>
+                                    {broker.avatar_url ? (
+                                      <img
+                                        src={broker.avatar_url}
+                                        alt={broker.full_name ?? "Corretor"}
+                                        className="h-8 w-8 rounded-full object-cover ring-1 ring-slate-200/70"
+                                      />
+                                    ) : (
+                                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-xs font-semibold text-slate-700 ring-1 ring-slate-200/70">
+                                        {initials}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="rounded-xl bg-slate-50 px-4 py-6 text-xs text-slate-600 ring-1 ring-slate-200/70">
+                          Sem leads nesta etapa.
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </div>
       </section>
