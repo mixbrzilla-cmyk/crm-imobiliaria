@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSupabaseClient } from "@/lib/supabaseClient";
-import { sendZApiTextMessage, verifyWhatsappWebhookClientKey } from "@/lib/whatsapp";
+import { sendZApiTextMessage } from "@/lib/whatsapp";
 
 export const dynamic = "force-dynamic";
 
@@ -51,16 +51,6 @@ export async function POST(req: Request) {
       },
       { status: 400 },
     );
-  }
-
-  const receivedClientKey = req.headers.get("x-client-key");
-  const allowed = verifyWhatsappWebhookClientKey({
-    expectedClientKey: settings?.client_key ?? null,
-    receivedClientKey,
-  });
-
-  if (!allowed) {
-    return NextResponse.json({ ok: false, error: "client_key inválido" }, { status: 401 });
   }
 
   try {

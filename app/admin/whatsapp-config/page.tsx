@@ -10,6 +10,7 @@ type SettingsRow = {
   instance_id: string | null;
   token: string | null;
   client_key: string | null;
+  official_number?: string | null;
   created_at?: string;
 };
 
@@ -18,6 +19,7 @@ type FormState = {
   instance_id: string;
   token: string;
   client_key: string;
+  official_number: string;
 };
 
 export default function WhatsAppConfigPage() {
@@ -33,6 +35,7 @@ export default function WhatsAppConfigPage() {
     instance_id: "",
     token: "",
     client_key: "",
+    official_number: "",
   });
 
   async function load() {
@@ -50,7 +53,7 @@ export default function WhatsAppConfigPage() {
     try {
       const res = await supabase
         .from("whatsapp_settings")
-        .select("api_base_url, instance_id, token, client_key, created_at")
+        .select("api_base_url, instance_id, token, client_key, official_number, created_at")
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -64,6 +67,7 @@ export default function WhatsAppConfigPage() {
           instance_id: row.instance_id ?? "",
           token: row.token ?? "",
           client_key: row.client_key ?? "",
+          official_number: row.official_number ?? "",
         });
       }
 
@@ -101,6 +105,7 @@ export default function WhatsAppConfigPage() {
         instance_id: form.instance_id.trim() ? form.instance_id.trim() : null,
         token: form.token.trim() ? form.token.trim() : null,
         client_key: form.client_key.trim() ? form.client_key.trim() : null,
+        official_number: form.official_number.trim() ? form.official_number.trim() : null,
       };
 
       const res = await (supabase as any).from("whatsapp_settings").insert({
@@ -199,6 +204,17 @@ export default function WhatsAppConfigPage() {
               value={form.client_key}
               onChange={(e) => setForm((s) => ({ ...s, client_key: e.target.value }))}
               placeholder="CLIENT_KEY"
+              className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
+              disabled={isLoading}
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 md:col-span-2">
+            <span className="text-xs font-semibold tracking-wide text-slate-600">Número Oficial (WhatsApp da empresa)</span>
+            <input
+              value={form.official_number}
+              onChange={(e) => setForm((s) => ({ ...s, official_number: e.target.value }))}
+              placeholder="Ex: 5591999999999"
               className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
               disabled={isLoading}
             />

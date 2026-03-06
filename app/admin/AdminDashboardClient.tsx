@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { getSupabaseClient } from "@/lib/supabaseClient";
@@ -33,6 +35,13 @@ type ObraMaterialRow = {
   status: string | null;
   unit_price: number | null;
   quantity: number | null;
+};
+
+type WhatsActivityLine = {
+  brokerName: string;
+  leadLabel: string;
+  count: number;
+  threadId: string;
 };
 
 function formatCurrencyBRL(value: number) {
@@ -120,6 +129,8 @@ export default function AdminDashboardClient() {
   });
   const [topProperties, setTopProperties] = useState<TopProperty[]>([]);
 
+  const [whatsActivityLines, setWhatsActivityLines] = useState<WhatsActivityLine[]>([]);
+
   const hasRows = useMemo(() => rows.length > 0, [rows.length]);
 
   const loadDashboard = useCallback(async () => {
@@ -160,7 +171,7 @@ export default function AdminDashboardClient() {
 
       const leadsDailyBuckets = new Array<number>(7).fill(0);
 
-      const [profilesRes, leadsRes, propertiesRes, vgvRes, obraMaterialsRes] = await Promise.allSettled([
+      const [profilesRes, leadsRes, propertiesRes, vgvRes, obraMaterialsRes, whatsRes] = await Promise.allSettled([
         supabase
           .from("profiles")
           .select("id, full_name, whatsapp, creci, status")
@@ -183,6 +194,16 @@ export default function AdminDashboardClient() {
           .from("obra_materials")
           .select("id, status, unit_price, quantity")
           .order("created_at", { ascending: false }),
+
+        // WhatsApp activity today (schema optional)
+        supabase
+          .from("chat_messages")
+          .select(
+            "id, thread_id, broker_id, direction, sender_type, sent_at, thread:chat_threads(contact_name, contact_number)",
+          )
+          .gte("sent_at", startOfToday.toISOString())
+          .order("sent_at", { ascending: false })
+          .limit(500),
       ]);
 
       if (profilesRes.status === "fulfilled") {
@@ -282,6 +303,66 @@ export default function AdminDashboardClient() {
           setObraPendingDeliveries(pending);
         }
       }
+
+      if (whatsRes.status === "fulfilled") {
+        if (whatsRes.value.error) {
+          console.log("[Dashboard] Erro ao carregar chat_messages:", whatsRes.value.error);
+          setWhatsActivityLines([]);
+        } else {
+          const msgRows = (whatsRes.value.data ?? []) as Array<any>;
+          const profilesById = new Map<string, Profile>();
+          if (profilesRes.status === "fulfilled" && !profilesRes.value.error) {
+            const allRows = (profilesRes.value.data ?? []) as Profile[];
+            for (const p of allRows) profilesById.set(p.id, p);
+          }
+
+          const bucket = new Map<string, { brokerId: string; brokerName: string; leadLabel: string; count: number; threadId: string }>();
+
+          for (const m of msgRows) {
+            const senderType = (m.sender_type ?? null) as string | null;
+            const brokerId = (m.broker_id ?? null) as string | null;
+            const direction = (m.direction ?? null) as string | null;
+
+            const isBrokerMessage = senderType
+              ? senderType === "broker"
+              : Boolean(brokerId) && direction === "out";
+            if (!isBrokerMessage) continue;
+            if (!brokerId) continue;
+
+            const thread = m.thread as { contact_name?: string | null; contact_number?: string | null } | null;
+            const leadLabel =
+              (thread?.contact_name ?? "").trim() || (thread?.contact_number ?? "").trim() || "Lead";
+
+            const brokerName = (profilesById.get(brokerId)?.full_name ?? "").trim() || "Corretor";
+            const key = `${brokerId}::${m.thread_id ?? ""}`;
+            const current = bucket.get(key);
+            if (current) {
+              current.count += 1;
+            } else {
+              bucket.set(key, {
+                brokerId,
+                brokerName,
+                leadLabel,
+                count: 1,
+                threadId: String(m.thread_id ?? ""),
+              });
+            }
+          }
+
+          const lines = Array.from(bucket.values())
+            .filter((l) => l.threadId)
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 8)
+            .map((l) => ({
+              brokerName: l.brokerName,
+              leadLabel: l.leadLabel,
+              count: l.count,
+              threadId: l.threadId,
+            }));
+
+          setWhatsActivityLines(lines);
+        }
+      }
     } catch {
       console.log("Silenciando erro de auth");
       setRows([]);
@@ -303,6 +384,7 @@ export default function AdminDashboardClient() {
         outros: 0,
       });
       setTopProperties([]);
+      setWhatsActivityLines([]);
     }
   }, [supabase]);
 
@@ -383,6 +465,43 @@ export default function AdminDashboardClient() {
             {formatCurrencyBRL(vgvValue)}
           </div>
           <div className="mt-2 text-xs text-slate-500">Somatório dos preços de imóveis avulsos</div>
+        </div>
+      </section>
+
+      <section className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
+        <div className="flex items-start justify-between gap-6">
+          <div>
+            <div className="text-sm font-semibold text-slate-900">Atividade dos Corretores (Hoje)</div>
+            <div className="mt-1 text-xs text-slate-500">
+              Mensagens enviadas via WhatsApp Business Central
+            </div>
+          </div>
+          <Link
+            href="/admin/whatsapp"
+            className="inline-flex h-11 items-center justify-center rounded-xl bg-[#001f3f] px-5 text-sm font-semibold text-white shadow-[0_6px_14px_-10px_rgba(15,23,42,0.45)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#001a33]"
+          >
+            Abrir Painel
+          </Link>
+        </div>
+
+        <div className="mt-5 flex flex-col gap-3">
+          {whatsActivityLines.length > 0 ? (
+            whatsActivityLines.map((l) => (
+              <Link
+                key={`${l.threadId}-${l.brokerName}`}
+                href={`/admin/whatsapp?thread=${encodeURIComponent(l.threadId)}`}
+                className="rounded-2xl bg-slate-50 px-5 py-4 text-sm text-slate-700 ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-white"
+              >
+                <span className="font-semibold text-slate-900">Corretor {l.brokerName}</span> enviou{" "}
+                <span className="font-semibold text-slate-900">{l.count}</span> mensagens para o Lead{" "}
+                <span className="font-semibold text-slate-900">{l.leadLabel}</span> hoje.
+              </Link>
+            ))
+          ) : (
+            <div className="rounded-2xl bg-slate-50 px-5 py-6 text-sm text-slate-600 ring-1 ring-slate-200/70">
+              Nenhuma atividade de WhatsApp registrada hoje.
+            </div>
+          )}
         </div>
       </section>
 
