@@ -5,10 +5,15 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
+  BadgeCheck,
+  ClipboardCheck,
+  FileText,
+  Handshake,
   Filter,
   MessageCircle,
   Phone,
   Plus,
+  Sparkles,
   RefreshCw,
   Search,
   Users,
@@ -544,10 +549,10 @@ export default function LeadsAdminPage() {
 
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         <div className="lg:col-span-4">
-          <div className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
+          <div className="flex h-full min-h-[560px] flex-col rounded-2xl bg-white p-6 shadow-[0_10px_30px_-20px_rgba(15,23,42,0.25)] ring-1 ring-[#E2E8F0]">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <div className="text-sm font-semibold text-slate-900">Novo lead</div>
+                <div className="text-sm font-semibold text-[#001f3f]">Novo lead</div>
                 <div className="mt-1 text-xs text-slate-500">Entrada padrão cai em “Recebido”.</div>
               </div>
               <button
@@ -560,7 +565,7 @@ export default function LeadsAdminPage() {
               </button>
             </div>
 
-            <form onSubmit={createLead} className="mt-5 flex flex-col gap-4">
+            <form onSubmit={createLead} className="mt-5 flex flex-1 flex-col gap-4">
               <label className="flex flex-col gap-2">
                 <span className="text-xs font-semibold tracking-wide text-slate-600">Nome</span>
                 <input
@@ -609,7 +614,7 @@ export default function LeadsAdminPage() {
               <button
                 type="submit"
                 disabled={isSaving}
-                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#ff0000] px-5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-1 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#ff0000] px-5 text-sm font-semibold text-white shadow-[0_10px_24px_-18px_rgba(255,0,0,0.55)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Plus className="h-4 w-4" />
                 {isSaving ? "Salvando..." : "Cadastrar"}
@@ -702,10 +707,10 @@ export default function LeadsAdminPage() {
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
             <div className="lg:col-span-8">
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                <div className="rounded-2xl bg-white p-5 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
+                <div className="flex min-h-[560px] flex-col rounded-2xl bg-white p-5 shadow-[0_10px_30px_-20px_rgba(15,23,42,0.25)] ring-1 ring-[#E2E8F0]">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <div className="text-sm font-semibold text-slate-900">Novo Lead</div>
+                      <div className="text-sm font-semibold text-[#001f3f]">Novo Lead</div>
                       <div className="mt-1 text-xs text-slate-500">Entrada e primeiro contato.</div>
                     </div>
                     <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-slate-50 px-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200/70">
@@ -713,7 +718,7 @@ export default function LeadsAdminPage() {
                     </span>
                   </div>
 
-                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="mt-4 grid flex-1 grid-cols-1 content-start gap-3 sm:grid-cols-2">
                     {receivedLeads.length > 0 ? (
                       receivedLeads.map((lead) => (
                         <button
@@ -749,17 +754,42 @@ export default function LeadsAdminPage() {
                         </button>
                       ))
                     ) : (
-                      <div className="rounded-xl bg-slate-50 px-4 py-6 text-xs text-slate-600 ring-1 ring-slate-200/70">
-                        Sem leads novos.
+                      <div className="col-span-full flex flex-1 items-center justify-center rounded-xl bg-slate-50 px-4 py-10 text-center ring-1 ring-slate-200/70">
+                        <div className="flex flex-col items-center gap-3">
+                          <svg
+                            width="46"
+                            height="46"
+                            viewBox="0 0 48 48"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="text-slate-300"
+                            aria-hidden="true"
+                          >
+                            <path
+                              d="M14 19.5C14 13.701 18.701 9 24.5 9C30.299 9 35 13.701 35 19.5C35 25.299 30.299 30 24.5 30C18.701 30 14 25.299 14 19.5Z"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            />
+                            <path
+                              d="M31.5 31.5L39 39"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                          <div className="text-xs font-semibold tracking-wide text-slate-500">
+                            Nenhum lead nesta etapa
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
                 </div>
 
-                <div className="rounded-2xl bg-white p-5 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
+                <div className="flex min-h-[560px] flex-col rounded-2xl bg-white p-5 shadow-[0_10px_30px_-20px_rgba(15,23,42,0.25)] ring-1 ring-[#E2E8F0]">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <div className="text-sm font-semibold text-slate-900">Em Atendimento</div>
+                      <div className="text-sm font-semibold text-[#001f3f]">Em Atendimento</div>
                       <div className="mt-1 text-xs text-slate-500">Diagnóstico e follow-up.</div>
                     </div>
                     <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-slate-50 px-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200/70">
@@ -767,7 +797,7 @@ export default function LeadsAdminPage() {
                     </span>
                   </div>
 
-                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="mt-4 grid flex-1 grid-cols-1 content-start gap-3 sm:grid-cols-2">
                     {atendimentoLeads.length > 0 ? (
                       atendimentoLeads.map((lead) => (
                         <button
@@ -830,8 +860,13 @@ export default function LeadsAdminPage() {
                         </button>
                       ))
                     ) : (
-                      <div className="rounded-xl bg-slate-50 px-4 py-6 text-xs text-slate-600 ring-1 ring-slate-200/70">
-                        Sem leads em atendimento.
+                      <div className="col-span-full flex flex-1 items-center justify-center rounded-xl bg-slate-50 px-4 py-10 text-center ring-1 ring-slate-200/70">
+                        <div className="flex flex-col items-center gap-3">
+                          <Sparkles className="h-10 w-10 text-slate-300" />
+                          <div className="text-xs font-semibold tracking-wide text-slate-500">
+                            Nenhum lead nesta etapa
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -840,26 +875,26 @@ export default function LeadsAdminPage() {
             </div>
 
             <div className="lg:col-span-4">
-              <div className="rounded-2xl bg-white p-5 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
+              <div className="flex min-h-[560px] flex-col rounded-2xl bg-white p-5 shadow-[0_10px_30px_-20px_rgba(15,23,42,0.25)] ring-1 ring-[#E2E8F0]">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <div className="text-sm font-semibold text-slate-900">Fluxo</div>
+                    <div className="text-sm font-semibold text-[#001f3f]">Fluxo</div>
                     <div className="mt-1 text-xs text-slate-500">
-                      Volume por etapa (lista compacta).
+                      Métricas por etapa (visão cockpit).
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-slate-50 p-2 ring-1 ring-slate-200/70">
+                <div className="mt-4 flex flex-col gap-2 rounded-2xl bg-slate-50 p-2 ring-1 ring-slate-200/70">
                   {(
                     [
-                      ["Qualificado", "qualificado"],
-                      ["Visita", "visita"],
-                      ["Proposta", "proposta"],
-                      ["Contrato", "contrato"],
-                      ["Vendido", "vendido"],
+                      [ClipboardCheck, "Qualificado", "qualificado"],
+                      [BadgeCheck, "Visita", "visita"],
+                      [FileText, "Proposta", "proposta"],
+                      [Handshake, "Contrato", "contrato"],
+                      [Sparkles, "Vendidos", "vendido"],
                     ] as const
-                  ).map(([label, key]) => {
+                  ).map(([Icon, label, key]) => {
                     const active = sideStage === key;
                     const count = countsByStage[key];
                     return (
@@ -868,14 +903,17 @@ export default function LeadsAdminPage() {
                         type="button"
                         onClick={() => setSideStage(key)}
                         className={
-                          "flex items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition-all duration-300 " +
+                          "flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-300 " +
                           (active
-                            ? "bg-white text-slate-900 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70"
-                            : "text-slate-600 hover:bg-white/70")
+                            ? "bg-white text-slate-900 shadow-[0_8px_18px_-16px_rgba(15,23,42,0.35)] ring-1 ring-slate-200/70"
+                            : "text-slate-700 hover:bg-white/70")
                         }
                       >
-                        <span className="truncate">{label}</span>
-                        <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-slate-50 px-2 text-[11px] text-slate-700 ring-1 ring-slate-200/70">
+                        <span className="flex min-w-0 items-center gap-2">
+                          <Icon className="h-4 w-4 text-slate-400" />
+                          <span className="truncate font-semibold">{label}</span>
+                        </span>
+                        <span className="text-sm font-semibold tabular-nums text-slate-900">
                           {count}
                         </span>
                       </button>
@@ -884,7 +922,7 @@ export default function LeadsAdminPage() {
                 </div>
 
                 <div className="mt-4 flex items-center justify-between">
-                  <div className="text-sm font-semibold text-slate-900">
+                  <div className="text-sm font-semibold text-[#001f3f]">
                     {(() => {
                       if (sideStage === "qualificado") return "Qualificados";
                       if (sideStage === "visita") return "Visitas";
@@ -896,7 +934,7 @@ export default function LeadsAdminPage() {
                   <div className="text-xs text-slate-500">{sideLeads.length}</div>
                 </div>
 
-                <div className="mt-4 flex max-h-[62vh] flex-col gap-2 overflow-auto pr-1">
+                <div className="mt-4 flex flex-1 flex-col gap-2 overflow-auto pr-1">
                   {sideLeads.length > 0 ? (
                     sideLeads.map((lead) => (
                       <button
@@ -924,8 +962,10 @@ export default function LeadsAdminPage() {
                       </button>
                     ))
                   ) : (
-                    <div className="rounded-xl bg-slate-50 px-4 py-6 text-xs text-slate-600 ring-1 ring-slate-200/70">
-                      Nenhum lead nesta etapa.
+                    <div className="flex flex-1 items-center justify-center rounded-xl bg-slate-50 px-4 py-10 text-center ring-1 ring-slate-200/70">
+                      <div className="text-xs font-semibold tracking-wide text-slate-500">
+                        Nenhum lead nesta etapa
+                      </div>
                     </div>
                   )}
                 </div>
