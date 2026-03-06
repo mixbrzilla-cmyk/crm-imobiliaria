@@ -28,13 +28,24 @@ export default function CadastroPage() {
     setIsSubmitting(true);
 
     try {
+      const id = crypto.randomUUID();
+
       const { error } = await supabase.from("profiles").insert({
+        id,
         full_name: form.full_name.trim(),
         whatsapp: form.whatsapp.trim(),
         creci: form.creci.trim(),
+        status: "pendente",
       });
 
       if (error) {
+        if (/null value in column\s+"id"/i.test(error.message)) {
+          setErrorMessage(
+            "Erro ao enviar cadastro: o sistema não conseguiu gerar um identificador. Tente novamente.",
+          );
+          return;
+        }
+
         setErrorMessage(error.message);
         return;
       }
