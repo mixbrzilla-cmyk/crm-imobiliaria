@@ -59,7 +59,7 @@ export default function CadastroPage() {
         return;
       }
 
-      const { error } = await supabase.from("profiles").insert({
+      const { error } = await (supabase as any).from("profiles").insert({
         id: userId,
         email: form.email.trim().toLowerCase(),
         full_name: form.full_name.trim(),

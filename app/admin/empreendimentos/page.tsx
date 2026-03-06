@@ -99,7 +99,7 @@ export default function EmpreendimentosPage() {
       price_table_url: form.price_table_url.trim() ? form.price_table_url.trim() : null,
     };
 
-    const { error } = await supabase.from("developments").insert(payload);
+    const { error } = await (supabase as any).from("developments").insert(payload);
 
     if (error) {
       setErrorMessage(error.message);

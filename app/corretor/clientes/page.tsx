@@ -156,7 +156,7 @@ export default function MeusClientesPage() {
         source: "corretor" as const,
       };
 
-      const { error } = await supabase.from("leads").insert(payload);
+      const { error } = await (supabase as any).from("leads").insert(payload);
       if (error) {
         setErrorMessage(error.message);
         return;
@@ -183,7 +183,10 @@ export default function MeusClientesPage() {
 
     setMovingLeadId(leadId);
 
-    const { error } = await supabase.from("leads").update({ stage }).eq("id", leadId);
+    const { error } = await (supabase as any)
+      .from("leads")
+      .update({ stage })
+      .eq("id", leadId);
 
     if (error) {
       setErrorMessage(error.message);

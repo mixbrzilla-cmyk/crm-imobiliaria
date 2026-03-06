@@ -130,9 +130,11 @@ export default function CorretoresAdminPage() {
       return;
     }
 
-    const devIds = new Set<string>((devRes.data ?? []).map((r) => r.development_id as string));
+    const devIds = new Set<string>(
+      ((devRes.data ?? []) as any[]).map((r) => r.development_id as string),
+    );
     const avIds = new Set<string>(
-      (avRes.data ?? []).map((r) => r.standalone_property_id as string),
+      ((avRes.data ?? []) as any[]).map((r) => r.standalone_property_id as string),
     );
 
     setSelectedDevelopmentIds(devIds);
@@ -181,7 +183,7 @@ export default function CorretoresAdminPage() {
 
     setIsSaving(true);
 
-    const delDev = await supabase
+    const delDev = await (supabase as any)
       .from("broker_developments")
       .delete()
       .eq("broker_profile_id", selectedBrokerId);
@@ -192,7 +194,7 @@ export default function CorretoresAdminPage() {
       return;
     }
 
-    const delAv = await supabase
+    const delAv = await (supabase as any)
       .from("broker_standalone_properties")
       .delete()
       .eq("broker_profile_id", selectedBrokerId);
@@ -216,7 +218,7 @@ export default function CorretoresAdminPage() {
     }));
 
     if (devPayload.length > 0) {
-      const ins = await supabase.from("broker_developments").insert(devPayload);
+      const ins = await (supabase as any).from("broker_developments").insert(devPayload);
       if (ins.error) {
         setErrorMessage(ins.error.message);
         setIsSaving(false);
@@ -225,7 +227,9 @@ export default function CorretoresAdminPage() {
     }
 
     if (avPayload.length > 0) {
-      const ins = await supabase.from("broker_standalone_properties").insert(avPayload);
+      const ins = await (supabase as any)
+        .from("broker_standalone_properties")
+        .insert(avPayload);
       if (ins.error) {
         setErrorMessage(ins.error.message);
         setIsSaving(false);

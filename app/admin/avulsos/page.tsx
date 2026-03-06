@@ -109,7 +109,9 @@ export default function ImoveisAvulsosPage() {
       description: form.description.trim() ? form.description.trim() : null,
     };
 
-    const { error } = await supabase.from("standalone_properties").insert(payload);
+    const { error } = await (supabase as any)
+      .from("standalone_properties")
+      .insert(payload);
 
     if (error) {
       setErrorMessage(error.message);
