@@ -3,8 +3,13 @@ export default function Home() {
     <div className="flex min-h-screen items-center justify-center bg-white px-6">
       <main className="flex w-full max-w-md flex-col items-center gap-10 py-16 text-center">
         <div className="flex flex-col items-center gap-3">
+          <img
+            src="/logo-imobiliaria-moderna.png"
+            alt="Imobiliária Moderna"
+            className="h-28 w-28 rounded-full object-cover ring-2 ring-[#1e3a8a]/10"
+          />
           <div className="text-3xl font-semibold tracking-tight text-[#1e3a8a]">
-            CRM Imobiliário
+            CRM Imobiliária Moderna
           </div>
           <div className="text-sm text-zinc-500">Portal da Imobiliária</div>
         </div>

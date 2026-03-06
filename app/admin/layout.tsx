@@ -26,8 +26,15 @@ export default function AdminLayout({
           <div className="text-[13px] font-semibold tracking-[0.18em] text-slate-200/90">
             PAINEL DE CONTROLE
           </div>
-          <div className="mt-2 text-xl font-semibold tracking-tight text-white">
-            CRM Imobiliário
+          <div className="mt-4 flex items-center gap-3">
+            <img
+              src="/logo-imobiliaria-moderna.png"
+              alt="Imobiliária Moderna"
+              className="h-10 w-10 rounded-full bg-white object-cover ring-2 ring-white/20"
+            />
+            <div className="text-xl font-semibold tracking-tight text-white">
+              CRM Imobiliária Moderna
+            </div>
           </div>
           <div className="mt-1 text-xs text-slate-200/70">
             Gestão operacional • Inventário • Corretores
