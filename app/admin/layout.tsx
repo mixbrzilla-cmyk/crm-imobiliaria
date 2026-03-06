@@ -28,7 +28,7 @@ export default function AdminLayout({
           </div>
           <div className="mt-4 flex items-center gap-3">
             <img
-              src="/logo-imobiliaria-moderna.png"
+              src="https://imobmoderna.com.br/wp-content/uploads/2026/03/Sem-Titulo-2-1024x1024-1.png"
               alt="Imobiliária Moderna"
               className="h-10 w-10 rounded-full bg-white object-cover ring-2 ring-white/20"
             />

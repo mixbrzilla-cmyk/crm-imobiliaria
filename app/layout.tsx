@@ -16,8 +16,8 @@ export const metadata: Metadata = {
   title: "CRM Imobiliária Moderna",
   description: "CRM Imobiliária Moderna",
   icons: {
-    icon: "/logo-imobiliaria-moderna.png",
-    apple: "/logo-imobiliaria-moderna.png",
+    icon: "https://imobmoderna.com.br/wp-content/uploads/2026/03/Sem-Titulo-2-1024x1024-1.png",
+    apple: "https://imobmoderna.com.br/wp-content/uploads/2026/03/Sem-Titulo-2-1024x1024-1.png",
   },
 };
 
