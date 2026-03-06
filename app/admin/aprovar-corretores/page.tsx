@@ -1,3 +1,5 @@
+"use client";
+
 export default function AprovarCorretoresPage() {
   return (
     <div className="flex w-full flex-col gap-2">

@@ -1,23 +1,10 @@
-"use client";
-
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 
 export default function AdminLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const pathname = usePathname();
-
-  const items = [
-    { href: "/admin", label: "Dashboard" },
-    { href: "/admin/empreendimentos", label: "Empreendimentos" },
-    { href: "/admin/avulsos", label: "Imóveis Avulsos" },
-    { href: "/admin/corretores", label: "Gestão de Corretores" },
-    { href: "/admin/leads", label: "Leads/Atendimento" },
-  ];
-
   return (
     <div className="min-h-screen bg-white">
       <aside className="fixed left-0 top-0 h-screen w-72 bg-[#1e3a8a] px-5 py-6 text-white">
@@ -27,24 +14,36 @@ export default function AdminLayout({
         </div>
 
         <nav className="flex flex-col gap-1">
-          {items.map((item) => {
-            const isActive = pathname === item.href;
-
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={
-                  "rounded-lg px-3 py-2 text-sm font-medium transition-colors " +
-                  (isActive
-                    ? "bg-white/15 text-white"
-                    : "text-white/90 hover:bg-white/10 hover:text-white")
-                }
-              >
-                {item.label}
-              </Link>
-            );
-          })}
+          <Link
+            href="/admin"
+            className="rounded-lg px-3 py-2 text-sm font-medium text-white/90 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            Dashboard
+          </Link>
+          <Link
+            href="/admin/empreendimentos"
+            className="rounded-lg px-3 py-2 text-sm font-medium text-white/90 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            Empreendimentos
+          </Link>
+          <Link
+            href="/admin/avulsos"
+            className="rounded-lg px-3 py-2 text-sm font-medium text-white/90 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            Imóveis Avulsos
+          </Link>
+          <Link
+            href="/admin/corretores"
+            className="rounded-lg px-3 py-2 text-sm font-medium text-white/90 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            Gestão de Corretores
+          </Link>
+          <Link
+            href="/admin/leads"
+            className="rounded-lg px-3 py-2 text-sm font-medium text-white/90 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            Leads/Atendimento
+          </Link>
         </nav>
       </aside>
 

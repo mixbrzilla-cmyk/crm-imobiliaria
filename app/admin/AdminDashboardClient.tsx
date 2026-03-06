@@ -17,7 +17,6 @@ export default function AdminDashboardClient() {
   const [rows, setRows] = useState<Profile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isAuthorizedOwner, setIsAuthorizedOwner] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [activeCount, setActiveCount] = useState<number>(0);
@@ -33,7 +32,6 @@ export default function AdminDashboardClient() {
       setErrorMessage(
         "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
       );
-      setIsAuthorizedOwner(false);
       setRows([]);
       setPendingCount(0);
       setActiveCount(0);
@@ -41,51 +39,6 @@ export default function AdminDashboardClient() {
       setIsLoading(false);
       return;
     }
-
-    const ownerEmail = (
-      process.env.NEXT_PUBLIC_OWNER_EMAIL ?? "imobmoderna2024@gmail.com"
-    ).toLowerCase();
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError) {
-      setErrorMessage(userError.message);
-      setIsAuthorizedOwner(false);
-      setRows([]);
-      setPendingCount(0);
-      setActiveCount(0);
-      setPropertiesCount(0);
-      setIsLoading(false);
-      return;
-    }
-
-    const currentEmail = (user?.email ?? "").toLowerCase();
-    if (!currentEmail) {
-      setErrorMessage("Você precisa entrar para acessar o admin.");
-      setIsAuthorizedOwner(false);
-      setRows([]);
-      setPendingCount(0);
-      setActiveCount(0);
-      setPropertiesCount(0);
-      setIsLoading(false);
-      return;
-    }
-
-    if (currentEmail !== ownerEmail) {
-      setErrorMessage("Acesso negado: esta área é exclusiva do dono.");
-      setIsAuthorizedOwner(false);
-      setRows([]);
-      setPendingCount(0);
-      setActiveCount(0);
-      setPropertiesCount(0);
-      setIsLoading(false);
-      return;
-    }
-
-    setIsAuthorizedOwner(true);
 
     const { data, error } = await supabase
       .from("profiles")
@@ -127,11 +80,6 @@ export default function AdminDashboardClient() {
       setErrorMessage(
         "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
       );
-      return;
-    }
-
-    if (!isAuthorizedOwner) {
-      setErrorMessage("Acesso negado: esta ação é exclusiva do dono.");
       return;
     }
 

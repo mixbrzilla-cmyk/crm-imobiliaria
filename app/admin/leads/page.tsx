@@ -1,3 +1,5 @@
+"use client";
+
 export default function LeadsAdminPage() {
   return (
     <div className="flex w-full flex-col gap-2">

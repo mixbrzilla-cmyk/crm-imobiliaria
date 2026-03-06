@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { getSupabaseClient } from "@/lib/supabaseClient";
 
@@ -28,7 +28,6 @@ export default function EmpreendimentosPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isAuthorizedOwner, setIsAuthorizedOwner] = useState(false);
 
   const [form, setForm] = useState<FormState>({
     name: "",
@@ -38,55 +37,14 @@ export default function EmpreendimentosPage() {
     price_table_url: "",
   });
 
-  const ownerEmail = useMemo(
-    () =>
-      (process.env.NEXT_PUBLIC_OWNER_EMAIL ?? "imobmoderna2024@gmail.com").toLowerCase(),
-    [],
-  );
-
-  async function guardOwner() {
-    if (!supabase) {
-      setErrorMessage(
-        "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
-      );
-      setIsAuthorizedOwner(false);
-      return false;
-    }
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError) {
-      setErrorMessage(userError.message);
-      setIsAuthorizedOwner(false);
-      return false;
-    }
-
-    const currentEmail = (user?.email ?? "").toLowerCase();
-    if (!currentEmail) {
-      setErrorMessage("Você precisa entrar para acessar o admin.");
-      setIsAuthorizedOwner(false);
-      return false;
-    }
-
-    if (currentEmail !== ownerEmail) {
-      setErrorMessage("Acesso negado: esta área é exclusiva do dono.");
-      setIsAuthorizedOwner(false);
-      return false;
-    }
-
-    setIsAuthorizedOwner(true);
-    return true;
-  }
-
   async function load() {
     setIsLoading(true);
     setErrorMessage(null);
 
-    const ok = await guardOwner();
-    if (!ok || !supabase) {
+    if (!supabase) {
+      setErrorMessage(
+        "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+      );
       setRows([]);
       setIsLoading(false);
       return;
@@ -125,11 +83,6 @@ export default function EmpreendimentosPage() {
       setErrorMessage(
         "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
       );
-      return;
-    }
-
-    if (!isAuthorizedOwner) {
-      setErrorMessage("Acesso negado: esta ação é exclusiva do dono.");
       return;
     }
 

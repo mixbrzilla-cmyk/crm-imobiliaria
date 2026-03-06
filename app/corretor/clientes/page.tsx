@@ -33,7 +33,8 @@ export default function MeusClientesPage() {
   const supabase = getSupabaseClient();
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [brokerId, setBrokerId] = useState<string | null>(null);
+  const [brokers, setBrokers] = useState<Array<{ id: string; full_name: string | null }>>([]);
+  const [brokerId, setBrokerId] = useState<string>("");
   const [leads, setLeads] = useState<LeadRow[]>([]);
   const [movingLeadId, setMovingLeadId] = useState<string | null>(null);
 
@@ -68,35 +69,43 @@ export default function MeusClientesPage() {
       setErrorMessage(
         "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
       );
-      setBrokerId(null);
+      setBrokers([]);
+      setBrokerId("");
       setLeads([]);
       setIsLoading(false);
       return;
     }
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    const brokersRes = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .eq("role", "broker")
+      .order("full_name", { ascending: true });
 
-    if (userError) {
-      setErrorMessage(userError.message);
+    if (brokersRes.error) {
+      setErrorMessage(brokersRes.error.message);
       setIsLoading(false);
       return;
     }
 
-    if (!user) {
-      setErrorMessage("Você precisa entrar para acessar essa área.");
+    const brokerRows = (brokersRes.data ?? []) as Array<{ id: string; full_name: string | null }>;
+    setBrokers(brokerRows);
+
+    const saved = window.localStorage.getItem("active_broker_profile_id") ?? "";
+    const initial = saved && brokerRows.some((b) => b.id === saved) ? saved : brokerRows[0]?.id ?? "";
+    setBrokerId(initial);
+    if (initial) window.localStorage.setItem("active_broker_profile_id", initial);
+
+    if (!initial) {
+      setLeads([]);
       setIsLoading(false);
       return;
     }
-
-    setBrokerId(user.id);
 
     const { data, error } = await supabase
       .from("leads")
       .select("id, owner_broker_profile_id, full_name, phone, interest, stage")
-      .eq("owner_broker_profile_id", user.id)
+      .eq("owner_broker_profile_id", initial)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -130,7 +139,7 @@ export default function MeusClientesPage() {
     }
 
     if (!brokerId) {
-      setErrorMessage("Você precisa entrar para cadastrar leads.");
+      setErrorMessage("Selecione um corretor para cadastrar leads.");
       return;
     }
 
@@ -216,17 +225,39 @@ export default function MeusClientesPage() {
       <div className="mx-auto w-full max-w-7xl px-6 py-8">
         {errorMessage ? (
           <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            {errorMessage} {errorMessage.includes("entrar") ? (
-              <Link className="ml-2 font-semibold underline" href="/login">
-                Ir para login
-              </Link>
-            ) : null}
+            {errorMessage}
           </div>
         ) : null}
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
           <div className="rounded-xl border border-zinc-200 bg-white p-5">
             <div className="text-sm font-semibold text-[#1e3a8a]">Novo lead</div>
+
+            <label className="mt-4 flex flex-col gap-2">
+              <span className="text-xs font-medium text-zinc-600">Corretor</span>
+              <select
+                className="h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/20"
+                value={brokerId}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setBrokerId(next);
+                  window.localStorage.setItem("active_broker_profile_id", next);
+                  void load();
+                }}
+                disabled={isLoading || brokers.length === 0}
+              >
+                {brokers.length === 0 ? (
+                  <option value="">Nenhum corretor encontrado</option>
+                ) : (
+                  brokers.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.full_name ?? b.id}
+                    </option>
+                  ))
+                )}
+              </select>
+            </label>
+
             <form className="mt-4 flex flex-col gap-3" onSubmit={criarLead}>
               <label className="flex flex-col gap-2">
                 <span className="text-xs font-medium text-zinc-600">Nome</span>
@@ -260,7 +291,7 @@ export default function MeusClientesPage() {
 
               <button
                 type="submit"
-                disabled={isLoading || isCreating}
+                disabled={isLoading || isCreating || !brokerId}
                 className="mt-2 inline-flex h-10 items-center justify-center rounded-lg bg-[#dc2626] px-4 text-sm font-semibold text-white hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isCreating ? "Cadastrando..." : "Cadastrar"}

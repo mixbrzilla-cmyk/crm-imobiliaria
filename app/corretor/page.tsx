@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { getSupabaseClient } from "@/lib/supabaseClient";
 
@@ -16,7 +16,13 @@ export default function CorretorHomePage() {
   const supabase = getSupabaseClient();
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [brokers, setBrokers] = useState<Profile[]>([]);
+  const [selectedBrokerId, setSelectedBrokerId] = useState<string>("");
+
+  const selectedBroker = useMemo(
+    () => brokers.find((b) => b.id === selectedBrokerId) ?? null,
+    [brokers, selectedBrokerId],
+  );
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -28,24 +34,8 @@ export default function CorretorHomePage() {
           setErrorMessage(
             "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
           );
-          setProfile(null);
-          setIsLoading(false);
-          return;
-        }
-
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser();
-
-        if (userError) {
-          setErrorMessage(userError.message);
-          setIsLoading(false);
-          return;
-        }
-
-        if (!user) {
-          setErrorMessage("Você precisa entrar para acessar essa área.");
+          setBrokers([]);
+          setSelectedBrokerId("");
           setIsLoading(false);
           return;
         }
@@ -53,17 +43,23 @@ export default function CorretorHomePage() {
         const { data, error } = await supabase
           .from("profiles")
           .select("id, full_name, status, role")
-          .eq("id", user.id)
-          .maybeSingle();
+          .eq("role", "broker")
+          .order("full_name", { ascending: true });
 
         if (error) {
           setErrorMessage(error.message);
-          setProfile(null);
+          setBrokers([]);
           setIsLoading(false);
           return;
         }
 
-        setProfile((data as Profile | null) ?? null);
+        const rows = (data ?? []) as Profile[];
+        setBrokers(rows);
+
+        const saved = window.localStorage.getItem("active_broker_profile_id") ?? "";
+        const initial = saved && rows.some((r) => r.id === saved) ? saved : rows[0]?.id ?? "";
+        setSelectedBrokerId(initial);
+        if (initial) window.localStorage.setItem("active_broker_profile_id", initial);
         setIsLoading(false);
       })();
     }, 0);
@@ -71,10 +67,9 @@ export default function CorretorHomePage() {
     return () => clearTimeout(timeoutId);
   }, []);
 
-  async function sair() {
-    if (!supabase) return;
-    await supabase.auth.signOut();
-    window.location.href = "/login";
+  function onChangeBroker(nextId: string) {
+    setSelectedBrokerId(nextId);
+    window.localStorage.setItem("active_broker_profile_id", nextId);
   }
 
   return (
@@ -93,13 +88,6 @@ export default function CorretorHomePage() {
             >
               Meus Clientes
             </Link>
-            <button
-              type="button"
-              onClick={() => void sair()}
-              className="inline-flex h-10 items-center justify-center rounded-lg bg-[#dc2626] px-4 text-sm font-semibold text-white hover:opacity-95"
-            >
-              Sair
-            </button>
           </div>
         </div>
       </div>
@@ -111,29 +99,42 @@ export default function CorretorHomePage() {
           </div>
         ) : errorMessage ? (
           <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">
-            {errorMessage} {errorMessage.includes("entrar") ? (
-              <span>
-                <Link className="ml-2 font-semibold underline" href="/login">
-                  Ir para login
-                </Link>
-              </span>
-            ) : null}
-          </div>
-        ) : profile && profile.status !== "ativo" ? (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-6">
-            <div className="text-lg font-semibold text-[#1e3a8a]">Acesso pendente</div>
-            <div className="mt-1 text-sm text-zinc-700">
-              Seu cadastro foi recebido e está aguardando aprovação do dono.
-            </div>
+            {errorMessage}
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
             <div className="rounded-xl border border-zinc-200 bg-white p-6 md:col-span-2">
-              <div className="text-lg font-semibold text-[#1e3a8a]">
-                Bem-vindo{profile?.full_name ? `, ${profile.full_name}` : ""}
-              </div>
+              <div className="text-lg font-semibold text-[#1e3a8a]">Área Operacional</div>
               <div className="mt-1 text-sm text-zinc-600">
-                Aqui você vai gerenciar seus clientes e o funil de vendas.
+                Selecione o corretor para operar e acesse o Kanban de clientes.
+              </div>
+
+              <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="flex flex-col gap-2">
+                  <span className="text-xs font-medium text-zinc-600">Corretor</span>
+                  <select
+                    className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/20"
+                    value={selectedBrokerId}
+                    onChange={(e) => onChangeBroker(e.target.value)}
+                    disabled={brokers.length === 0}
+                  >
+                    {brokers.length === 0 ? (
+                      <option value="">Nenhum corretor encontrado</option>
+                    ) : (
+                      brokers.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.full_name ?? b.id}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </label>
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3">
+                  <div className="text-xs font-medium text-zinc-600">Status</div>
+                  <div className="mt-1 text-sm font-semibold text-zinc-900">
+                    {selectedBroker?.status ?? "-"}
+                  </div>
+                </div>
               </div>
 
               <div className="mt-5 flex flex-wrap gap-3">
