@@ -191,7 +191,7 @@ export default function AdminPage() {
                         type="button"
                         onClick={() => liberarAcesso(row.id)}
                         disabled={updatingId === row.id}
-                        className="inline-flex h-10 items-center justify-center rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="inline-flex h-10 items-center justify-center rounded-lg bg-green-600 px-4 text-sm font-semibold text-white transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {updatingId === row.id ? "Liberando..." : "Liberar Acesso"}
                       </button>
@@ -207,10 +207,6 @@ export default function AdminPage() {
               )}
             </tbody>
           </table>
-        </div>
-
-        <div className="text-xs text-zinc-500">
-          Fundo branco. Menu azul escuro. Ações de sucesso em verde.
         </div>
       </section>
     </div>
