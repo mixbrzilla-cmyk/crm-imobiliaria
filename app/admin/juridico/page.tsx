@@ -483,7 +483,7 @@ export default function JuridicoAdminPage() {
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-red px-5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#ff0000] px-5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Plus className="h-4 w-4" />
                   {isSaving ? "Salvando..." : "Adicionar"}
@@ -558,7 +558,7 @@ export default function JuridicoAdminPage() {
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-blue px-5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#001a33] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#001f3f] px-5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#001a33] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Plus className="h-4 w-4" />
                   {isSaving ? "Salvando..." : "Adicionar"}
@@ -671,7 +671,7 @@ export default function JuridicoAdminPage() {
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-red px-5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#ff0000] px-5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Plus className="h-4 w-4" />
                   {isSaving ? "Salvando..." : "Adicionar"}
@@ -725,7 +725,7 @@ export default function JuridicoAdminPage() {
                             href={l.meeting_link}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-brand-blue px-3 text-xs font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:bg-[#001a33]"
+                            className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-[#001f3f] px-3 text-xs font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:bg-[#001a33]"
                           >
                             <LinkIcon className="h-4 w-4" />
                             Chamada
@@ -827,7 +827,7 @@ export default function JuridicoAdminPage() {
                             href={c.meeting_link}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-brand-blue px-3 text-xs font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:bg-[#001a33]"
+                            className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-[#001f3f] px-3 text-xs font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:bg-[#001a33]"
                           >
                             <LinkIcon className="h-4 w-4" />
                             Chamada

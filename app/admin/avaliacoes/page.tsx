@@ -521,7 +521,7 @@ export default function AvaliacoesAdminPage() {
                   <button
                     type="submit"
                     disabled={isSaving}
-                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-red px-5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#ff0000] px-5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <Plus className="h-4 w-4" />
                     {isSaving ? "Salvando..." : "Adicionar"}
@@ -568,7 +568,7 @@ export default function AvaliacoesAdminPage() {
                       <button
                         type="button"
                         onClick={() => exportPdf(r)}
-                        className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-brand-blue px-3 text-xs font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:bg-[#001a33]"
+                        className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-[#001f3f] px-3 text-xs font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:bg-[#001a33]"
                       >
                         <FileDown className="h-4 w-4" />
                         Exportar PDF
@@ -578,7 +578,7 @@ export default function AvaliacoesAdminPage() {
                         type="button"
                         onClick={() => void publishToCatalog(r)}
                         disabled={publishingId === r.id || !!r.published_property_id}
-                        className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-brand-red px-3 text-xs font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60"
+                        className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-[#ff0000] px-3 text-xs font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         <Send className="h-4 w-4" />
                         {r.published_property_id ? "Publicado" : publishingId === r.id ? "Publicando..." : "Publicar no Catálogo"}

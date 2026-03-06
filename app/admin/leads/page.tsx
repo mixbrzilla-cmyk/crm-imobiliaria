@@ -609,7 +609,7 @@ export default function LeadsAdminPage() {
               <button
                 type="submit"
                 disabled={isSaving}
-                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-red px-5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#ff0000] px-5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Plus className="h-4 w-4" />
                 {isSaving ? "Salvando..." : "Cadastrar"}
@@ -690,7 +690,7 @@ export default function LeadsAdminPage() {
                 type="button"
                 onClick={() => void distributeUnassigned()}
                 disabled={isDistributing}
-                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-blue px-5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#001a33] disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#001f3f] px-5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#001a33] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isDistributing ? "Distribuindo..." : "Distribuir leads sem corretor"}
               </button>
@@ -1017,7 +1017,7 @@ export default function LeadsAdminPage() {
                     type="button"
                     disabled={movingLeadId === selectedLead.id}
                     onClick={() => void setLeadStage(selectedLead.id, nextStage(selectedLead.stage))}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-brand-blue px-4 text-sm font-semibold text-white shadow-[0_6px_16px_-10px_rgba(15,23,42,0.45)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#001a33] disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-[#001f3f] px-4 text-sm font-semibold text-white shadow-[0_6px_16px_-10px_rgba(15,23,42,0.45)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#001a33] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     Avançar
                     <ArrowRight className="h-4 w-4" />
