@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   BadgeCheck,
@@ -136,10 +136,18 @@ export default function InventarioImoveisPage() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
+
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = useCallback((message: string) => {
+    setToastMessage(message);
+    window.setTimeout(() => setToastMessage(null), 8000);
+  }, []);
+
   const [updatingFieldByRowId, setUpdatingFieldByRowId] = useState<Record<string, "corretor" | "premium" | null>>(
     {},
   );
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [brokers, setBrokers] = useState<BrokerProfile[]>([]);
 
@@ -481,7 +489,16 @@ export default function InventarioImoveisPage() {
     try {
       const { error } = await (supabase as any).from("properties").delete().eq("id", id);
       if (error) {
-        setErrorMessage(error.message);
+        const code = (error as any)?.code;
+        const details = (error as any)?.details;
+        const hint = (error as any)?.hint;
+        const message = String(error.message ?? "Erro ao excluir.");
+        console.error("[Inventário] DELETE properties falhou", { id, code, details, hint, message, error });
+        const full = [message, code ? `code=${code}` : null, details ? `details=${details}` : null, hint ? `hint=${hint}` : null]
+          .filter(Boolean)
+          .join(" | ");
+        setErrorMessage(full);
+        showToast(full);
         setIsDeletingId(null);
         return;
       }
@@ -490,7 +507,9 @@ export default function InventarioImoveisPage() {
       if (selectedId === id) resetForm();
       setIsDeletingId(null);
     } catch {
+      console.error("[Inventário] DELETE properties falhou (exception)", { id });
       setErrorMessage("Não foi possível excluir o imóvel agora.");
+      showToast("Não foi possível excluir o imóvel agora.");
       setIsDeletingId(null);
     }
   }
@@ -519,7 +538,13 @@ export default function InventarioImoveisPage() {
   ];
 
   return (
-    <div className="flex w-full flex-col gap-8">
+    <div className="flex w-full flex-col gap-10">
+      {toastMessage ? (
+        <div className="fixed right-6 top-6 z-50 max-w-[520px] rounded-2xl bg-rose-600 px-5 py-4 text-sm font-semibold text-white shadow-[0_16px_40px_-24px_rgba(0,0,0,0.55)]">
+          {toastMessage}
+        </div>
+      ) : null}
+
       <header className="flex flex-col gap-2">
         <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">
           INVENTÁRIO UNIFICADO
