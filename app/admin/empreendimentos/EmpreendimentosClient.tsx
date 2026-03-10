@@ -31,6 +31,8 @@ type Development = {
   city?: string | null;
   localidade?: string | null;
 
+  is_premium?: boolean | null;
+
   status?: DevelopmentStatus | null;
   lot_value?: number | null;
   preco?: number | null;
@@ -62,6 +64,7 @@ type FormState = {
   name: string;
   city: string;
   corretor_id: string;
+  is_premium: boolean;
 
   status: DevelopmentStatus;
   lot_value: string;
@@ -169,6 +172,7 @@ export default function EmpreendimentosClient() {
     name: "",
     city: "Marabá",
     corretor_id: "",
+    is_premium: false,
     status: "pre_lancamento",
     lot_value: "",
     total_area_m2: "",
@@ -192,6 +196,7 @@ export default function EmpreendimentosClient() {
       name: "",
       city: "Marabá",
       corretor_id: "",
+      is_premium: false,
       status: "pre_lancamento",
       lot_value: "",
       total_area_m2: "",
@@ -216,6 +221,7 @@ export default function EmpreendimentosClient() {
       name: row.name ?? "",
       city: row.city ?? "Marabá",
       corretor_id: row.corretor_id ?? "",
+      is_premium: Boolean(row.is_premium),
       status: (row.status ?? "pre_lancamento") as DevelopmentStatus,
       lot_value:
         typeof row.lot_value === "number"
@@ -255,7 +261,7 @@ export default function EmpreendimentosClient() {
       const res = await supabase
         .from("developments")
         .select(
-          "id, name, cover_url, video_url, sales_material_url, price_table_url, city, localidade, status, lot_value, preco, total_area_m2, lots_count, green_area_m2, infra_asphalt, infra_power, infra_water, infra_sewage, gallery_urls, corretor_id, created_at",
+          "id, name, cover_url, video_url, sales_material_url, price_table_url, city, localidade, is_premium, status, lot_value, preco, total_area_m2, lots_count, green_area_m2, infra_asphalt, infra_power, infra_water, infra_sewage, gallery_urls, corretor_id, created_at",
         )
         .order("created_at", { ascending: false });
 
@@ -420,6 +426,7 @@ export default function EmpreendimentosClient() {
       ...basePayload,
       city: form.city.trim() ? form.city.trim() : null,
       corretor_id: form.corretor_id.trim() ? form.corretor_id.trim() : null,
+      is_premium: form.is_premium,
       status: form.status,
       lot_value: parseBRLInputToNumber(form.lot_value),
       total_area_m2: parseOptionalNumber(form.total_area_m2),
@@ -576,6 +583,16 @@ export default function EmpreendimentosClient() {
                         </option>
                       ))}
                     </select>
+                  </label>
+
+                  <label className="flex items-center gap-3 rounded-xl bg-white px-4 py-3 text-sm text-slate-900 ring-1 ring-slate-200/70">
+                    <input
+                      type="checkbox"
+                      checked={form.is_premium}
+                      onChange={(e) => setForm((s) => ({ ...s, is_premium: e.target.checked }))}
+                      className="h-4 w-4"
+                    />
+                    <span className="text-sm">Marcar como Imóvel Premium (Destaque Dashboard)</span>
                   </label>
 
                   <label className="flex flex-col gap-2">

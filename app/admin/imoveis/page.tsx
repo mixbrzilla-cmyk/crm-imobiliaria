@@ -32,6 +32,7 @@ type PropertyRow = {
   property_type: string | null;
   purpose: PropertyPurpose | null;
   price: number | null;
+  is_premium?: boolean | null;
   corretor_id?: string | null;
   neighborhood: string | null;
   city: string | null;
@@ -55,6 +56,7 @@ type FormState = {
   neighborhood: string;
   city: string;
   corretor_id: string;
+  is_premium: boolean;
   bedrooms: string;
   suites: string;
   bathrooms: string;
@@ -133,6 +135,9 @@ export default function InventarioImoveisPage() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
+  const [updatingFieldByRowId, setUpdatingFieldByRowId] = useState<Record<string, "corretor" | "premium" | null>>(
+    {},
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [brokers, setBrokers] = useState<BrokerProfile[]>([]);
@@ -145,6 +150,7 @@ export default function InventarioImoveisPage() {
     neighborhood: "",
     city: "",
     corretor_id: "",
+    is_premium: false,
     bedrooms: "",
     suites: "",
     bathrooms: "",
@@ -171,7 +177,7 @@ export default function InventarioImoveisPage() {
       const { data, error } = await supabase
         .from("properties")
         .select(
-          "id, title, property_type, purpose, price, corretor_id, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description, created_at",
+          "id, title, property_type, purpose, price, is_premium, corretor_id, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description, created_at",
         )
         .order("created_at", { ascending: false });
 
@@ -187,7 +193,7 @@ export default function InventarioImoveisPage() {
         const { data, error } = await supabase
           .from("properties")
           .select(
-            "id, title, property_type, purpose, price, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description, created_at",
+            "id, title, property_type, purpose, price, is_premium, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description, created_at",
           )
           .order("created_at", { ascending: false });
         if (error) {
@@ -248,6 +254,70 @@ export default function InventarioImoveisPage() {
     void loadBrokers();
   }, []);
 
+  async function updateCorretorInline(rowId: string, brokerId: string) {
+    setErrorMessage(null);
+
+    if (!supabase) {
+      setErrorMessage(
+        "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+      );
+      return;
+    }
+
+    setUpdatingFieldByRowId((c) => ({ ...c, [rowId]: "corretor" }));
+    setRows((current) => current.map((r) => (r.id === rowId ? { ...r, corretor_id: brokerId || null } : r)));
+
+    try {
+      const { error } = await (supabase as any)
+        .from("properties")
+        .update({ corretor_id: brokerId || null })
+        .eq("id", rowId);
+
+      if (error) {
+        setErrorMessage(error.message);
+        await load();
+        return;
+      }
+    } catch {
+      setErrorMessage("Não foi possível salvar o corretor agora.");
+      await load();
+    } finally {
+      setUpdatingFieldByRowId((c) => ({ ...c, [rowId]: null }));
+    }
+  }
+
+  async function updatePremiumInline(rowId: string, nextValue: boolean) {
+    setErrorMessage(null);
+
+    if (!supabase) {
+      setErrorMessage(
+        "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+      );
+      return;
+    }
+
+    setUpdatingFieldByRowId((c) => ({ ...c, [rowId]: "premium" }));
+    setRows((current) => current.map((r) => (r.id === rowId ? { ...r, is_premium: nextValue } : r)));
+
+    try {
+      const { error } = await (supabase as any)
+        .from("properties")
+        .update({ is_premium: nextValue })
+        .eq("id", rowId);
+
+      if (error) {
+        setErrorMessage(error.message);
+        await load();
+        return;
+      }
+    } catch {
+      setErrorMessage("Não foi possível salvar o premium agora.");
+      await load();
+    } finally {
+      setUpdatingFieldByRowId((c) => ({ ...c, [rowId]: null }));
+    }
+  }
+
   function resetForm() {
     setSelectedId(null);
     setActiveTab("basicos");
@@ -259,6 +329,7 @@ export default function InventarioImoveisPage() {
       neighborhood: "",
       city: "",
       corretor_id: "",
+      is_premium: false,
       bedrooms: "",
       suites: "",
       bathrooms: "",
@@ -283,6 +354,7 @@ export default function InventarioImoveisPage() {
       neighborhood: row.neighborhood ?? "",
       city: row.city ?? "",
       corretor_id: row.corretor_id ?? "",
+      is_premium: Boolean(row.is_premium),
       bedrooms: row.bedrooms != null ? String(row.bedrooms) : "",
       suites: row.suites != null ? String(row.suites) : "",
       bathrooms: row.bathrooms != null ? String(row.bathrooms) : "",
@@ -320,6 +392,7 @@ export default function InventarioImoveisPage() {
       purpose: form.purpose,
       price: parseBRLInputToNumber(form.price),
       corretor_id: form.corretor_id.trim() ? form.corretor_id.trim() : null,
+      is_premium: form.is_premium,
       neighborhood: form.neighborhood.trim() ? form.neighborhood.trim() : null,
       city: form.city.trim() ? form.city.trim() : null,
       bedrooms: parseOptionalInt(form.bedrooms),
@@ -543,27 +616,7 @@ export default function InventarioImoveisPage() {
                         <option value="locacao">Locação</option>
                       </select>
                     </label>
-                  </div>
 
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs font-semibold tracking-wide text-slate-600">
-                      Corretor Responsável
-                    </span>
-                    <select
-                      value={form.corretor_id}
-                      onChange={(e) => setForm((s) => ({ ...s, corretor_id: e.target.value }))}
-                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
-                    >
-                      <option value="">Sem corretor</option>
-                      {brokers.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.full_name ?? b.id}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <label className="flex flex-col gap-2">
                       <span className="text-xs font-semibold tracking-wide text-slate-600">
                         Preço
@@ -796,6 +849,12 @@ export default function InventarioImoveisPage() {
                       Preço
                     </th>
                     <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">
+                      Corretor
+                    </th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">
+                      Premium
+                    </th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">
                       Status
                     </th>
                     <th className="px-5 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">
@@ -824,6 +883,35 @@ export default function InventarioImoveisPage() {
                         <td className="px-5 py-4 text-sm font-semibold text-slate-900">
                           {typeof r.price === "number" ? formatCurrencyBRL(r.price) : "-"}
                         </td>
+                        <td className="px-5 py-4 text-sm text-slate-900">
+                          <select
+                            value={r.corretor_id ?? ""}
+                            onChange={(e) => void updateCorretorInline(r.id, e.target.value)}
+                            disabled={updatingFieldByRowId[r.id] === "corretor"}
+                            className="h-10 w-56 rounded-xl bg-white px-3 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10 disabled:cursor-not-allowed disabled:bg-slate-50"
+                          >
+                            <option value="">Sem corretor</option>
+                            {brokers.map((b) => (
+                              <option key={b.id} value={b.id}>
+                                {b.full_name ?? b.id}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-5 py-4 text-sm text-slate-900">
+                          <label className="inline-flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(r.is_premium)}
+                              onChange={(e) => void updatePremiumInline(r.id, e.target.checked)}
+                              disabled={updatingFieldByRowId[r.id] === "premium"}
+                              className="h-4 w-4"
+                            />
+                            <span className="text-xs text-slate-600">
+                              {updatingFieldByRowId[r.id] === "premium" ? "Salvando..." : ""}
+                            </span>
+                          </label>
+                        </td>
                         <td className="px-5 py-4">
                           <Badge status={(r.status ?? "disponivel") as PropertyStatus} />
                         </td>
@@ -850,7 +938,7 @@ export default function InventarioImoveisPage() {
                     ))
                   ) : (
                     <tr>
-                      <td className="px-5 py-10 text-sm text-slate-600" colSpan={5}>
+                      <td className="px-5 py-10 text-sm text-slate-600" colSpan={7}>
                         Nenhum imóvel cadastrado.
                       </td>
                     </tr>

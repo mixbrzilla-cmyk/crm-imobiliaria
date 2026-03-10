@@ -14,6 +14,7 @@ type StandaloneProperty = {
   address: string | null;
   photos_urls: string[] | null;
   description: string | null;
+  is_premium?: boolean | null;
   corretor_id?: string | null;
   created_at?: string;
 };
@@ -32,6 +33,7 @@ type FormState = {
   price: string;
   address: string;
   corretor_id: string;
+  is_premium: boolean;
   photos_urls: string;
   description: string;
 };
@@ -59,6 +61,7 @@ export default function ImoveisAvulsosPage() {
     price: "",
     address: "",
     corretor_id: "",
+    is_premium: false,
     photos_urls: "",
     description: "",
   });
@@ -79,7 +82,7 @@ export default function ImoveisAvulsosPage() {
     const res = await supabase
       .from("standalone_properties")
       .select(
-        "id, property_type, purpose, price, address, photos_urls, description, corretor_id, created_at",
+        "id, property_type, purpose, price, address, photos_urls, description, is_premium, corretor_id, created_at",
       )
       .order("created_at", { ascending: false });
 
@@ -224,6 +227,7 @@ export default function ImoveisAvulsosPage() {
       price: Number.isFinite(normalizedPrice as number) ? normalizedPrice : null,
       address: form.address.trim() ? form.address.trim() : null,
       corretor_id: form.corretor_id.trim() ? form.corretor_id.trim() : null,
+      is_premium: form.is_premium,
       photos_urls: photos.length ? photos : null,
       description: form.description.trim() ? form.description.trim() : null,
     };
@@ -244,6 +248,7 @@ export default function ImoveisAvulsosPage() {
       price: "",
       address: "",
       corretor_id: "",
+      is_premium: false,
       photos_urls: "",
       description: "",
     });
@@ -341,6 +346,16 @@ export default function ImoveisAvulsosPage() {
             </select>
           </label>
 
+          <label className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-900 md:col-span-2">
+            <input
+              type="checkbox"
+              checked={form.is_premium}
+              onChange={(e) => setForm((s) => ({ ...s, is_premium: e.target.checked }))}
+              className="h-4 w-4"
+            />
+            <span className="text-sm">Marcar como Imóvel Premium (Destaque Dashboard)</span>
+          </label>
+
           <label className="flex flex-col gap-2 md:col-span-2">
             <span className="text-xs font-medium text-zinc-600">Fotos (1 URL por linha)</span>
             <textarea
@@ -384,13 +399,14 @@ export default function ImoveisAvulsosPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-[#1e3a8a]">Finalidade</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-[#1e3a8a]">Preço</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-[#1e3a8a]">Endereço</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-[#1e3a8a]">Premium</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-[#1e3a8a]">Enviar ao Corretor</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td className="px-4 py-6 text-sm text-zinc-600" colSpan={5}>
+                  <td className="px-4 py-6 text-sm text-zinc-600" colSpan={6}>
                     Carregando...
                   </td>
                 </tr>
@@ -403,6 +419,7 @@ export default function ImoveisAvulsosPage() {
                       {typeof r.price === "number" ? r.price.toLocaleString("pt-BR") : "-"}
                     </td>
                     <td className="px-4 py-4 text-sm text-zinc-900">{r.address ?? "-"}</td>
+                    <td className="px-4 py-4 text-sm text-zinc-900">{r.is_premium ? "Sim" : "-"}</td>
                     <td className="px-4 py-4 text-sm">
                       <div className="flex flex-col gap-2">
                         <div className="flex items-center gap-2">
@@ -439,21 +456,22 @@ export default function ImoveisAvulsosPage() {
                             </span>
                           </div>
                         ) : null}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td className="px-4 py-6 text-sm text-zinc-600" colSpan={5}>
-                    Nenhum imóvel avulso cadastrado.
+                    </div>
                   </td>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </div>
-  );
+              ))
+            ) : (
+              <tr>
+                <td className="px-4 py-6 text-sm text-zinc-600" colSpan={6}>
+                  Nenhum registro encontrado.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+);
+
 }
