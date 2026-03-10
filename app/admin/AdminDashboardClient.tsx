@@ -202,6 +202,20 @@ export default function AdminDashboardClient() {
     }
 
     try {
+      const supportsDeletedAt = async (table: string) => {
+        try {
+          const res = await (supabase as any).from(table).select("deleted_at").limit(1);
+          return !res?.error;
+        } catch {
+          return false;
+        }
+      };
+
+      const [propertiesHasDeletedAt, developmentsHasDeletedAt] = await Promise.all([
+        supportsDeletedAt("properties"),
+        supportsDeletedAt("developments"),
+      ]);
+
       const now = new Date();
       const startOfToday = new Date(now);
       startOfToday.setHours(0, 0, 0, 0);
@@ -245,12 +259,18 @@ export default function AdminDashboardClient() {
             .select("id, source, created_at")
             .gte("created_at", startOfWeek.toISOString())
             .order("created_at", { ascending: true }),
-          supabase
-            .from("properties")
-            .select("id, title, property_type, purpose, price, neighborhood, city")
-            .order("price", { ascending: false })
-            .limit(5),
-          supabase.from("properties").select("price").not("price", "is", null),
+          (() => {
+            const q = supabase
+              .from("properties")
+              .select("id, title, property_type, purpose, price, neighborhood, city")
+              .order("price", { ascending: false })
+              .limit(5);
+            return propertiesHasDeletedAt ? q.is("deleted_at", null) : q;
+          })(),
+          (() => {
+            const q = supabase.from("properties").select("price").not("price", "is", null);
+            return propertiesHasDeletedAt ? q.is("deleted_at", null) : q;
+          })(),
           (supabase as any)
             .from("obra_materials")
             .select("id, status, unit_price, quantity")
@@ -267,16 +287,25 @@ export default function AdminDashboardClient() {
             .limit(500),
 
           // unificação: Empreendimentos + Inventário (properties), sempre via corretor_id
-          (supabase as any).from("developments").select("id, corretor_id"),
-          supabase.from("properties").select("id, corretor_id"),
+          (() => {
+            const q = (supabase as any).from("developments").select("id, corretor_id");
+            return developmentsHasDeletedAt ? q.is("deleted_at", null) : q;
+          })(),
+          (() => {
+            const q = supabase.from("properties").select("id, corretor_id");
+            return propertiesHasDeletedAt ? q.is("deleted_at", null) : q;
+          })(),
 
           // Relatório de direcionamento (posse)
-          supabase
-            .from("properties")
-            .select("id, title, neighborhood, city, corretor_id, data_direcionamento, created_at")
-            .not("corretor_id", "is", null)
-            .order("data_direcionamento", { ascending: false, nullsFirst: false })
-            .limit(50),
+          (() => {
+            const q = supabase
+              .from("properties")
+              .select("id, title, neighborhood, city, corretor_id, data_direcionamento, created_at")
+              .not("corretor_id", "is", null)
+              .order("data_direcionamento", { ascending: false, nullsFirst: false })
+              .limit(50);
+            return propertiesHasDeletedAt ? q.is("deleted_at", null) : q;
+          })(),
         ]);
 
       if (profilesRes.status === "fulfilled" && profilesRes.value.error) {
