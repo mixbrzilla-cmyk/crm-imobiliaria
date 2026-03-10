@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { MessageCircle, Trash2, X } from "lucide-react";
@@ -266,6 +268,9 @@ export default function CorretoresAdminPage() {
   return (
     <div className="min-h-screen w-full bg-slate-100 px-6 py-6">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+        <div className="rounded-2xl bg-[#001f3f] px-6 py-4 text-center text-2xl font-extrabold tracking-tight text-white shadow-lg">
+          TESTE DE LAYOUT BITRIX
+        </div>
         <header className="flex items-end justify-between gap-4">
           <div className="flex flex-col gap-2">
             <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">GESTÃO DE CORRETORES</div>
