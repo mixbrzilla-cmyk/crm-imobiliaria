@@ -12,6 +12,8 @@ type Profile = {
   whatsapp: string | null;
   creci: string | null;
   status: string | null;
+  role?: string | null;
+  status_aprovacao?: string | null;
 };
 
 type LeadSource = "meta" | "google" | "whatsapp" | "portais" | "landing" | "outros";
@@ -112,6 +114,11 @@ export default function AdminDashboardClient() {
   const [activeCount, setActiveCount] = useState<number>(0);
   const [propertiesCount, setPropertiesCount] = useState<number>(0);
 
+  const [carteiraByBrokerId, setCarteiraByBrokerId] = useState<Record<string, number>>({});
+  const [totalImoveisCount, setTotalImoveisCount] = useState<number>(0);
+  const [assignedImoveisCount, setAssignedImoveisCount] = useState<number>(0);
+  const [unassignedImoveisCount, setUnassignedImoveisCount] = useState<number>(0);
+
   const [obraMaterialsTotal, setObraMaterialsTotal] = useState<number>(0);
   const [obraPendingDeliveries, setObraPendingDeliveries] = useState<number>(0);
 
@@ -144,6 +151,10 @@ export default function AdminDashboardClient() {
       setPendingCount(0);
       setActiveCount(0);
       setPropertiesCount(0);
+      setCarteiraByBrokerId({});
+      setTotalImoveisCount(0);
+      setAssignedImoveisCount(0);
+      setUnassignedImoveisCount(0);
       setLeadsTodayCount(0);
       setLeadsWeekCount(0);
       setLeadsWeekTrend([0, 0, 0, 0, 0, 0, 0]);
@@ -171,47 +182,77 @@ export default function AdminDashboardClient() {
 
       const leadsDailyBuckets = new Array<number>(7).fill(0);
 
-      const [profilesRes, leadsRes, propertiesRes, vgvRes, obraMaterialsRes, whatsRes] = await Promise.allSettled([
-        supabase
-          .from("profiles")
-          .select("id, full_name, whatsapp, creci, status")
-          .order("full_name", { ascending: true }),
-        supabase
-          .from("leads")
-          .select("id, source, created_at")
-          .gte("created_at", startOfWeek.toISOString())
-          .order("created_at", { ascending: true }),
-        supabase
-          .from("standalone_properties")
-          .select("id, property_type, purpose, price, address")
-          .order("price", { ascending: false })
-          .limit(5),
-        supabase
-          .from("standalone_properties")
-          .select("price")
-          .not("price", "is", null),
-        (supabase as any)
-          .from("obra_materials")
-          .select("id, status, unit_price, quantity")
-          .order("created_at", { ascending: false }),
+      const brokerProfilesQuery = supabase
+        .from("profiles")
+        .select("id, full_name, whatsapp, creci, status, role, status_aprovacao")
+        .eq("role", "broker")
+        .eq("status_aprovacao", "aprovado")
+        .order("full_name", { ascending: true });
 
-        // WhatsApp activity today (schema optional)
-        supabase
-          .from("chat_messages")
-          .select(
-            "id, thread_id, broker_id, direction, sender_type, sent_at, thread:chat_threads(contact_name, contact_number)",
-          )
-          .gte("sent_at", startOfToday.toISOString())
-          .order("sent_at", { ascending: false })
-          .limit(500),
-      ]);
+      const brokerProfilesFallbackQuery = supabase
+        .from("profiles")
+        .select("id, full_name, whatsapp, creci, status, role")
+        .eq("role", "broker")
+        .order("full_name", { ascending: true });
 
-      if (profilesRes.status === "fulfilled") {
-        if (profilesRes.value.error) {
-          setErrorMessage(profilesRes.value.error.message);
+      const [profilesRes, leadsRes, propertiesRes, vgvRes, obraMaterialsRes, whatsRes, avulsosIdsRes, devIdsRes, inventarioIdsRes] =
+        await Promise.allSettled([
+          brokerProfilesQuery,
+          supabase
+            .from("leads")
+            .select("id, source, created_at")
+            .gte("created_at", startOfWeek.toISOString())
+            .order("created_at", { ascending: true }),
+          supabase
+            .from("standalone_properties")
+            .select("id, property_type, purpose, price, address")
+            .order("price", { ascending: false })
+            .limit(5),
+          supabase
+            .from("standalone_properties")
+            .select("price")
+            .not("price", "is", null),
+          (supabase as any)
+            .from("obra_materials")
+            .select("id, status, unit_price, quantity")
+            .order("created_at", { ascending: false }),
+
+          // WhatsApp activity today (schema optional)
+          supabase
+            .from("chat_messages")
+            .select(
+              "id, thread_id, broker_id, direction, sender_type, sent_at, thread:chat_threads(contact_name, contact_number)",
+            )
+            .gte("sent_at", startOfToday.toISOString())
+            .order("sent_at", { ascending: false })
+            .limit(500),
+
+          // unificação: Avulsos + Empreendimentos + Inventário (properties), sempre via corretor_id
+          supabase.from("standalone_properties").select("id, corretor_id"),
+          (supabase as any).from("developments").select("id, corretor_id"),
+          supabase.from("properties").select("id, corretor_id"),
+        ]);
+
+      if (profilesRes.status === "fulfilled" && profilesRes.value.error) {
+        const fallback = await brokerProfilesFallbackQuery;
+        if (fallback.error) {
+          setErrorMessage(fallback.error.message);
           setRows([]);
           setPendingCount(0);
           setActiveCount(0);
+        } else {
+          const allRows = (fallback.data ?? []) as Profile[];
+          const pending = allRows.filter((r) => r.status === "pendente").length;
+          const active = allRows.filter((r) => r.status === "ativo").length;
+          setRows(allRows);
+          setPendingCount(pending);
+          setActiveCount(active);
+        }
+      }
+
+      if (profilesRes.status === "fulfilled") {
+        if (profilesRes.value.error) {
+          // handled above with fallback query
         } else {
           const allRows = (profilesRes.value.data ?? []) as Profile[];
           const pending = allRows.filter((r) => r.status === "pendente").length;
@@ -221,6 +262,43 @@ export default function AdminDashboardClient() {
           setActiveCount(active);
         }
       }
+
+      const brokerCountMap = new Map<string, number>();
+      let totalCount = 0;
+      let assignedCount = 0;
+      let unassignedCount = 0;
+
+      const inventorySources: Array<{ res: typeof avulsosIdsRes; label: string }> = [
+        { res: avulsosIdsRes, label: "standalone_properties" },
+        { res: devIdsRes, label: "developments" },
+        { res: inventarioIdsRes, label: "properties" },
+      ];
+
+      for (const src of inventorySources) {
+        if (src.res.status !== "fulfilled") continue;
+        const value: any = src.res.value;
+        if (value?.error) {
+          console.log("[Dashboard] Erro ao carregar inventário", src.label, value.error);
+          continue;
+        }
+
+        const data = (value?.data ?? []) as Array<{ id: string; corretor_id?: string | null }>;
+        for (const row of data) {
+          totalCount += 1;
+          const brokerId = (row as any)?.corretor_id ?? null;
+          if (brokerId) {
+            assignedCount += 1;
+            brokerCountMap.set(brokerId, (brokerCountMap.get(brokerId) ?? 0) + 1);
+          } else {
+            unassignedCount += 1;
+          }
+        }
+      }
+
+      setCarteiraByBrokerId(Object.fromEntries(brokerCountMap.entries()));
+      setTotalImoveisCount(totalCount);
+      setAssignedImoveisCount(assignedCount);
+      setUnassignedImoveisCount(unassignedCount);
 
       if (leadsRes.status === "fulfilled") {
         if (leadsRes.value.error) {
@@ -369,6 +447,10 @@ export default function AdminDashboardClient() {
       setPendingCount(0);
       setActiveCount(0);
       setPropertiesCount(0);
+      setCarteiraByBrokerId({});
+      setTotalImoveisCount(0);
+      setAssignedImoveisCount(0);
+      setUnassignedImoveisCount(0);
       setLeadsTodayCount(0);
       setLeadsWeekCount(0);
       setLeadsWeekTrend([0, 0, 0, 0, 0, 0, 0]);
@@ -439,6 +521,32 @@ export default function AdminDashboardClient() {
           Visão geral operacional de corretores e cadastros.
         </p>
       </header>
+
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
+          <div className="text-sm font-medium text-slate-600">Total Geral de Imóveis</div>
+          <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
+            {totalImoveisCount}
+          </div>
+          <div className="mt-2 text-xs text-slate-500">Avulsos + Empreendimentos + Inventário</div>
+        </div>
+
+        <div className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
+          <div className="text-sm font-medium text-slate-600">Atribuídos</div>
+          <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
+            {assignedImoveisCount}
+          </div>
+          <div className="mt-2 text-xs text-slate-500">Com corretor responsável</div>
+        </div>
+
+        <div className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
+          <div className="text-sm font-medium text-slate-600">Sem Corretor</div>
+          <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
+            {unassignedImoveisCount}
+          </div>
+          <div className="mt-2 text-xs text-slate-500">Ações pendentes de distribuição</div>
+        </div>
+      </section>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
@@ -622,6 +730,9 @@ export default function AdminDashboardClient() {
                   Nome
                 </th>
                 <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">
+                  Imóveis em Carteira
+                </th>
+                <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">
                   Status
                 </th>
                 <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">
@@ -641,6 +752,9 @@ export default function AdminDashboardClient() {
                   <tr key={row.id} className="border-t border-slate-100">
                     <td className="px-5 py-4 text-sm text-slate-900">
                       {row.full_name ?? "-"}
+                    </td>
+                    <td className="px-5 py-4 text-sm font-semibold text-slate-900">
+                      {carteiraByBrokerId[row.id] ?? 0}
                     </td>
                     <td className="px-5 py-4 text-sm text-slate-700">
                       {row.status ?? "-"}
@@ -669,7 +783,7 @@ export default function AdminDashboardClient() {
                 ))
               ) : (
                 <tr>
-                  <td className="px-5 py-8 text-sm text-slate-600" colSpan={5}>
+                  <td className="px-5 py-8 text-sm text-slate-600" colSpan={6}>
                     Nenhum registro encontrado.
                   </td>
                 </tr>

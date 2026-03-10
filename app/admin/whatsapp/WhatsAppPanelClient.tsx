@@ -130,6 +130,34 @@ export default function WhatsAppPanelClient() {
     official_number: "",
   });
 
+  const testProfilesConnection = useCallback(
+    async (context: string, error: unknown) => {
+      if (!supabase) return;
+      try {
+        const errAny = error as any;
+        console.log("[Supabase Diagnostic]", {
+          context,
+          code: errAny?.code,
+          message: errAny?.message,
+          details: errAny?.details,
+          hint: errAny?.hint,
+        });
+        const res = await supabase.from("profiles").select("id").limit(1);
+        if (res.error) {
+          console.log("DEBUG SUPABASE:", res.error);
+          console.log("[Supabase Diagnostic] profiles query failed:", res.error);
+        } else {
+          console.log("[Supabase Diagnostic] profiles query OK:", {
+            hasRow: (res.data ?? []).length > 0,
+          });
+        }
+      } catch (e) {
+        console.log("[Supabase Diagnostic] profiles query threw:", e);
+      }
+    },
+    [supabase],
+  );
+
   const selectedThread = useMemo(
     () => threads.find((t) => t.id === selectedThreadId) ?? null,
     [selectedThreadId, threads],
@@ -181,7 +209,12 @@ export default function WhatsAppPanelClient() {
 
       if (res.error) {
         console.log("DEBUG SUPABASE:", res.error);
+        console.log("[WhatsApp] Supabase error code:", (res.error as any)?.code);
         console.log("[WhatsApp] Erro ao carregar chat_threads:", res.error);
+        const code = (res.error as any)?.code;
+        if (code === "PGRST204" || code === "PGRST301") {
+          await testProfilesConnection("loadThreads(chat_threads)", res.error);
+        }
         throw res.error;
       }
 
@@ -223,7 +256,12 @@ export default function WhatsAppPanelClient() {
 
         if (res.error) {
           console.log("DEBUG SUPABASE:", res.error);
+          console.log("[WhatsApp] Supabase error code:", (res.error as any)?.code);
           console.log("[WhatsApp] Erro ao carregar chat_messages:", res.error);
+          const code = (res.error as any)?.code;
+          if (code === "PGRST204" || code === "PGRST301") {
+            await testProfilesConnection("loadMessages(chat_messages)", res.error);
+          }
           throw res.error;
         }
 
@@ -253,7 +291,12 @@ export default function WhatsAppPanelClient() {
 
       if (res.error) {
         console.log("DEBUG SUPABASE:", res.error);
+        console.log("[WhatsApp] Supabase error code:", (res.error as any)?.code);
         console.log("[WhatsApp] Erro ao carregar whatsapp_settings:", res.error);
+        const code = (res.error as any)?.code;
+        if (code === "PGRST204" || code === "PGRST301") {
+          await testProfilesConnection("loadSettings(whatsapp_settings)", res.error);
+        }
         throw res.error;
       }
 
@@ -380,6 +423,10 @@ export default function WhatsAppPanelClient() {
   }
 
   useEffect(() => {
+    console.log("CONEXÃO TESTE:", {
+      url: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      hasKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    });
     const t = setTimeout(() => {
       void loadBrokers();
       void loadThreads();

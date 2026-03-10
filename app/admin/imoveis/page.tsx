@@ -32,6 +32,7 @@ type PropertyRow = {
   property_type: string | null;
   purpose: PropertyPurpose | null;
   price: number | null;
+  corretor_id?: string | null;
   neighborhood: string | null;
   city: string | null;
   bedrooms: number | null;
@@ -53,6 +54,7 @@ type FormState = {
   price: string;
   neighborhood: string;
   city: string;
+  corretor_id: string;
   bedrooms: string;
   suites: string;
   bathrooms: string;
@@ -113,6 +115,14 @@ function Badge({ status }: { status: PropertyStatus }) {
 
 type TabKey = "basicos" | "caracteristicas" | "midia" | "status";
 
+type BrokerProfile = {
+  id: string;
+  full_name: string | null;
+  status: string | null;
+  status_aprovacao?: string | null;
+  role?: string | null;
+};
+
 export default function InventarioImoveisPage() {
   const supabase = useMemo(() => getSupabaseClient(), []);
 
@@ -125,6 +135,8 @@ export default function InventarioImoveisPage() {
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const [brokers, setBrokers] = useState<BrokerProfile[]>([]);
+
   const [form, setForm] = useState<FormState>({
     title: "",
     property_type: "Apartamento",
@@ -132,6 +144,7 @@ export default function InventarioImoveisPage() {
     price: "",
     neighborhood: "",
     city: "",
+    corretor_id: "",
     bedrooms: "",
     suites: "",
     bathrooms: "",
@@ -158,7 +171,7 @@ export default function InventarioImoveisPage() {
       const { data, error } = await supabase
         .from("properties")
         .select(
-          "id, title, property_type, purpose, price, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description, created_at",
+          "id, title, property_type, purpose, price, corretor_id, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description, created_at",
         )
         .order("created_at", { ascending: false });
 
@@ -170,13 +183,69 @@ export default function InventarioImoveisPage() {
 
       setRows((data ?? []) as PropertyRow[]);
     } catch {
-      setRows([]);
-      setErrorMessage("Não foi possível carregar o inventário agora.");
+      try {
+        const { data, error } = await supabase
+          .from("properties")
+          .select(
+            "id, title, property_type, purpose, price, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description, created_at",
+          )
+          .order("created_at", { ascending: false });
+        if (error) {
+          setRows([]);
+          setErrorMessage(error.message);
+          return;
+        }
+        setRows((data ?? []) as PropertyRow[]);
+      } catch {
+        setRows([]);
+        setErrorMessage("Não foi possível carregar o inventário agora.");
+      }
+    }
+  }
+
+  async function loadBrokers() {
+    if (!supabase) {
+      setBrokers([]);
+      return;
+    }
+
+    try {
+      let res: any = await supabase
+        .from("profiles")
+        .select("id, full_name, status, status_aprovacao, role")
+        .eq("role", "broker")
+        .order("full_name", { ascending: true });
+
+      if (res.error) {
+        res = await supabase
+          .from("profiles")
+          .select("id, full_name, status, role")
+          .eq("role", "broker")
+          .order("full_name", { ascending: true });
+      }
+
+      if (res.error) {
+        setBrokers([]);
+        return;
+      }
+
+      const all = (res.data ?? []) as BrokerProfile[];
+      const eligible = all.filter((b) => {
+        const status = (b.status ?? "").toLowerCase();
+        const aprov = (b.status_aprovacao ?? "").toLowerCase();
+        if (aprov) return aprov === "aprovado";
+        return status === "ativo" || status === "aprovado";
+      });
+
+      setBrokers(eligible);
+    } catch {
+      setBrokers([]);
     }
   }
 
   useEffect(() => {
     void load();
+    void loadBrokers();
   }, []);
 
   function resetForm() {
@@ -189,6 +258,7 @@ export default function InventarioImoveisPage() {
       price: "",
       neighborhood: "",
       city: "",
+      corretor_id: "",
       bedrooms: "",
       suites: "",
       bathrooms: "",
@@ -212,6 +282,7 @@ export default function InventarioImoveisPage() {
         typeof row.price === "number" ? formatCurrencyBRL(row.price, { maximumFractionDigits: 2 }) : "",
       neighborhood: row.neighborhood ?? "",
       city: row.city ?? "",
+      corretor_id: row.corretor_id ?? "",
       bedrooms: row.bedrooms != null ? String(row.bedrooms) : "",
       suites: row.suites != null ? String(row.suites) : "",
       bathrooms: row.bathrooms != null ? String(row.bathrooms) : "",
@@ -248,6 +319,7 @@ export default function InventarioImoveisPage() {
       property_type: form.property_type.trim() ? form.property_type.trim() : null,
       purpose: form.purpose,
       price: parseBRLInputToNumber(form.price),
+      corretor_id: form.corretor_id.trim() ? form.corretor_id.trim() : null,
       neighborhood: form.neighborhood.trim() ? form.neighborhood.trim() : null,
       city: form.city.trim() ? form.city.trim() : null,
       bedrooms: parseOptionalInt(form.bedrooms),
@@ -267,18 +339,33 @@ export default function InventarioImoveisPage() {
         ? await query.update(payload).eq("id", selectedId)
         : await query.insert(payload);
 
-      if (error) {
-        setErrorMessage(error.message);
-        setIsSaving(false);
-        return;
-      }
+      if (error) throw error;
 
       setIsSaving(false);
       resetForm();
       await load();
     } catch {
-      setIsSaving(false);
-      setErrorMessage("Não foi possível salvar o imóvel agora.");
+      try {
+        const retryPayload: any = { ...payload };
+        delete retryPayload.corretor_id;
+        const query = (supabase as any).from("properties");
+        const { error } = selectedId
+          ? await query.update(retryPayload).eq("id", selectedId)
+          : await query.insert(retryPayload);
+
+        if (error) {
+          setErrorMessage(error.message);
+          setIsSaving(false);
+          return;
+        }
+
+        setIsSaving(false);
+        resetForm();
+        await load();
+      } catch {
+        setIsSaving(false);
+        setErrorMessage("Não foi possível salvar o imóvel agora.");
+      }
     }
   }
 
@@ -457,6 +544,24 @@ export default function InventarioImoveisPage() {
                       </select>
                     </label>
                   </div>
+
+                  <label className="flex flex-col gap-2">
+                    <span className="text-xs font-semibold tracking-wide text-slate-600">
+                      Corretor Responsável
+                    </span>
+                    <select
+                      value={form.corretor_id}
+                      onChange={(e) => setForm((s) => ({ ...s, corretor_id: e.target.value }))}
+                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
+                    >
+                      <option value="">Sem corretor</option>
+                      {brokers.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.full_name ?? b.id}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <label className="flex flex-col gap-2">

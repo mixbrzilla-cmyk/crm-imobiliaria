@@ -29,9 +29,11 @@ type Development = {
   sales_material_url: string | null;
   price_table_url: string | null;
   city?: string | null;
+  localidade?: string | null;
 
   status?: DevelopmentStatus | null;
   lot_value?: number | null;
+  preco?: number | null;
 
   total_area_m2?: number | null;
   lots_count?: number | null;
@@ -44,7 +46,7 @@ type Development = {
 
   gallery_urls?: string[] | null;
 
-  assigned_broker_profile_id?: string | null;
+  corretor_id?: string | null;
   created_at?: string;
 };
 
@@ -52,12 +54,14 @@ type BrokerProfile = {
   id: string;
   full_name: string | null;
   status: string | null;
+  status_aprovacao?: string | null;
   role?: string | null;
 };
 
 type FormState = {
   name: string;
   city: string;
+  corretor_id: string;
 
   status: DevelopmentStatus;
   lot_value: string;
@@ -86,6 +90,14 @@ const statusLabel: Record<DevelopmentStatus, string> = {
   em_obras: "Em Obras",
   pronto_para_construir: "Pronto para Construir",
 };
+
+function formatBRLIntl(value: number) {
+  try {
+    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+  } catch {
+    return `R$ ${value}`;
+  }
+}
 
 function parseOptionalInt(value: string) {
   const trimmed = value.trim();
@@ -119,7 +131,6 @@ export default function EmpreendimentosClient() {
   const [brokers, setBrokers] = useState<BrokerProfile[]>([]);
   const [dispatchSelectionById, setDispatchSelectionById] = useState<Record<string, string>>({});
   const [dispatchingId, setDispatchingId] = useState<string | null>(null);
-  const [supportsAssignment, setSupportsAssignment] = useState(true);
 
   const [supportsDetails, setSupportsDetails] = useState(true);
 
@@ -129,9 +140,35 @@ export default function EmpreendimentosClient() {
     return map;
   }, [brokers]);
 
+  async function testProfilesConnection(context: string, error: unknown) {
+    if (!supabase) return;
+    try {
+      const errAny = error as any;
+      console.log("[Supabase Diagnostic]", {
+        context,
+        code: errAny?.code,
+        message: errAny?.message,
+        details: errAny?.details,
+        hint: errAny?.hint,
+      });
+      const res = await supabase.from("profiles").select("id").limit(1);
+      if (res.error) {
+        console.log("DEBUG SUPABASE:", res.error);
+        console.log("[Supabase Diagnostic] profiles query failed:", res.error);
+      } else {
+        console.log("[Supabase Diagnostic] profiles query OK:", {
+          hasRow: (res.data ?? []).length > 0,
+        });
+      }
+    } catch (e) {
+      console.log("[Supabase Diagnostic] profiles query threw:", e);
+    }
+  }
+
   const [form, setForm] = useState<FormState>({
     name: "",
     city: "Marabá",
+    corretor_id: "",
     status: "pre_lancamento",
     lot_value: "",
     total_area_m2: "",
@@ -154,6 +191,7 @@ export default function EmpreendimentosClient() {
     setForm({
       name: "",
       city: "Marabá",
+      corretor_id: "",
       status: "pre_lancamento",
       lot_value: "",
       total_area_m2: "",
@@ -177,10 +215,13 @@ export default function EmpreendimentosClient() {
     setForm({
       name: row.name ?? "",
       city: row.city ?? "Marabá",
+      corretor_id: row.corretor_id ?? "",
       status: (row.status ?? "pre_lancamento") as DevelopmentStatus,
       lot_value:
         typeof row.lot_value === "number"
           ? formatCurrencyBRL(row.lot_value, { maximumFractionDigits: 2 })
+          : typeof row.preco === "number"
+            ? formatCurrencyBRL(row.preco, { maximumFractionDigits: 2 })
           : "",
       total_area_m2: row.total_area_m2 != null ? String(row.total_area_m2) : "",
       lots_count: row.lots_count != null ? String(row.lots_count) : "",
@@ -214,52 +255,24 @@ export default function EmpreendimentosClient() {
       const res = await supabase
         .from("developments")
         .select(
-          "id, name, cover_url, video_url, sales_material_url, price_table_url, city, status, lot_value, total_area_m2, lots_count, green_area_m2, infra_asphalt, infra_power, infra_water, infra_sewage, gallery_urls, assigned_broker_profile_id, created_at",
+          "id, name, cover_url, video_url, sales_material_url, price_table_url, city, localidade, status, lot_value, preco, total_area_m2, lots_count, green_area_m2, infra_asphalt, infra_power, infra_water, infra_sewage, gallery_urls, corretor_id, created_at",
         )
         .order("created_at", { ascending: false });
 
-      if (res.error) throw res.error;
-      setSupportsAssignment(true);
+      if (res.error) {
+        const code = (res.error as any)?.code;
+        if (code === "PGRST204" || code === "PGRST301") {
+          await testProfilesConnection("load(developments)", res.error);
+        }
+        throw res.error;
+      }
       setSupportsDetails(true);
       setRows((res.data ?? []) as Development[]);
-    } catch {
-      try {
-        const fallbackRes = await supabase
-          .from("developments")
-          .select(
-            "id, name, cover_url, video_url, sales_material_url, price_table_url, assigned_broker_profile_id, created_at",
-          )
-          .order("created_at", { ascending: false });
-
-        if (fallbackRes.error) {
-          console.log("DEBUG SUPABASE:", fallbackRes.error);
-          setErrorMessage(fallbackRes.error.message);
-          setRows([]);
-          setIsLoading(false);
-          return;
-        }
-
-        setSupportsAssignment(true);
-        setSupportsDetails(false);
-        setRows((fallbackRes.data ?? []) as Development[]);
-      } catch {
-        const minimalRes = await supabase
-          .from("developments")
-          .select("id, name, cover_url, video_url, sales_material_url, price_table_url, created_at")
-          .order("created_at", { ascending: false });
-
-        if (minimalRes.error) {
-          console.log("DEBUG SUPABASE:", minimalRes.error);
-          setErrorMessage(minimalRes.error.message);
-          setRows([]);
-          setIsLoading(false);
-          return;
-        }
-
-        setSupportsAssignment(false);
-        setSupportsDetails(false);
-        setRows((minimalRes.data ?? []) as Development[]);
-      }
+    } catch (e) {
+      console.log("DEBUG SUPABASE:", e);
+      setErrorMessage("Não foi possível carregar empreendimentos agora.");
+      setRows([]);
+      setSupportsDetails(false);
     }
 
     setIsLoading(false);
@@ -272,11 +285,19 @@ export default function EmpreendimentosClient() {
     }
 
     try {
-      const res = await supabase
+      let res: any = await supabase
         .from("profiles")
-        .select("id, full_name, status, role")
+        .select("id, full_name, status, status_aprovacao, role")
         .eq("role", "broker")
         .order("full_name", { ascending: true });
+
+      if (res.error) {
+        res = await supabase
+          .from("profiles")
+          .select("id, full_name, status, role")
+          .eq("role", "broker")
+          .order("full_name", { ascending: true });
+      }
 
       if (res.error) {
         console.log("DEBUG SUPABASE:", res.error);
@@ -286,8 +307,10 @@ export default function EmpreendimentosClient() {
 
       const all = (res.data ?? []) as BrokerProfile[];
       const eligible = all.filter((b) => {
-        const s = (b.status ?? "").toLowerCase();
-        return s === "ativo" || s === "aprovado";
+        const status = (b.status ?? "").toLowerCase();
+        const aprov = (b.status_aprovacao ?? "").toLowerCase();
+        if (aprov) return aprov === "aprovado";
+        return status === "ativo" || status === "aprovado";
       });
       setBrokers(eligible);
     } catch {
@@ -321,13 +344,6 @@ export default function EmpreendimentosClient() {
       return;
     }
 
-    if (!supportsAssignment) {
-      setErrorMessage(
-        "Distribuição não disponível: adicione a coluna assigned_broker_profile_id em developments.",
-      );
-      return;
-    }
-
     const brokerId = (dispatchSelectionById[developmentId] ?? "").trim();
     if (!brokerId) {
       setErrorMessage("Selecione um corretor.");
@@ -339,7 +355,7 @@ export default function EmpreendimentosClient() {
     try {
       const { error } = await (supabase as any)
         .from("developments")
-        .update({ assigned_broker_profile_id: brokerId })
+        .update({ corretor_id: brokerId })
         .eq("id", developmentId);
 
       if (error) {
@@ -351,9 +367,7 @@ export default function EmpreendimentosClient() {
 
       void logDispatch("development", developmentId, brokerId);
 
-      setRows((current) =>
-        current.map((r) => (r.id === developmentId ? { ...r, assigned_broker_profile_id: brokerId } : r)),
-      );
+      setRows((current) => current.map((r) => (r.id === developmentId ? { ...r, corretor_id: brokerId } : r)));
     } catch {
       setErrorMessage("Não foi possível enviar ao corretor agora.");
     } finally {
@@ -405,6 +419,7 @@ export default function EmpreendimentosClient() {
     const detailsPayload: any = {
       ...basePayload,
       city: form.city.trim() ? form.city.trim() : null,
+      corretor_id: form.corretor_id.trim() ? form.corretor_id.trim() : null,
       status: form.status,
       lot_value: parseBRLInputToNumber(form.lot_value),
       total_area_m2: parseOptionalNumber(form.total_area_m2),
@@ -429,27 +444,10 @@ export default function EmpreendimentosClient() {
       resetForm();
       await load();
       return;
-    } catch {
-      try {
-        const query = (supabase as any).from("developments");
-        const res = selectedId
-          ? await query.update(basePayload).eq("id", selectedId)
-          : await query.insert(basePayload);
-
-        if (res.error) {
-          console.log("DEBUG SUPABASE:", res.error);
-          setErrorMessage(res.error.message);
-          setIsSaving(false);
-          return;
-        }
-
-        setIsSaving(false);
-        resetForm();
-        await load();
-      } catch {
-        setErrorMessage("Não foi possível salvar o empreendimento agora.");
-        setIsSaving(false);
-      }
+    } catch (e) {
+      console.log("DEBUG SUPABASE:", e);
+      setErrorMessage("Não foi possível salvar o empreendimento agora.");
+      setIsSaving(false);
     }
   }
 
@@ -562,6 +560,22 @@ export default function EmpreendimentosClient() {
                         placeholder="Ex: Marabá"
                       />
                     </div>
+                  </label>
+
+                  <label className="flex flex-col gap-2">
+                    <span className="text-xs font-semibold tracking-wide text-slate-600">Corretor responsável</span>
+                    <select
+                      value={form.corretor_id}
+                      onChange={(e) => setForm((s) => ({ ...s, corretor_id: e.target.value }))}
+                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
+                    >
+                      <option value="">Sem corretor</option>
+                      {brokers.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.full_name ?? b.id}
+                        </option>
+                      ))}
+                    </select>
                   </label>
 
                   <label className="flex flex-col gap-2">
@@ -779,7 +793,7 @@ export default function EmpreendimentosClient() {
                   if (!selectedId) return;
                   setDispatchSelectionById((c) => ({ ...c, [selectedId]: e.target.value }));
                 }}
-                disabled={!supportsAssignment || !selectedId}
+                disabled={!selectedId}
                 className="h-11 w-full rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15 disabled:cursor-not-allowed disabled:bg-slate-50"
               >
                 <option value="">Selecione um corretor</option>
@@ -792,7 +806,7 @@ export default function EmpreendimentosClient() {
               <button
                 type="button"
                 onClick={() => (selectedId ? void dispatchToBroker(selectedId) : null)}
-                disabled={!supportsAssignment || !selectedId || dispatchingId === selectedId}
+                disabled={!selectedId || dispatchingId === selectedId}
                 className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-[#001f3f] px-5 text-sm font-semibold text-white shadow-[0_6px_14px_-10px_rgba(15,23,42,0.45)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#001a33] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {dispatchingId === selectedId ? "Enviando..." : "Confirmar"}
@@ -804,7 +818,7 @@ export default function EmpreendimentosClient() {
               <span className="font-semibold text-slate-900">
                 {(() => {
                   const current = selectedId ? rows.find((r) => r.id === selectedId) : null;
-                  const id = current?.assigned_broker_profile_id ?? "";
+                  const id = current?.corretor_id ?? "";
                   if (!id) return "-";
                   return brokerById.get(id)?.full_name ?? id;
                 })()}
@@ -883,9 +897,15 @@ export default function EmpreendimentosClient() {
                               </a>
                             ) : null}
                           </td>
-                          <td className="px-5 py-4 text-sm text-slate-700">{r.city ?? "-"}</td>
+                          <td className="px-5 py-4 text-sm text-slate-700">
+                            {r.city ?? r.localidade ?? "-"}
+                          </td>
                           <td className="px-5 py-4 text-sm font-semibold text-slate-900">
-                            {typeof r.lot_value === "number" ? formatCurrencyBRL(r.lot_value) : "-"}
+                            {typeof r.lot_value === "number"
+                              ? formatBRLIntl(r.lot_value)
+                              : typeof r.preco === "number"
+                                ? formatBRLIntl(r.preco)
+                                : "-"}
                           </td>
                           <td className="px-5 py-4 text-sm">
                             <div className="flex items-center gap-2">
