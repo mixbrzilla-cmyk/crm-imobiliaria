@@ -5,18 +5,13 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
-  BadgeCheck,
-  ClipboardCheck,
-  FileText,
-  Handshake,
-  Filter,
+  DollarSign,
+  Globe,
   MessageCircle,
   Phone,
   Plus,
-  Sparkles,
   RefreshCw,
   Search,
-  Users,
   X,
 } from "lucide-react";
 
@@ -36,6 +31,10 @@ type LeadRow = {
   full_name: string;
   phone: string;
   interest: string | null;
+  estimated_value?: number | null;
+  email?: string | null;
+  message?: string | null;
+  slug_imovel?: string | null;
   stage: LeadStage;
   source: string | null;
   assigned_broker_profile_id?: string | null;
@@ -68,34 +67,34 @@ type FormState = {
   source: string;
 };
 
-const stages: Array<{ key: LeadStage; label: string; hint: string }> = [
-  { key: "recebido", label: "Recebido", hint: "Entrada (ADS, portais, WhatsApp, LP)." },
-  { key: "qualificado", label: "Qualificado", hint: "Lead validado (perfil e intenção)." },
-  { key: "atendimento", label: "Atendimento", hint: "Contato ativo e diagnóstico." },
-  { key: "visita", label: "Visita", hint: "Agendado/realizado." },
-  { key: "proposta", label: "Proposta", hint: "Negociação." },
-  { key: "contrato", label: "Contrato", hint: "Documentação e assinatura." },
-  { key: "vendido", label: "Vendido", hint: "Fechamento concluído." },
+const LEAD_STAGE_ORDER: LeadStage[] = [
+  "recebido",
+  "qualificado",
+  "atendimento",
+  "visita",
+  "proposta",
+  "contrato",
+  "vendido",
 ];
 
-function stageBadgeCls(stage: LeadStage) {
-  if (stage === "recebido") return "bg-slate-50 text-slate-700 ring-slate-200/70";
-  if (stage === "qualificado") return "bg-indigo-50 text-indigo-700 ring-indigo-200/70";
-  if (stage === "atendimento") return "bg-sky-50 text-sky-700 ring-sky-200/70";
-  if (stage === "visita") return "bg-amber-50 text-amber-700 ring-amber-200/70";
-  if (stage === "proposta") return "bg-violet-50 text-violet-700 ring-violet-200/70";
-  if (stage === "contrato") return "bg-emerald-50 text-emerald-700 ring-emerald-200/70";
-  return "bg-slate-100 text-slate-700 ring-slate-200/70";
-}
-
 function nextStage(stage: LeadStage): LeadStage {
-  const idx = stages.findIndex((s) => s.key === stage);
-  return stages[Math.min(stages.length - 1, idx + 1)]!.key;
+  const idx = LEAD_STAGE_ORDER.indexOf(stage);
+  if (idx < 0) return stage;
+  return LEAD_STAGE_ORDER[Math.min(LEAD_STAGE_ORDER.length - 1, idx + 1)]!;
 }
 
 function prevStage(stage: LeadStage): LeadStage {
-  const idx = stages.findIndex((s) => s.key === stage);
-  return stages[Math.max(0, idx - 1)]!.key;
+  const idx = LEAD_STAGE_ORDER.indexOf(stage);
+  if (idx < 0) return stage;
+  return LEAD_STAGE_ORDER[Math.max(0, idx - 1)]!;
+}
+
+function formatCurrencyBRL(value: number) {
+  return value.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    maximumFractionDigits: 0,
+  });
 }
 
 function normalizeText(input: string) {
@@ -142,6 +141,14 @@ function sourceBadgeCls(source: string | null) {
   return "bg-slate-100 text-slate-700 ring-slate-200/70";
 }
 
+function sourceIconName(source: string | null) {
+  const s = normalizeText(source ?? "");
+  if (!s) return "globe";
+  if (s.includes("google") || s.includes("adwords") || s.includes("gads")) return "search";
+  if (s.includes("whats")) return "whatsapp";
+  return "globe";
+}
+
 function sanitizePhone(input: string) {
   return input.replace(/[^0-9+]/g, "").trim();
 }
@@ -154,6 +161,8 @@ export default function LeadsAdminPage() {
   const [movingLeadId, setMovingLeadId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState<string>("");
   const [brokerFilter, setBrokerFilter] = useState<string>("");
@@ -161,10 +170,6 @@ export default function LeadsAdminPage() {
   const [brokers, setBrokers] = useState<BrokerProfile[]>([]);
   const [autoDistribute, setAutoDistribute] = useState(true);
   const [isDistributing, setIsDistributing] = useState(false);
-
-  const [sideStage, setSideStage] = useState<Exclude<LeadStage, "recebido" | "atendimento">>(
-    "qualificado",
-  );
 
   const [selectedLead, setSelectedLead] = useState<LeadRow | null>(null);
   const [leadHistory, setLeadHistory] = useState<LeadEventRow[]>([]);
@@ -181,6 +186,31 @@ export default function LeadsAdminPage() {
   });
 
   const normalizedSearch = useMemo(() => normalizeText(search), [search]);
+
+  const columns = useMemo(
+    () =>
+      [
+        {
+          key: "novo" as const,
+          label: "Novo",
+          headerCls: "bg-sky-600",
+          stages: ["recebido", "qualificado"] as LeadStage[],
+        },
+        {
+          key: "atendimento" as const,
+          label: "Atendimento",
+          headerCls: "bg-amber-500",
+          stages: ["atendimento", "visita", "proposta", "contrato"] as LeadStage[],
+        },
+        {
+          key: "ganho" as const,
+          label: "Ganho",
+          headerCls: "bg-emerald-600",
+          stages: ["vendido"] as LeadStage[],
+        },
+      ] as const,
+    [],
+  );
 
   const filtered = useMemo(() => {
     const bySource = sourceFilter.trim().toLowerCase();
@@ -409,20 +439,30 @@ export default function LeadsAdminPage() {
     }
 
     try {
-      const { data, error } = await supabase
+      const rich = await supabase
         .from("leads")
         .select(
-          "id, full_name, phone, interest, stage, source, assigned_broker_profile_id, created_at",
+          "id, full_name, phone, interest, stage, source, assigned_broker_profile_id, created_at, estimated_value, email, message, slug_imovel",
         )
         .order("created_at", { ascending: false });
 
-      if (error) {
-        setRows([]);
-        setErrorMessage(error.message);
+      if (!rich.error) {
+        setRows((rich.data ?? []) as LeadRow[]);
         return;
       }
 
-      setRows((data ?? []) as LeadRow[]);
+      const basic = await supabase
+        .from("leads")
+        .select("id, full_name, phone, interest, stage, source, assigned_broker_profile_id, created_at")
+        .order("created_at", { ascending: false });
+
+      if (basic.error) {
+        setRows([]);
+        setErrorMessage(basic.error.message);
+        return;
+      }
+
+      setRows((basic.data ?? []) as LeadRow[]);
     } catch {
       setRows([]);
       setErrorMessage("Não foi possível carregar o funil agora.");
@@ -568,157 +608,41 @@ export default function LeadsAdminPage() {
     setIsHistoryLoading(false);
   }
 
-  const countsByStage = useMemo(() => {
-    const base: Record<LeadStage, number> = {
-      recebido: 0,
-      qualificado: 0,
-      atendimento: 0,
-      visita: 0,
-      proposta: 0,
-      contrato: 0,
-      vendido: 0,
-    };
-
-    for (const r of filtered) {
-      base[r.stage] += 1;
-    }
-    return base;
-  }, [filtered]);
-
-  const receivedLeads = useMemo(
-    () => filtered.filter((r) => r.stage === "recebido"),
-    [filtered],
-  );
-
-  const atendimentoLeads = useMemo(
-    () => filtered.filter((r) => r.stage === "atendimento"),
-    [filtered],
-  );
-
-  const sideLeads = useMemo(
-    () => filtered.filter((r) => r.stage === sideStage),
-    [filtered, sideStage],
-  );
-
   return (
-    <div className="flex w-full flex-col gap-8">
-      <header className="flex flex-col gap-2">
-        <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">
-          CRM • FUNIL AUTOMÁTICO
+    <div className="min-h-screen bg-slate-50">
+      <div className="mx-auto w-full max-w-7xl px-6 py-6">
+        <div className="flex items-center justify-between gap-4">
+          <div className="text-xl font-semibold tracking-tight text-slate-900">Leads</div>
+
+          <button
+            type="button"
+            onClick={() => setIsCreateOpen(true)}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white shadow-[0_10px_24px_-18px_rgba(16,185,129,0.55)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-emerald-700"
+          >
+            <Plus className="h-4 w-4" />
+            Novo Lead
+          </button>
         </div>
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Leads</h1>
-        <p className="text-sm leading-relaxed text-slate-600">
-          Kanban operacional com 7 etapas e origem rastreada. Render estático primeiro, dados em segundo plano.
-        </p>
-      </header>
 
-      {errorMessage ? (
-        <div className="rounded-2xl bg-red-50 px-5 py-4 text-sm text-red-700 ring-1 ring-red-200/70">
-          {errorMessage}
-        </div>
-      ) : null}
-
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        <div className="lg:col-span-4">
-          <div className="flex h-full min-h-[560px] flex-col rounded-2xl bg-white p-6 shadow-[0_10px_30px_-20px_rgba(15,23,42,0.25)] ring-1 ring-[#E2E8F0]">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-sm font-semibold text-[#001f3f]">Novo lead</div>
-                <div className="mt-1 text-xs text-slate-500">Entrada padrão cai em “Recebido”.</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => void load()}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50"
-              >
-                <RefreshCw className="h-4 w-4" />
-                Atualizar
-              </button>
-            </div>
-
-            <form onSubmit={createLead} className="mt-5 flex flex-1 flex-col gap-4">
-              <label className="flex flex-col gap-2">
-                <span className="text-xs font-semibold tracking-wide text-slate-600">Nome</span>
-                <input
-                  value={form.full_name}
-                  onChange={(e) => setForm((s) => ({ ...s, full_name: e.target.value }))}
-                  className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
-                  placeholder="Cliente"
-                  required
-                />
-              </label>
-
-              <label className="flex flex-col gap-2">
-                <span className="text-xs font-semibold tracking-wide text-slate-600">Telefone</span>
-                <div className="relative">
-                  <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input
-                    value={form.phone}
-                    onChange={(e) => setForm((s) => ({ ...s, phone: e.target.value }))}
-                    className="h-11 w-full rounded-xl bg-white pl-10 pr-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
-                    placeholder="(DDD) 9xxxx-xxxx"
-                    required
-                  />
-                </div>
-              </label>
-
-              <label className="flex flex-col gap-2">
-                <span className="text-xs font-semibold tracking-wide text-slate-600">Interesse</span>
-                <input
-                  value={form.interest}
-                  onChange={(e) => setForm((s) => ({ ...s, interest: e.target.value }))}
-                  className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
-                  placeholder="Ex: Apartamento 2 dorm"
-                />
-              </label>
-
-              <label className="flex flex-col gap-2">
-                <span className="text-xs font-semibold tracking-wide text-slate-600">Origem</span>
-                <input
-                  value={form.source}
-                  onChange={(e) => setForm((s) => ({ ...s, source: e.target.value }))}
-                  className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
-                  placeholder="Meta, Google, WhatsApp, Portais, Landing"
-                />
-              </label>
-
-              <button
-                type="submit"
-                disabled={isSaving}
-                className="mt-1 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#ff0000] px-5 text-sm font-semibold text-white shadow-[0_10px_24px_-18px_rgba(255,0,0,0.55)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Plus className="h-4 w-4" />
-                {isSaving ? "Salvando..." : "Cadastrar"}
-              </button>
-            </form>
-          </div>
-
-          <div className="mt-6 rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-sm font-semibold text-slate-900">Filtros</div>
-                <div className="mt-1 text-xs text-slate-500">Pesquisa e origem (não trava o Kanban).</div>
-              </div>
-              <Filter className="h-4 w-4 text-slate-400" />
-            </div>
-
-            <div className="mt-5 flex flex-col gap-3">
-              <div className="relative">
+        <div className="mt-5 rounded-2xl bg-white p-4 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.08)] ring-1 ring-slate-200/70">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-1 flex-col gap-3 md:flex-row md:items-center">
+              <div className="relative w-full md:max-w-[360px]">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="h-11 w-full rounded-xl bg-white pl-10 pr-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
-                  placeholder="Nome, telefone, interesse, origem..."
+                  placeholder="Buscar..."
                 />
               </div>
 
               <select
                 value={sourceFilter}
                 onChange={(e) => setSourceFilter(e.target.value)}
-                className="h-11 w-full rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
+                className="h-11 w-full rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10 md:w-[220px]"
               >
-                <option value="">Todas as origens</option>
+                <option value="">Origem</option>
                 {uniqueSources.map((s) => (
                   <option key={s} value={s}>
                     {s}
@@ -729,9 +653,9 @@ export default function LeadsAdminPage() {
               <select
                 value={brokerFilter}
                 onChange={(e) => setBrokerFilter(e.target.value)}
-                className="h-11 w-full rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
+                className="h-11 w-full rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10 md:w-[240px]"
               >
-                <option value="">Todos os corretores</option>
+                <option value="">Corretor</option>
                 {brokers.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.full_name ?? "-"}
@@ -739,330 +663,172 @@ export default function LeadsAdminPage() {
                 ))}
               </select>
             </div>
-          </div>
 
-          <div className="mt-6 rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-sm font-semibold text-slate-900">Distribuição</div>
-                <div className="mt-1 text-xs text-slate-500">
-                  Round-robin (corretores ativos). Atribuição sem Auth.
-                </div>
-              </div>
-              <Users className="h-4 w-4 text-slate-400" />
-            </div>
-
-            <div className="mt-5 flex flex-col gap-3">
-              <label className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70">
-                <div className="text-sm font-semibold text-slate-900">Auto-distribuir novos leads</div>
-                <input
-                  type="checkbox"
-                  checked={autoDistribute}
-                  onChange={(e) => setAutoDistribute(e.target.checked)}
-                />
-              </label>
-
-              <button
-                type="button"
-                onClick={() => void distributeUnassigned()}
-                disabled={isDistributing}
-                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#001f3f] px-5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#001a33] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isDistributing ? "Distribuindo..." : "Distribuir leads sem corretor"}
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => void load()}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.08)] ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Atualizar
+            </button>
           </div>
         </div>
 
-        <div className="lg:col-span-8">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-            <div className="lg:col-span-8">
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                <div className="flex min-h-[560px] flex-col rounded-2xl bg-white p-5 shadow-[0_10px_30px_-20px_rgba(15,23,42,0.25)] ring-1 ring-[#E2E8F0]">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold text-[#001f3f]">Novo Lead</div>
-                      <div className="mt-1 text-xs text-slate-500">Entrada e primeiro contato.</div>
-                    </div>
-                    <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-slate-50 px-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200/70">
-                      {countsByStage.recebido}
-                    </span>
-                  </div>
+        {errorMessage ? (
+          <div className="mt-5 rounded-2xl bg-red-50 px-5 py-4 text-sm text-red-700 ring-1 ring-red-200/70">
+            {errorMessage}
+          </div>
+        ) : null}
 
-                  <div className="mt-4 grid flex-1 grid-cols-1 content-start gap-3 sm:grid-cols-2">
-                    {receivedLeads.length > 0 ? (
-                      receivedLeads.map((lead) => (
-                        <button
-                          key={lead.id}
-                          type="button"
-                          onClick={() => void openLeadModal(lead)}
-                          className="text-left"
-                        >
-                          <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50/70">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="truncate text-sm font-semibold text-slate-900">
-                                  {lead.full_name}
-                                </div>
-                                <div className="mt-1 text-xs text-slate-600">{lead.phone}</div>
-                              </div>
-                              <span
-                                className={
-                                  "inline-flex items-center justify-center rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 " +
-                                  sourceBadgeCls(lead.source)
-                                }
-                              >
-                                {(lead.source ?? "Outros").slice(0, 18)}
-                              </span>
-                            </div>
-
-                            {lead.interest ? (
-                              <div className="mt-3 text-xs text-slate-700">
-                                <span className="font-semibold text-slate-900">Interesse:</span> {lead.interest}
-                              </div>
-                            ) : null}
-
-                            {lead.assigned_broker_profile_id ? (
-                              <div className="mt-2 text-[11px] text-slate-500">
-                                Enviado para:{" "}
-                                <span className="font-semibold text-slate-700">
-                                  {brokerById.get(lead.assigned_broker_profile_id)?.full_name ?? "-"}
-                                </span>
-                              </div>
-                            ) : null}
-                          </div>
-                        </button>
-                      ))
-                    ) : (
-                      <div className="col-span-full flex flex-1 items-center justify-center rounded-xl bg-slate-50 px-4 py-10 text-center ring-1 ring-slate-200/70">
-                        <div className="flex flex-col items-center gap-3">
-                          <svg
-                            width="46"
-                            height="46"
-                            viewBox="0 0 48 48"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="text-slate-300"
-                            aria-hidden="true"
-                          >
-                            <path
-                              d="M14 19.5C14 13.701 18.701 9 24.5 9C30.299 9 35 13.701 35 19.5C35 25.299 30.299 30 24.5 30C18.701 30 14 25.299 14 19.5Z"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                            />
-                            <path
-                              d="M31.5 31.5L39 39"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                            />
-                          </svg>
-                          <div className="text-xs font-semibold tracking-wide text-slate-500">
-                            Nenhum lead nesta etapa
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+        <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
+          {columns.map((col) => {
+            const items = filtered.filter((l) => col.stages.includes(l.stage));
+            return (
+              <div key={col.key} className="flex min-h-[70vh] flex-col rounded-2xl">
+                <div className={"flex items-center justify-between rounded-t-2xl px-4 py-3 text-white " + col.headerCls}>
+                  <div className="text-sm font-semibold">{col.label}</div>
+                  <div className="text-xs font-semibold tabular-nums">{items.length}</div>
                 </div>
-
-                <div className="flex min-h-[560px] flex-col rounded-2xl bg-white p-5 shadow-[0_10px_30px_-20px_rgba(15,23,42,0.25)] ring-1 ring-[#E2E8F0]">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold text-[#001f3f]">Em Atendimento</div>
-                      <div className="mt-1 text-xs text-slate-500">Diagnóstico e follow-up.</div>
+                <div className="flex flex-1 flex-col gap-3 rounded-b-2xl bg-white p-4 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.08)] ring-1 ring-slate-200/70">
+                  {items.length === 0 ? (
+                    <div className="flex flex-1 items-center justify-center rounded-xl bg-slate-50 px-4 py-10 text-center ring-1 ring-slate-200/70">
+                      <div className="text-xs font-semibold tracking-wide text-slate-500">Sem leads</div>
                     </div>
-                    <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-slate-50 px-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200/70">
-                      {countsByStage.atendimento}
-                    </span>
-                  </div>
+                  ) : null}
 
-                  <div className="mt-4 grid flex-1 grid-cols-1 content-start gap-3 sm:grid-cols-2">
-                    {atendimentoLeads.length > 0 ? (
-                      atendimentoLeads.map((lead) => (
-                        <button
-                          key={lead.id}
-                          type="button"
-                          onClick={() => void openLeadModal(lead)}
-                          className="text-left"
-                        >
-                          <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50/70">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="truncate text-sm font-semibold text-slate-900">
-                                  {lead.full_name}
-                                </div>
-                                <div className="mt-1 text-xs text-slate-600">{lead.phone}</div>
-                              </div>
+                  {items.map((lead) => {
+                    const icon = sourceIconName(lead.source);
+                    const SourceIcon = icon === "search" ? Search : icon === "whatsapp" ? MessageCircle : Globe;
 
-                              {(() => {
-                                const id = lead.assigned_broker_profile_id ?? "";
-                                const broker = id ? brokerById.get(id) : null;
-                                if (!broker) {
-                                  return (
-                                    <span
-                                      className={
-                                        "inline-flex items-center justify-center rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 " +
-                                        sourceBadgeCls(lead.source)
-                                      }
-                                    >
-                                      {(lead.source ?? "Outros").slice(0, 18)}
-                                    </span>
-                                  );
-                                }
-                                const initials = formatInitials(broker.full_name ?? "");
-                                return broker.avatar_url ? (
-                                  <img
-                                    src={broker.avatar_url}
-                                    alt={broker.full_name ?? "Corretor"}
-                                    className="h-9 w-9 rounded-full object-cover ring-1 ring-slate-200/70"
-                                  />
-                                ) : (
-                                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-xs font-semibold text-slate-700 ring-1 ring-slate-200/70">
-                                    {initials}
-                                  </div>
-                                );
-                              })()}
-                            </div>
+                    const digits = sanitizePhone(lead.phone);
+                    const waDigits = digits.startsWith("55") ? digits : digits ? `55${digits}` : "";
+                    const waHref = waDigits ? `https://wa.me/${waDigits}` : "";
+                    const telHref = digits ? `tel:${digits}` : "";
 
-                            <div className="mt-3 flex items-center justify-between gap-3">
-                              <div className="truncate text-[11px] text-slate-500">Origem: {lead.source ?? "-"}</div>
-                              <div className="truncate text-[11px] text-slate-500">
-                                Corretor: {(() => {
-                                  const id = lead.assigned_broker_profile_id ?? "";
-                                  if (!id) return "-";
-                                  const broker = brokerById.get(id);
-                                  return broker?.full_name ?? id;
-                                })()}
-                              </div>
-                            </div>
+                    const canPrev = col.key !== "novo";
+                    const canNext = col.key !== "ganho";
 
-                            {lead.assigned_broker_profile_id ? (
-                              <div className="mt-2 text-[11px] text-slate-500">
-                                Enviado para:{" "}
-                                <span className="font-semibold text-slate-700">
-                                  {brokerById.get(lead.assigned_broker_profile_id)?.full_name ?? "-"}
-                                </span>
-                              </div>
-                            ) : null}
-                          </div>
-                        </button>
-                      ))
-                    ) : (
-                      <div className="col-span-full flex flex-1 items-center justify-center rounded-xl bg-slate-50 px-4 py-10 text-center ring-1 ring-slate-200/70">
-                        <div className="flex flex-col items-center gap-3">
-                          <Sparkles className="h-10 w-10 text-slate-300" />
-                          <div className="text-xs font-semibold tracking-wide text-slate-500">
-                            Nenhum lead nesta etapa
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
+                    const prevStage: LeadStage = col.key === "atendimento" ? "recebido" : "atendimento";
+                    const nextStage: LeadStage = col.key === "novo" ? "atendimento" : "vendido";
 
-            <div className="lg:col-span-4">
-              <div className="flex min-h-[560px] flex-col rounded-2xl bg-white p-5 shadow-[0_10px_30px_-20px_rgba(15,23,42,0.25)] ring-1 ring-[#E2E8F0]">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="text-sm font-semibold text-[#001f3f]">Fluxo</div>
-                    <div className="mt-1 text-xs text-slate-500">
-                      Métricas por etapa (visão cockpit).
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 flex flex-col gap-2 rounded-2xl bg-slate-50 p-2 ring-1 ring-slate-200/70">
-                  {(
-                    [
-                      [ClipboardCheck, "Qualificado", "qualificado"],
-                      [BadgeCheck, "Visita", "visita"],
-                      [FileText, "Proposta", "proposta"],
-                      [Handshake, "Contrato", "contrato"],
-                      [Sparkles, "Vendidos", "vendido"],
-                    ] as const
-                  ).map(([Icon, label, key]) => {
-                    const active = sideStage === key;
-                    const count = countsByStage[key];
                     return (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => setSideStage(key)}
-                        className={
-                          "flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-300 " +
-                          (active
-                            ? "bg-white text-slate-900 shadow-[0_8px_18px_-16px_rgba(15,23,42,0.35)] ring-1 ring-slate-200/70"
-                            : "text-slate-700 hover:bg-white/70")
-                        }
+                      <div
+                        key={lead.id}
+                        className="rounded-2xl bg-white p-4 shadow-[0_8px_18px_-16px_rgba(15,23,42,0.35)] ring-1 ring-slate-200/70"
                       >
-                        <span className="flex min-w-0 items-center gap-2">
-                          <Icon className="h-4 w-4 text-slate-400" />
-                          <span className="truncate font-semibold">{label}</span>
-                        </span>
-                        <span className="text-sm font-semibold tabular-nums text-slate-900">
-                          {count}
-                        </span>
-                      </button>
+                        <div className="flex items-start justify-between gap-3">
+                          <button
+                            type="button"
+                            onClick={() => void openLeadModal(lead)}
+                            className="min-w-0 text-left"
+                          >
+                            <div className="truncate text-sm font-semibold text-slate-900">{lead.full_name}</div>
+                            <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-500">
+                              <SourceIcon className="h-3.5 w-3.5 text-slate-400" />
+                              <span className="truncate">{lead.source ?? "-"}</span>
+                            </div>
+                          </button>
+
+                          <div className="flex shrink-0 flex-col items-end gap-2">
+                            {typeof lead.estimated_value === "number" ? (
+                              <div className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-800 ring-1 ring-slate-200/70">
+                                <DollarSign className="h-3.5 w-3.5 text-slate-400" />
+                                {formatCurrencyBRL(lead.estimated_value)}
+                              </div>
+                            ) : null}
+
+                            <span
+                              className={
+                                "inline-flex items-center justify-center rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 " +
+                                sourceBadgeCls(lead.source)
+                              }
+                            >
+                              {(lead.source ?? "Outros").slice(0, 14)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 flex items-center justify-between gap-3">
+                          {lead.slug_imovel || lead.interest ? (
+                            <span className="inline-flex max-w-[70%] items-center justify-center truncate rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200/70">
+                              {lead.slug_imovel ?? lead.interest}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-slate-400">&nbsp;</span>
+                          )}
+
+                          <div className="flex items-center gap-1.5">
+                            <a
+                              href={waHref}
+                              target="_blank"
+                              rel="noreferrer"
+                              className={
+                                "inline-flex h-9 w-9 items-center justify-center rounded-xl ring-1 transition-all duration-300 " +
+                                (waHref
+                                  ? "bg-emerald-50 text-emerald-700 ring-emerald-200/70 hover:-translate-y-[1px]"
+                                  : "bg-slate-50 text-slate-300 ring-slate-200/70 pointer-events-none")
+                              }
+                              aria-label="Abrir WhatsApp"
+                              title="WhatsApp"
+                            >
+                              <MessageCircle className="h-4 w-4" />
+                            </a>
+                            <a
+                              href={telHref}
+                              className={
+                                "inline-flex h-9 w-9 items-center justify-center rounded-xl ring-1 transition-all duration-300 " +
+                                (telHref
+                                  ? "bg-slate-900 text-white ring-slate-900/10 hover:-translate-y-[1px]"
+                                  : "bg-slate-50 text-slate-300 ring-slate-200/70 pointer-events-none")
+                              }
+                              aria-label="Ligar"
+                              title="Telefone"
+                            >
+                              <Phone className="h-4 w-4" />
+                            </a>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 flex items-center justify-between gap-2">
+                          <div className="text-[11px] text-slate-500">
+                            {lead.assigned_broker_profile_id
+                              ? brokerById.get(lead.assigned_broker_profile_id)?.full_name ?? "-"
+                              : "-"}
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              disabled={!canPrev || movingLeadId === lead.id}
+                              onClick={() => void setLeadStage(lead.id, prevStage)}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white text-slate-700 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                              aria-label="Voltar etapa"
+                              title="Voltar"
+                            >
+                              <ArrowLeft className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={!canNext || movingLeadId === lead.id}
+                              onClick={() => void setLeadStage(lead.id, nextStage)}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white text-slate-700 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                              aria-label="Avançar etapa"
+                              title="Avançar"
+                            >
+                              <ArrowRight className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
-
-                <div className="mt-4 flex items-center justify-between">
-                  <div className="text-sm font-semibold text-[#001f3f]">
-                    {(() => {
-                      if (sideStage === "qualificado") return "Qualificados";
-                      if (sideStage === "visita") return "Visitas";
-                      if (sideStage === "proposta") return "Propostas";
-                      if (sideStage === "contrato") return "Contratos";
-                      return "Vendidos";
-                    })()}
-                  </div>
-                  <div className="text-xs text-slate-500">{sideLeads.length}</div>
-                </div>
-
-                <div className="mt-4 flex flex-1 flex-col gap-2 overflow-auto pr-1">
-                  {sideLeads.length > 0 ? (
-                    sideLeads.map((lead) => (
-                      <button
-                        key={lead.id}
-                        type="button"
-                        onClick={() => void openLeadModal(lead)}
-                        className="rounded-xl bg-slate-50 px-4 py-3 text-left ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50/70"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="truncate text-sm font-semibold text-slate-900">
-                              {lead.full_name}
-                            </div>
-                            <div className="mt-1 text-xs text-slate-600">{lead.phone}</div>
-                          </div>
-                          <span
-                            className={
-                              "inline-flex items-center justify-center rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 " +
-                              sourceBadgeCls(lead.source)
-                            }
-                          >
-                            {(lead.source ?? "Outros").slice(0, 12)}
-                          </span>
-                        </div>
-                      </button>
-                    ))
-                  ) : (
-                    <div className="flex flex-1 items-center justify-center rounded-xl bg-slate-50 px-4 py-10 text-center ring-1 ring-slate-200/70">
-                      <div className="text-xs font-semibold tracking-wide text-slate-500">
-                        Nenhum lead nesta etapa
-                      </div>
-                    </div>
-                  )}
-                </div>
               </div>
-            </div>
-          </div>
+            );
+          })}
         </div>
-      </section>
+      </div>
 
       {selectedLead ? (
         <div
@@ -1104,14 +870,6 @@ export default function LeadsAdminPage() {
                   }
                 >
                   {selectedLead.source ?? "Outros"}
-                </span>
-                <span
-                  className={
-                    "inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-semibold ring-1 " +
-                    stageBadgeCls(selectedLead.stage)
-                  }
-                >
-                  {selectedLead.stage}
                 </span>
               </div>
 
@@ -1241,6 +999,86 @@ export default function LeadsAdminPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isCreateOpen ? (
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
+          <div
+            className="absolute inset-0 bg-slate-900/40"
+            onClick={() => setIsCreateOpen(false)}
+            aria-hidden="true"
+          />
+
+          <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-[0_24px_60px_-40px_rgba(15,23,42,0.75)] ring-1 ring-slate-200/70">
+            <div className="flex items-center justify-between gap-4">
+              <div className="text-base font-semibold text-slate-900">Novo Lead</div>
+              <button
+                type="button"
+                onClick={() => setIsCreateOpen(false)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-slate-700 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-100"
+                aria-label="Fechar"
+              >
+                ×
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                void createLead(e as any);
+                setIsCreateOpen(false);
+              }}
+              className="mt-5 flex flex-col gap-4"
+            >
+              <label className="flex flex-col gap-2">
+                <span className="text-xs font-semibold tracking-wide text-slate-600">Nome</span>
+                <input
+                  value={form.full_name}
+                  onChange={(e) => setForm((s) => ({ ...s, full_name: e.target.value }))}
+                  className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
+                  required
+                />
+              </label>
+
+              <label className="flex flex-col gap-2">
+                <span className="text-xs font-semibold tracking-wide text-slate-600">Telefone</span>
+                <input
+                  value={form.phone}
+                  onChange={(e) => setForm((s) => ({ ...s, phone: e.target.value }))}
+                  className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
+                  required
+                  inputMode="tel"
+                />
+              </label>
+
+              <label className="flex flex-col gap-2">
+                <span className="text-xs font-semibold tracking-wide text-slate-600">Imóvel de interesse</span>
+                <input
+                  value={form.interest}
+                  onChange={(e) => setForm((s) => ({ ...s, interest: e.target.value }))}
+                  className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
+                />
+              </label>
+
+              <label className="flex flex-col gap-2">
+                <span className="text-xs font-semibold tracking-wide text-slate-600">Origem</span>
+                <input
+                  value={form.source}
+                  onChange={(e) => setForm((s) => ({ ...s, source: e.target.value }))}
+                  className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
+                />
+              </label>
+
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white shadow-[0_10px_24px_-18px_rgba(16,185,129,0.55)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Plus className="h-4 w-4" />
+                {isSaving ? "Salvando..." : "Criar"}
+              </button>
+            </form>
           </div>
         </div>
       ) : null}
