@@ -599,22 +599,22 @@ export default function JuridicoAdminPage() {
 
   return (
     <div className="min-h-screen w-full bg-slate-100 px-6 py-6">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
-      <header className="flex flex-col gap-2">
-        <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">
-          JURÍDICO • INTELIGÊNCIA DE RISCO
-        </div>
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Jurídico</h1>
-        <p className="text-sm leading-relaxed text-slate-600">
-          Centro de inteligência: semáforo de risco, workflow processual (timeline) e controle de honorários.
-        </p>
-      </header>
+      <div className="flex w-full flex-col gap-8">
+        <header className="flex flex-col gap-2">
+          <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">
+            JURÍDICO • INTELIGÊNCIA DE RISCO
+          </div>
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Jurídico</h1>
+          <p className="text-sm leading-relaxed text-slate-600">
+            Centro de inteligência: semáforo de risco, workflow processual (timeline) e controle de honorários.
+          </p>
+        </header>
 
-      {errorMessage ? (
-        <div className="rounded-2xl bg-red-50 px-5 py-4 text-sm text-red-700 ring-1 ring-red-200/70">
-          {errorMessage}
-        </div>
-      ) : null}
+        {errorMessage ? (
+          <div className="rounded-2xl bg-red-50 px-5 py-4 text-sm text-red-700 ring-1 ring-red-200/70">
+            {errorMessage}
+          </div>
+        ) : null}
 
       <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">

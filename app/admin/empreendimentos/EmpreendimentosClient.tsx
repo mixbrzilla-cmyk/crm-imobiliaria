@@ -549,16 +549,11 @@ export default function EmpreendimentosClient() {
 
   return (
     <div className="flex w-full flex-col gap-8">
-      <div className="rounded-2xl bg-gradient-to-r from-[#001f3f] via-slate-900 to-[#ff0000] px-6 py-5 text-center shadow-[0_10px_24px_-14px_rgba(15,23,42,0.55)] ring-1 ring-slate-200/70">
-        <div className="text-[11px] font-semibold tracking-[0.28em] text-white/80">VALIDAÇÃO VISUAL</div>
-        <div className="mt-1 text-2xl font-semibold tracking-tight text-white">ESTILO VITRINE ATIVADO</div>
-      </div>
-
       <header className="flex flex-col gap-4">
         <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">LANÇAMENTOS</div>
         <div className="flex flex-col items-start justify-between gap-4 lg:flex-row lg:items-end">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Empreendimentos</h1>
+            <h1 className="text-2xl font-bold text-slate-800">Gestão de Empreendimentos</h1>
             <p className="mt-1 text-sm leading-relaxed text-slate-600">
               Portfólio de lançamentos com ficha técnica, infraestrutura e mídia de impacto.
             </p>
