@@ -309,27 +309,7 @@ export default function CorretoresAdminPage() {
                     key={r.id}
                     className="group relative rounded-2xl bg-white p-6 shadow-xl transition-all duration-300 hover:-translate-y-[2px]"
                   >
-                    <div className="absolute right-4 top-4 flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedBrokerId(r.id)}
-                        className="inline-flex h-10 items-center justify-center rounded-xl bg-white px-4 text-xs font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
-                      >
-                        Ver relatório
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void deleteBroker(r.id)}
-                        disabled={deletingId === r.id}
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-700 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-                        aria-label="Excluir corretor"
-                        title="Excluir"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-
-                    <div className="flex items-start justify-between gap-4 pr-28">
+                    <div className="flex items-start justify-between gap-4">
                       <div className="relative">
                         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">
                           {initialsFromName(r.full_name)}
@@ -343,28 +323,36 @@ export default function CorretoresAdminPage() {
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <div className="truncate text-base font-semibold text-slate-900">{r.full_name}</div>
-                          <div
-                            className={
-                              "inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold ring-1 " +
-                              (r.isActive
-                                ? "bg-emerald-50 text-emerald-700 ring-emerald-200/70"
-                                : "bg-slate-50 text-slate-700 ring-slate-200/70")
-                            }
-                          >
-                            {r.isActive ? "Ativo" : "Inativo"}
-                          </div>
-                        </div>
+                        <div className="truncate text-base font-semibold text-slate-900">{r.full_name}</div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedBrokerId(r.id)}
+                          className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-700 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
+                          aria-label="Ver relatório"
+                          title="Ver relatório"
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void deleteBroker(r.id)}
+                          disabled={deletingId === r.id}
+                          className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-700 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          aria-label="Excluir corretor"
+                          title="Excluir"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </div>
                     </div>
 
                     <div className="mt-5 flex items-center justify-between gap-4">
-                      <div className="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70">
-                        <div className="text-[11px] font-semibold tracking-wide text-slate-600">Imóveis em mãos</div>
-                        <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
-                          {r.propertiesInHands}
-                        </div>
+                      <div className="inline-flex items-center gap-2 rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70">
+                        <div className="text-2xl font-semibold tracking-tight text-slate-900">{r.propertiesInHands}</div>
+                        <div className="text-xs font-semibold text-slate-600">imóveis</div>
                       </div>
 
                       <div
