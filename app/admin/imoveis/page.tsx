@@ -34,6 +34,7 @@ type PropertyRow = {
   price: number | null;
   is_premium?: boolean | null;
   corretor_id?: string | null;
+  data_direcionamento?: string | null;
   neighborhood: string | null;
   city: string | null;
   bedrooms: number | null;
@@ -177,7 +178,7 @@ export default function InventarioImoveisPage() {
       const { data, error } = await supabase
         .from("properties")
         .select(
-          "id, title, property_type, purpose, price, is_premium, corretor_id, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description, created_at",
+          "id, title, property_type, purpose, price, is_premium, corretor_id, data_direcionamento, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description, created_at",
         )
         .order("created_at", { ascending: false });
 
@@ -264,13 +265,20 @@ export default function InventarioImoveisPage() {
       return;
     }
 
+    const nextBrokerId = brokerId || null;
+    const nowIso = nextBrokerId ? new Date().toISOString() : null;
+
     setUpdatingFieldByRowId((c) => ({ ...c, [rowId]: "corretor" }));
-    setRows((current) => current.map((r) => (r.id === rowId ? { ...r, corretor_id: brokerId || null } : r)));
+    setRows((current) =>
+      current.map((r) =>
+        r.id === rowId ? { ...r, corretor_id: nextBrokerId, data_direcionamento: nowIso } : r,
+      ),
+    );
 
     try {
       const { error } = await (supabase as any)
         .from("properties")
-        .update({ corretor_id: brokerId || null })
+        .update({ corretor_id: nextBrokerId, data_direcionamento: nowIso })
         .eq("id", rowId);
 
       if (error) {

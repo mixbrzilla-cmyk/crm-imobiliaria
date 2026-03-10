@@ -24,6 +24,23 @@ type LeadRow = {
   created_at?: string;
 };
 
+type DirecionamentoRow = {
+  id: string;
+  title: string | null;
+  neighborhood: string | null;
+  city: string | null;
+  corretor_id: string | null;
+  data_direcionamento: string | null;
+};
+
+type DirecionamentoViewRow = {
+  id: string;
+  brokerName: string;
+  propertyLabel: string;
+  directedAtIso: string;
+  daysSince: number;
+};
+
 type TopProperty = {
   id: string;
   property_type: string;
@@ -52,6 +69,13 @@ function formatCurrencyBRL(value: number) {
     currency: "BRL",
     maximumFractionDigits: 0,
   });
+}
+
+function formatDaysSinceLabel(days: number) {
+  if (!Number.isFinite(days) || days < 0) return "-";
+  if (days === 0) return "Hoje";
+  if (days === 1) return "Há 1 dia";
+  return `Há ${days} dias`;
 }
 
 function normalizeLeadSource(input: string | null): LeadSource {
@@ -136,6 +160,8 @@ export default function AdminDashboardClient() {
   });
   const [topProperties, setTopProperties] = useState<TopProperty[]>([]);
 
+  const [direcionamentos, setDirecionamentos] = useState<DirecionamentoViewRow[]>([]);
+
   const [whatsActivityLines, setWhatsActivityLines] = useState<WhatsActivityLine[]>([]);
 
   const hasRows = useMemo(() => rows.length > 0, [rows.length]);
@@ -168,6 +194,7 @@ export default function AdminDashboardClient() {
         outros: 0,
       });
       setTopProperties([]);
+      setDirecionamentos([]);
       return;
     }
 
@@ -205,6 +232,7 @@ export default function AdminDashboardClient() {
         avulsosIdsRes,
         devIdsRes,
         inventarioIdsRes,
+        direcionamentosRes,
       ] =
         await Promise.allSettled([
           brokerProfilesQuery,
@@ -241,6 +269,15 @@ export default function AdminDashboardClient() {
           supabase.from("standalone_properties").select("id, corretor_id"),
           (supabase as any).from("developments").select("id, corretor_id"),
           supabase.from("properties").select("id, corretor_id"),
+
+          // Relatório de direcionamento (posse)
+          supabase
+            .from("properties")
+            .select("id, title, neighborhood, city, corretor_id, data_direcionamento")
+            .not("corretor_id", "is", null)
+            .not("data_direcionamento", "is", null)
+            .order("data_direcionamento", { ascending: false })
+            .limit(50),
         ]);
 
       if (profilesRes.status === "fulfilled" && profilesRes.value.error) {
@@ -309,6 +346,43 @@ export default function AdminDashboardClient() {
       setTotalImoveisCount(totalCount);
       setAssignedImoveisCount(assignedCount);
       setUnassignedImoveisCount(unassignedCount);
+
+      const profilesById = new Map<string, Profile>();
+      if (profilesRes.status === "fulfilled" && !profilesRes.value.error) {
+        const allRows = (profilesRes.value.data ?? []) as Profile[];
+        for (const p of allRows) profilesById.set(p.id, p);
+      }
+
+      if (direcionamentosRes.status === "fulfilled") {
+        if (direcionamentosRes.value.error) {
+          console.log("[Dashboard] Erro ao carregar direcionamentos:", direcionamentosRes.value.error);
+          setDirecionamentos([]);
+        } else {
+          const data = (direcionamentosRes.value.data ?? []) as DirecionamentoRow[];
+          const nowTs = Date.now();
+          const view = data
+            .filter((r) => Boolean(r.corretor_id) && Boolean(r.data_direcionamento))
+            .map((r) => {
+              const brokerId = r.corretor_id ?? "";
+              const brokerName = (profilesById.get(brokerId)?.full_name ?? "").trim() || brokerId;
+              const loc = [r.neighborhood, r.city].filter(Boolean).join(" • ");
+              const propertyLabel = (r.title ?? "").trim() || loc || r.id;
+              const directedAt = r.data_direcionamento ?? "";
+              const directedTs = directedAt ? new Date(directedAt).getTime() : NaN;
+              const daysSince = Number.isFinite(directedTs)
+                ? Math.max(0, Math.floor((nowTs - directedTs) / (24 * 60 * 60 * 1000)))
+                : -1;
+              return {
+                id: r.id,
+                brokerName,
+                propertyLabel,
+                directedAtIso: directedAt,
+                daysSince,
+              };
+            });
+          setDirecionamentos(view);
+        }
+      }
 
       if (leadsRes.status === "fulfilled") {
         if (leadsRes.value.error) {
@@ -398,11 +472,7 @@ export default function AdminDashboardClient() {
           setWhatsActivityLines([]);
         } else {
           const msgRows = (whatsRes.value.data ?? []) as Array<any>;
-          const profilesById = new Map<string, Profile>();
-          if (profilesRes.status === "fulfilled" && !profilesRes.value.error) {
-            const allRows = (profilesRes.value.data ?? []) as Profile[];
-            for (const p of allRows) profilesById.set(p.id, p);
-          }
+          // profilesById já montado acima
 
           const bucket = new Map<string, { brokerId: string; brokerName: string; leadLabel: string; count: number; threadId: string }>();
 
@@ -477,6 +547,7 @@ export default function AdminDashboardClient() {
       });
       setTopProperties([]);
       setWhatsActivityLines([]);
+      setDirecionamentos([]);
     }
   }, [supabase]);
 
@@ -555,6 +626,61 @@ export default function AdminDashboardClient() {
             {unassignedImoveisCount}
           </div>
           <div className="mt-2 text-xs text-slate-500">Ações pendentes de distribuição</div>
+        </div>
+      </section>
+
+      <section className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
+        <div className="flex items-start justify-between gap-6">
+          <div>
+            <div className="text-sm font-semibold text-slate-900">Relatório de Direcionamento</div>
+            <div className="mt-1 text-xs text-slate-500">Quem está com a posse do imóvel</div>
+          </div>
+        </div>
+
+        <div className="mt-5 overflow-x-auto">
+          <table className="min-w-full border-separate border-spacing-0">
+            <thead>
+              <tr className="bg-slate-50">
+                <th className="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">
+                  Corretor
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">
+                  Imóvel
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">
+                  Direcionado em
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">
+                  Status de tempo
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {direcionamentos.length > 0 ? (
+                direcionamentos.map((r) => (
+                  <tr
+                    key={r.id}
+                    className="border-t border-slate-100 transition-all duration-300 hover:bg-slate-50/60"
+                  >
+                    <td className="px-4 py-3 text-sm font-semibold text-slate-900">{r.brokerName}</td>
+                    <td className="px-4 py-3 text-sm text-slate-700">{r.propertyLabel}</td>
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                      {r.directedAtIso ? new Date(r.directedAtIso).toLocaleDateString("pt-BR") : "-"}
+                    </td>
+                    <td className="px-4 py-3 text-sm font-semibold text-slate-900">
+                      {formatDaysSinceLabel(r.daysSince)}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="px-4 py-6 text-sm text-slate-600" colSpan={4}>
+                    Nenhum direcionamento registrado.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </section>
 
