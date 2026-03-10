@@ -268,9 +268,6 @@ export default function CorretoresAdminPage() {
   return (
     <div className="min-h-screen w-full bg-slate-100 px-6 py-6">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-        <div className="rounded-2xl bg-[#001f3f] px-6 py-4 text-center text-2xl font-extrabold tracking-tight text-white shadow-lg">
-          TESTE DE LAYOUT BITRIX
-        </div>
         <header className="flex items-end justify-between gap-4">
           <div className="flex flex-col gap-2">
             <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">GESTÃO DE CORRETORES</div>
@@ -301,7 +298,7 @@ export default function CorretoresAdminPage() {
             Nenhum corretor encontrado.
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
               {rows.map((r) => {
                 const showTags = r.assignedProperties.slice(0, 6);
                 const hiddenCount = Math.max(0, r.assignedProperties.length - showTags.length);
@@ -310,7 +307,7 @@ export default function CorretoresAdminPage() {
                 return (
                   <div
                     key={r.id}
-                    className="group relative rounded-2xl border-t-4 border-blue-600 bg-white p-6 shadow-lg transition-all duration-300 hover:-translate-y-[2px]"
+                    className="group relative rounded-2xl bg-white p-6 shadow-xl transition-all duration-300 hover:-translate-y-[2px]"
                   >
                     <div className="absolute right-4 top-4 flex items-center gap-2">
                       <button
@@ -359,7 +356,6 @@ export default function CorretoresAdminPage() {
                             {r.isActive ? "Ativo" : "Inativo"}
                           </div>
                         </div>
-                        <div className="mt-1 truncate text-sm text-slate-600">{r.email}</div>
                       </div>
                     </div>
 
@@ -373,10 +369,10 @@ export default function CorretoresAdminPage() {
 
                       <div
                         className={
-                          "flex h-20 w-20 flex-col items-center justify-center rounded-full ring-1 transition-all duration-300 " +
+                          "flex h-20 w-20 flex-col items-center justify-center rounded-full transition-all duration-300 " +
                           (hasClicks
-                            ? "bg-emerald-600 text-white ring-emerald-500/40 shadow-[0_14px_28px_-18px_rgba(5,150,105,0.85)]"
-                            : "bg-slate-50 text-slate-600 ring-slate-200/70")
+                            ? "bg-[#22c55e] text-white shadow-[0_18px_34px_-22px_rgba(34,197,94,0.95)]"
+                            : "bg-slate-100 text-slate-600 ring-1 ring-slate-200/70")
                         }
                         title={hasClicks ? `${r.whatsClicks} cliques` : "0 cliques"}
                       >
@@ -384,7 +380,7 @@ export default function CorretoresAdminPage() {
                         <div className={"mt-1 text-lg font-semibold leading-none " + (hasClicks ? "text-white" : "text-slate-700")}>
                           {r.whatsClicks}
                         </div>
-                        <div className={"mt-0.5 text-[10px] font-semibold " + (hasClicks ? "text-emerald-50" : "text-slate-400")}>
+                        <div className={"mt-0.5 text-[10px] font-semibold " + (hasClicks ? "text-white/90" : "text-slate-400")}>
                           {hasClicks ? "cliques" : "0 cliques"}
                         </div>
                       </div>
