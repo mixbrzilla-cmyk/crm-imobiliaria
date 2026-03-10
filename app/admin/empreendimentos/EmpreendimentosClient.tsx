@@ -4,11 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   BadgeCheck,
+  Building2,
   Camera,
   Droplets,
   FileText,
+  Image as ImageIcon,
   Lightbulb,
   MapPin,
+  Plus,
   Route,
   Tag,
   Trees,
@@ -31,6 +34,8 @@ type Development = {
   city?: string | null;
   localidade?: string | null;
 
+  progress_percent?: number | null;
+
   is_premium?: boolean | null;
 
   status?: DevelopmentStatus | null;
@@ -41,10 +46,14 @@ type Development = {
   lots_count?: number | null;
   green_area_m2?: number | null;
 
+  units_count?: number | null;
+
   infra_asphalt?: boolean | null;
   infra_power?: boolean | null;
   infra_water?: boolean | null;
   infra_sewage?: boolean | null;
+
+  infra_leisure?: boolean | null;
 
   gallery_urls?: string[] | null;
 
@@ -69,14 +78,20 @@ type FormState = {
   status: DevelopmentStatus;
   lot_value: string;
 
+  progress_percent: string;
+
   total_area_m2: string;
   lots_count: string;
   green_area_m2: string;
+
+  units_count: string;
 
   infra_asphalt: boolean;
   infra_power: boolean;
   infra_water: boolean;
   infra_sewage: boolean;
+
+  infra_leisure: boolean;
 
   gallery_urls: string;
 
@@ -109,6 +124,10 @@ function parseOptionalInt(value: string) {
   return Number.isFinite(n) ? Math.trunc(n) : null;
 }
 
+function clampInt(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, Math.trunc(n)));
+}
+
 function parseOptionalNumber(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return null;
@@ -130,6 +149,9 @@ export default function EmpreendimentosClient() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalStep, setModalStep] = useState<0 | 1 | 2 | 3>(0);
 
   const [brokers, setBrokers] = useState<BrokerProfile[]>([]);
   const [dispatchSelectionById, setDispatchSelectionById] = useState<Record<string, string>>({});
@@ -175,13 +197,16 @@ export default function EmpreendimentosClient() {
     is_premium: false,
     status: "pre_lancamento",
     lot_value: "",
+    progress_percent: "",
     total_area_m2: "",
     lots_count: "",
     green_area_m2: "",
+    units_count: "",
     infra_asphalt: false,
     infra_power: false,
     infra_water: false,
     infra_sewage: false,
+    infra_leisure: false,
     gallery_urls: "",
     cover_url: "",
     video_url: "",
@@ -192,6 +217,7 @@ export default function EmpreendimentosClient() {
   function resetForm() {
     setSelectedId(null);
     setActiveTab("basicos");
+    setModalStep(0);
     setForm({
       name: "",
       city: "Marabá",
@@ -199,13 +225,16 @@ export default function EmpreendimentosClient() {
       is_premium: false,
       status: "pre_lancamento",
       lot_value: "",
+      progress_percent: "",
       total_area_m2: "",
       lots_count: "",
       green_area_m2: "",
+      units_count: "",
       infra_asphalt: false,
       infra_power: false,
       infra_water: false,
       infra_sewage: false,
+      infra_leisure: false,
       gallery_urls: "",
       cover_url: "",
       video_url: "",
@@ -214,9 +243,21 @@ export default function EmpreendimentosClient() {
     });
   }
 
+  function openNewModal() {
+    setErrorMessage(null);
+    resetForm();
+    setIsModalOpen(true);
+  }
+
+  function closeModal() {
+    setIsModalOpen(false);
+    setModalStep(0);
+  }
+
   function editRow(row: Development) {
     setSelectedId(row.id);
     setActiveTab("basicos");
+    setModalStep(0);
     setForm({
       name: row.name ?? "",
       city: row.city ?? "Marabá",
@@ -229,19 +270,24 @@ export default function EmpreendimentosClient() {
           : typeof row.preco === "number"
             ? formatCurrencyBRL(row.preco, { maximumFractionDigits: 2 })
           : "",
+      progress_percent: row.progress_percent != null ? String(row.progress_percent) : "",
       total_area_m2: row.total_area_m2 != null ? String(row.total_area_m2) : "",
       lots_count: row.lots_count != null ? String(row.lots_count) : "",
       green_area_m2: row.green_area_m2 != null ? String(row.green_area_m2) : "",
+      units_count: row.units_count != null ? String(row.units_count) : "",
       infra_asphalt: Boolean(row.infra_asphalt),
       infra_power: Boolean(row.infra_power),
       infra_water: Boolean(row.infra_water),
       infra_sewage: Boolean(row.infra_sewage),
+      infra_leisure: Boolean(row.infra_leisure),
       gallery_urls: (row.gallery_urls ?? []).join("\n"),
       cover_url: row.cover_url ?? "",
       video_url: row.video_url ?? "",
       sales_material_url: row.sales_material_url ?? "",
       price_table_url: row.price_table_url ?? "",
     });
+    setErrorMessage(null);
+    setIsModalOpen(true);
   }
 
   async function load() {
@@ -258,25 +304,33 @@ export default function EmpreendimentosClient() {
     }
 
     try {
-      const res = await supabase
-        .from("developments")
-        .select(
-          "id, name, cover_url, video_url, sales_material_url, price_table_url, city, localidade, is_premium, status, lot_value, preco, total_area_m2, lots_count, green_area_m2, infra_asphalt, infra_power, infra_water, infra_sewage, gallery_urls, corretor_id, created_at",
-        )
-        .order("created_at", { ascending: false });
+      const fullSelect =
+        "id, name, cover_url, video_url, sales_material_url, price_table_url, city, localidade, is_premium, status, lot_value, preco, progress_percent, total_area_m2, lots_count, green_area_m2, units_count, infra_asphalt, infra_power, infra_water, infra_sewage, infra_leisure, gallery_urls, corretor_id, created_at";
+
+      let res = await supabase.from("developments").select(fullSelect).order("created_at", { ascending: false });
 
       if (res.error) {
         const code = (res.error as any)?.code;
         if (code === "PGRST204" || code === "PGRST301") {
           await testProfilesConnection("load(developments)", res.error);
         }
-        throw res.error;
+
+        const fallbackSelect =
+          "id, name, cover_url, video_url, sales_material_url, price_table_url, city, localidade, is_premium, status, lot_value, preco, corretor_id, created_at";
+        const fallback = await supabase
+          .from("developments")
+          .select(fallbackSelect)
+          .order("created_at", { ascending: false });
+
+        if (fallback.error) throw fallback.error;
+        setSupportsDetails(false);
+        setRows((fallback.data ?? []) as Development[]);
+      } else {
+        setSupportsDetails(true);
+        setRows((res.data ?? []) as Development[]);
       }
-      setSupportsDetails(true);
-      setRows((res.data ?? []) as Development[]);
     } catch (e) {
       console.log("DEBUG SUPABASE:", e);
-      setErrorMessage("Não foi possível carregar empreendimentos agora.");
       setRows([]);
       setSupportsDetails(false);
     }
@@ -429,13 +483,21 @@ export default function EmpreendimentosClient() {
       is_premium: form.is_premium,
       status: form.status,
       lot_value: parseBRLInputToNumber(form.lot_value),
+      progress_percent: (() => {
+        const raw = form.progress_percent.trim();
+        if (!raw) return null;
+        const n = Number(raw);
+        return Number.isFinite(n) ? clampInt(n, 0, 100) : null;
+      })(),
       total_area_m2: parseOptionalNumber(form.total_area_m2),
       lots_count: parseOptionalInt(form.lots_count),
       green_area_m2: parseOptionalNumber(form.green_area_m2),
+      units_count: parseOptionalInt(form.units_count),
       infra_asphalt: form.infra_asphalt,
       infra_power: form.infra_power,
       infra_water: form.infra_water,
       infra_sewage: form.infra_sewage,
+      infra_leisure: form.infra_leisure,
       gallery_urls: gallery.length ? gallery : null,
     };
 
@@ -448,6 +510,7 @@ export default function EmpreendimentosClient() {
       if (res.error) throw res.error;
 
       setIsSaving(false);
+      closeModal();
       resetForm();
       await load();
       return;
@@ -458,524 +521,601 @@ export default function EmpreendimentosClient() {
     }
   }
 
+  function getDisplayValue(dev: Development) {
+    if (typeof dev.lot_value === "number") return formatBRLIntl(dev.lot_value);
+    if (typeof dev.preco === "number") return formatBRLIntl(dev.preco);
+    return "-";
+  }
+
+  function getLocationLabel(dev: Development) {
+    const c = (dev.city ?? "").trim();
+    const l = (dev.localidade ?? "").trim();
+    return c || l ? [c, l].filter(Boolean).join(" • ") : "Local não informado";
+  }
+
+  function progressLabel(dev: Development) {
+    const p = dev.progress_percent;
+    if (typeof p === "number" && Number.isFinite(p)) return `${clampInt(p, 0, 100)}%`;
+    return null;
+  }
+
+  function progressCls(dev: Development) {
+    const p = dev.progress_percent;
+    if (typeof p !== "number" || !Number.isFinite(p)) return "bg-slate-50 text-slate-700 ring-slate-200/70";
+    if (p >= 80) return "bg-emerald-50 text-emerald-800 ring-emerald-200/70";
+    if (p >= 40) return "bg-amber-50 text-amber-900 ring-amber-200/70";
+    return "bg-rose-50 text-rose-800 ring-rose-200/70";
+  }
+
   return (
     <div className="flex w-full flex-col gap-8">
-      <header className="flex flex-col gap-2">
+      <div className="rounded-2xl bg-gradient-to-r from-[#001f3f] via-slate-900 to-[#ff0000] px-6 py-5 text-center shadow-[0_10px_24px_-14px_rgba(15,23,42,0.55)] ring-1 ring-slate-200/70">
+        <div className="text-[11px] font-semibold tracking-[0.28em] text-white/80">VALIDAÇÃO VISUAL</div>
+        <div className="mt-1 text-2xl font-semibold tracking-tight text-white">ESTILO VITRINE ATIVADO</div>
+      </div>
+
+      <header className="flex flex-col gap-4">
         <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">LANÇAMENTOS</div>
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Empreendimentos</h1>
-        <p className="text-sm leading-relaxed text-slate-600">
-          Lançamentos e loteamentos com ficha técnica, infraestrutura e mídia de impacto.
-        </p>
+        <div className="flex flex-col items-start justify-between gap-4 lg:flex-row lg:items-end">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Empreendimentos</h1>
+            <p className="mt-1 text-sm leading-relaxed text-slate-600">
+              Portfólio de lançamentos com ficha técnica, infraestrutura e mídia de impacto.
+            </p>
+          </div>
+
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+            <button
+              type="button"
+              onClick={() => void load()}
+              className="inline-flex h-11 items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-slate-900 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50"
+            >
+              Recarregar
+            </button>
+            <button
+              type="button"
+              onClick={() => openNewModal()}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#ff0000] px-5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#e60000]"
+            >
+              <Plus className="h-4 w-4" />
+              Novo Empreendimento
+            </button>
+          </div>
+        </div>
       </header>
 
-      {errorMessage ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {errorMessage}
-        </div>
-      ) : null}
+      <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {isLoading ? (
+          <div className="rounded-2xl bg-white px-6 py-8 text-sm text-slate-600 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70 lg:col-span-3">
+            Carregando empreendimentos...
+          </div>
+        ) : rows.length > 0 ? (
+          rows.map((r) => {
+            const infraCount =
+              (r.infra_asphalt ? 1 : 0) +
+              (r.infra_power ? 1 : 0) +
+              (r.infra_water ? 1 : 0) +
+              (r.infra_sewage ? 1 : 0) +
+              (r.infra_leisure ? 1 : 0);
+            const progress = progressLabel(r);
+            const value = getDisplayValue(r);
+            return (
+              <div
+                key={r.id}
+                className="group overflow-hidden rounded-2xl bg-white shadow-[0_10px_24px_-14px_rgba(15,23,42,0.55)] ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[2px]"
+              >
+                <div className="relative h-40 w-full bg-gradient-to-br from-slate-900 to-[#001f3f]">
+                  {r.cover_url ? (
+                    <img src={r.cover_url} alt={r.name} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-white/70">
+                      <ImageIcon className="h-10 w-10" />
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-slate-950/25 to-transparent" />
 
-      {!supportsDetails ? (
-        <div className="rounded-2xl bg-amber-50 px-5 py-4 text-sm text-amber-800 ring-1 ring-amber-200/70">
-          Campos técnicos avançados não estão disponíveis no banco ainda. O painel continua operando no modo
-          básico.
-        </div>
-      ) : null}
+                  <div className="absolute left-4 top-4 flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-slate-900 ring-1 ring-white/40">
+                      <Building2 className="h-3.5 w-3.5" />
+                      {statusLabel[(r.status ?? "pre_lancamento") as DevelopmentStatus]}
+                    </span>
+                    {progress ? (
+                      <span className={"inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 " + progressCls(r)}>
+                        {progress} concluído
+                      </span>
+                    ) : null}
+                  </div>
 
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        <div className="lg:col-span-5">
-          <div className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
-            <div className="flex items-start justify-between gap-6">
+                  <div className="absolute bottom-4 left-4 right-4">
+                    <div className="truncate text-lg font-semibold text-white">{r.name}</div>
+                    <div className="mt-1 flex items-center gap-2 text-xs font-medium text-white/80">
+                      <MapPin className="h-3.5 w-3.5" />
+                      <span className="truncate">{getLocationLabel(r)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="text-[11px] font-semibold tracking-[0.18em] text-slate-500">
+                        VALOR
+                      </div>
+                      <div className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">{value}</div>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <span className="inline-flex items-center justify-center rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200/70">
+                        Infra: {infraCount}/5
+                      </span>
+                      {r.is_premium ? (
+                        <span className="inline-flex items-center justify-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 ring-1 ring-emerald-200/70">
+                          Premium
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    {r.infra_asphalt ? (
+                      <span className={"inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ring-1 " + infraBadgeCls(true)}>
+                        <Route className="h-3.5 w-3.5" /> Asfalto
+                      </span>
+                    ) : null}
+                    {r.infra_power ? (
+                      <span className={"inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ring-1 " + infraBadgeCls(true)}>
+                        <Lightbulb className="h-3.5 w-3.5" /> Energia
+                      </span>
+                    ) : null}
+                    {r.infra_leisure ? (
+                      <span className={"inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ring-1 " + infraBadgeCls(true)}>
+                        <Waves className="h-3.5 w-3.5" /> Lazer
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-5 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => editRow(r)}
+                      className="inline-flex h-11 items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedId(r.id);
+                        setDispatchSelectionById((c) => ({ ...c, [r.id]: r.corretor_id ?? "" }));
+                        setIsModalOpen(true);
+                        setModalStep(0);
+                      }}
+                      className="inline-flex h-11 items-center justify-center rounded-xl bg-[#001f3f] px-4 text-sm font-semibold text-white shadow-[0_6px_14px_-10px_rgba(15,23,42,0.45)] transition-all duration-300 hover:bg-[#001a33]"
+                    >
+                      Abrir
+                    </button>
+                  </div>
+
+                  <div className="mt-4 text-xs text-slate-500">
+                    {r.video_url ? "Vídeo disponível" : "Sem vídeo"} • {r.sales_material_url ? "Material OK" : "Sem material"}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <div className="rounded-2xl bg-white px-6 py-10 text-sm text-slate-600 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70 lg:col-span-3">
+            Nenhum empreendimento cadastrado.
+          </div>
+        )}
+      </section>
+
+      {isModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 p-4 sm:items-center">
+          <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-[0_20px_60px_-24px_rgba(15,23,42,0.65)] ring-1 ring-slate-200/70">
+            <div className="flex items-start justify-between gap-6 border-b border-slate-100 px-6 py-5">
               <div>
                 <div className="text-sm font-semibold text-slate-900">
-                  {selectedId ? "Editar empreendimento" : "Novo empreendimento"}
+                  {selectedId ? "Editar Empreendimento" : "Novo Empreendimento"}
                 </div>
                 <div className="mt-1 text-xs text-slate-500">
-                  Loteamento/Lançamento com ficha técnica, status e infraestrutura.
+                  Etapa {modalStep + 1} de 4 • Dados completos do lançamento
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  closeModal();
+                  setErrorMessage(null);
+                }}
+                className="inline-flex h-10 items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
+              >
+                Fechar
+              </button>
+            </div>
+
+            {errorMessage ? (
+              <div className="px-6 pt-5">
+                <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200/70">
+                  {errorMessage}
+                </div>
+              </div>
+            ) : null}
+
+            {!supportsDetails ? (
+              <div className="px-6 pt-5">
+                <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-700 ring-1 ring-slate-200/70">
+                  Alguns campos técnicos ainda não existem no banco. Você já pode cadastrar o básico e depois
+                  completamos.
+                </div>
+              </div>
+            ) : null}
+
+            <form onSubmit={createDevelopment} className="px-6 py-6">
+              <div className="grid grid-cols-4 gap-2 rounded-2xl bg-slate-50 p-2 ring-1 ring-slate-200/70">
+                {(
+                  [
+                    { idx: 0 as const, label: "Dados Básicos", icon: <Tag className="h-4 w-4" /> },
+                    { idx: 1 as const, label: "Ficha Técnica", icon: <FileText className="h-4 w-4" /> },
+                    { idx: 2 as const, label: "Infraestrutura", icon: <Route className="h-4 w-4" /> },
+                    { idx: 3 as const, label: "Mídia & Docs", icon: <Camera className="h-4 w-4" /> },
+                  ] as Array<{ idx: 0 | 1 | 2 | 3; label: string; icon: React.ReactNode }>
+                ).map((t) => {
+                  const isActive = t.idx === modalStep;
+                  return (
+                    <button
+                      key={t.idx}
+                      type="button"
+                      onClick={() => setModalStep(t.idx)}
+                      className={
+                        "flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-[11px] font-semibold transition-all duration-300 " +
+                        (isActive
+                          ? "bg-white text-slate-900 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70"
+                          : "text-slate-600 hover:bg-white/70")
+                      }
+                    >
+                      {t.icon}
+                      <span className="hidden sm:inline">{t.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mt-6 flex flex-col gap-4">
+                {modalStep === 0 ? (
+                  <>
+                    <label className="flex flex-col gap-2">
+                      <span className="text-xs font-semibold tracking-wide text-slate-600">Nome</span>
+                      <input
+                        value={form.name}
+                        onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
+                        className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
+                        placeholder="Ex: Residencial / Loteamento"
+                        required
+                      />
+                    </label>
+
+                    <label className="flex flex-col gap-2">
+                      <span className="text-xs font-semibold tracking-wide text-slate-600">Local</span>
+                      <div className="relative">
+                        <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <input
+                          value={form.city}
+                          onChange={(e) => setForm((s) => ({ ...s, city: e.target.value }))}
+                          className="h-11 w-full rounded-xl bg-white pl-10 pr-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
+                          placeholder="Cidade / Bairro"
+                        />
+                      </div>
+                    </label>
+
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <label className="flex flex-col gap-2">
+                        <span className="text-xs font-semibold tracking-wide text-slate-600">Valor do Lote / Global</span>
+                        <input
+                          value={form.lot_value}
+                          onChange={(e) => setForm((s) => ({ ...s, lot_value: formatBRLInput(e.target.value) }))}
+                          className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
+                          placeholder="R$ 0,00"
+                          inputMode="decimal"
+                        />
+                      </label>
+
+                      <label className="flex flex-col gap-2">
+                        <span className="text-xs font-semibold tracking-wide text-slate-600">Progresso da Obra (%)</span>
+                        <input
+                          value={form.progress_percent}
+                          onChange={(e) => setForm((s) => ({ ...s, progress_percent: e.target.value }))}
+                          className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
+                          placeholder="0 a 100"
+                          inputMode="numeric"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <label className="flex flex-col gap-2">
+                        <span className="text-xs font-semibold tracking-wide text-slate-600">Corretor responsável</span>
+                        <select
+                          value={form.corretor_id}
+                          onChange={(e) => setForm((s) => ({ ...s, corretor_id: e.target.value }))}
+                          className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
+                        >
+                          <option value="">Sem corretor</option>
+                          {brokers.map((b) => (
+                            <option key={b.id} value={b.id}>
+                              {b.full_name ?? b.id}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="flex flex-col gap-2">
+                        <span className="text-xs font-semibold tracking-wide text-slate-600">Status</span>
+                        <select
+                          value={form.status}
+                          onChange={(e) => setForm((s) => ({ ...s, status: e.target.value as DevelopmentStatus }))}
+                          className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
+                        >
+                          <option value="pre_lancamento">{statusLabel.pre_lancamento}</option>
+                          <option value="em_obras">{statusLabel.em_obras}</option>
+                          <option value="pronto_para_construir">{statusLabel.pronto_para_construir}</option>
+                        </select>
+                      </label>
+                    </div>
+
+                    <label className="flex items-center gap-3 rounded-xl bg-white px-4 py-3 text-sm text-slate-900 ring-1 ring-slate-200/70">
+                      <input
+                        type="checkbox"
+                        checked={form.is_premium}
+                        onChange={(e) => setForm((s) => ({ ...s, is_premium: e.target.checked }))}
+                        className="h-4 w-4"
+                      />
+                      <span className="text-sm">Marcar como Premium</span>
+                    </label>
+                  </>
+                ) : null}
+
+                {modalStep === 1 ? (
+                  <>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <label className="flex flex-col gap-2">
+                        <span className="text-xs font-semibold tracking-wide text-slate-600">Área total (m²)</span>
+                        <input
+                          value={form.total_area_m2}
+                          onChange={(e) => setForm((s) => ({ ...s, total_area_m2: e.target.value }))}
+                          className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
+                          placeholder="0"
+                          inputMode="decimal"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-2">
+                        <span className="text-xs font-semibold tracking-wide text-slate-600">Lotes</span>
+                        <input
+                          value={form.lots_count}
+                          onChange={(e) => setForm((s) => ({ ...s, lots_count: e.target.value }))}
+                          className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
+                          placeholder="0"
+                          inputMode="numeric"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <label className="flex flex-col gap-2">
+                        <span className="text-xs font-semibold tracking-wide text-slate-600">Unidades</span>
+                        <input
+                          value={form.units_count}
+                          onChange={(e) => setForm((s) => ({ ...s, units_count: e.target.value }))}
+                          className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
+                          placeholder="0"
+                          inputMode="numeric"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-2">
+                        <span className="text-xs font-semibold tracking-wide text-slate-600">Área verde (m²)</span>
+                        <div className="relative">
+                          <Trees className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                          <input
+                            value={form.green_area_m2}
+                            onChange={(e) => setForm((s) => ({ ...s, green_area_m2: e.target.value }))}
+                            className="h-11 w-full rounded-xl bg-white pl-10 pr-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
+                            placeholder="0"
+                            inputMode="decimal"
+                          />
+                        </div>
+                      </label>
+                    </div>
+                  </>
+                ) : null}
+
+                {modalStep === 2 ? (
+                  <>
+                    <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200/70">
+                      <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">INFRAESTRUTURA</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-900">O que esse lançamento entrega</div>
+                      <div className="mt-4 grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setForm((s) => ({ ...s, infra_asphalt: !s.infra_asphalt }))}
+                          className={
+                            "flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold ring-1 transition-all duration-300 hover:-translate-y-[1px] " +
+                            infraBadgeCls(form.infra_asphalt)
+                          }
+                        >
+                          <Route className="h-4 w-4" />
+                          Asfalto
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setForm((s) => ({ ...s, infra_power: !s.infra_power }))}
+                          className={
+                            "flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold ring-1 transition-all duration-300 hover:-translate-y-[1px] " +
+                            infraBadgeCls(form.infra_power)
+                          }
+                        >
+                          <Lightbulb className="h-4 w-4" />
+                          Energia
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setForm((s) => ({ ...s, infra_leisure: !s.infra_leisure }))}
+                          className={
+                            "flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold ring-1 transition-all duration-300 hover:-translate-y-[1px] " +
+                            infraBadgeCls(form.infra_leisure)
+                          }
+                        >
+                          <Waves className="h-4 w-4" />
+                          Lazer
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setForm((s) => ({ ...s, infra_water: !s.infra_water }))}
+                          className={
+                            "flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold ring-1 transition-all duration-300 hover:-translate-y-[1px] " +
+                            infraBadgeCls(form.infra_water)
+                          }
+                        >
+                          <Droplets className="h-4 w-4" />
+                          Água
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                ) : null}
+
+                {modalStep === 3 ? (
+                  <>
+                    <label className="flex flex-col gap-2">
+                      <span className="text-xs font-semibold tracking-wide text-slate-600">Imagem de Capa (URL)</span>
+                      <div className="relative">
+                        <ImageIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <input
+                          value={form.cover_url}
+                          onChange={(e) => setForm((s) => ({ ...s, cover_url: e.target.value }))}
+                          className="h-11 w-full rounded-xl bg-white pl-10 pr-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
+                          placeholder="https://..."
+                        />
+                      </div>
+                    </label>
+
+                    <label className="flex flex-col gap-2">
+                      <span className="text-xs font-semibold tracking-wide text-slate-600">Link de Vídeo</span>
+                      <div className="relative">
+                        <Video className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <input
+                          value={form.video_url}
+                          onChange={(e) => setForm((s) => ({ ...s, video_url: e.target.value }))}
+                          className="h-11 w-full rounded-xl bg-white pl-10 pr-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
+                          placeholder="https://youtube.com/..."
+                        />
+                      </div>
+                    </label>
+
+                    <label className="flex flex-col gap-2">
+                      <span className="text-xs font-semibold tracking-wide text-slate-600">Galeria (1 URL por linha)</span>
+                      <textarea
+                        value={form.gallery_urls}
+                        onChange={(e) => setForm((s) => ({ ...s, gallery_urls: e.target.value }))}
+                        className="min-h-28 rounded-xl bg-white px-4 py-3 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
+                        placeholder="https://..."
+                      />
+                    </label>
+
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <label className="flex flex-col gap-2">
+                        <span className="text-xs font-semibold tracking-wide text-slate-600">Material de Venda</span>
+                        <input
+                          value={form.sales_material_url}
+                          onChange={(e) => setForm((s) => ({ ...s, sales_material_url: e.target.value }))}
+                          className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
+                          placeholder="https://..."
+                        />
+                      </label>
+                      <label className="flex flex-col gap-2">
+                        <span className="text-xs font-semibold tracking-wide text-slate-600">Tabela de Preços</span>
+                        <input
+                          value={form.price_table_url}
+                          onChange={(e) => setForm((s) => ({ ...s, price_table_url: e.target.value }))}
+                          className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
+                          placeholder="https://..."
+                        />
+                      </label>
+                    </div>
+                  </>
+                ) : null}
+              </div>
+
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setModalStep((s) => (s > 0 ? ((s - 1) as 0 | 1 | 2 | 3) : s))}
+                    disabled={modalStep === 0}
+                    className="inline-flex h-11 items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModalStep((s) => (s < 3 ? ((s + 1) as 0 | 1 | 2 | 3) : s))}
+                    disabled={modalStep === 3}
+                    className="inline-flex h-11 items-center justify-center rounded-xl bg-slate-900 px-5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Próximo
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => resetForm()}
+                    className="inline-flex h-11 items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
+                  >
+                    Limpar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSaving}
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#ff0000] px-6 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <BadgeCheck className="h-4 w-4" />
+                    {isSaving ? "Salvando..." : selectedId ? "Atualizar" : "Cadastrar"}
+                  </button>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => void load()}
-                  className="inline-flex h-11 items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50"
-                >
-                  Recarregar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => resetForm()}
-                  className="inline-flex h-11 items-center justify-center rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-800"
-                >
-                  Limpar
-                </button>
-              </div>
-            </div>
+              {selectedId ? (
+                <div className="mt-6 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200/70">
+                  <div className="text-sm font-semibold text-slate-900">Enviar ao Corretor</div>
+                  <div className="mt-1 text-xs text-slate-500">Distribuição manual do lançamento.</div>
 
-            <div className="mt-5 grid grid-cols-2 gap-2 rounded-2xl bg-slate-50 p-2 ring-1 ring-slate-200/70">
-              {(
-                [
-                  { key: "basicos", label: "Básicos", icon: <Tag className="h-4 w-4" /> },
-                  { key: "tecnicos", label: "Técnico", icon: <FileText className="h-4 w-4" /> },
-                  { key: "infra", label: "Infra", icon: <Route className="h-4 w-4" /> },
-                  { key: "midia", label: "Mídia", icon: <Camera className="h-4 w-4" /> },
-                  { key: "status", label: "Status", icon: <BadgeCheck className="h-4 w-4" /> },
-                ] as Array<{ key: TabKey; label: string; icon: React.ReactNode }>
-              ).map((t) => {
-                const isActive = t.key === activeTab;
-                return (
-                  <button
-                    key={t.key}
-                    type="button"
-                    onClick={() => setActiveTab(t.key)}
-                    className={
-                      "flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition-all duration-300 " +
-                      (isActive
-                        ? "bg-white text-slate-900 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70"
-                        : "text-slate-600 hover:bg-white/70")
-                    }
-                  >
-                    {t.icon}
-                    {t.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            <form onSubmit={createDevelopment} className="mt-5 flex flex-col gap-4">
-              {activeTab === "basicos" ? (
-                <>
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs font-semibold tracking-wide text-slate-600">Nome do Empreendimento</span>
-                    <input
-                      value={form.name}
-                      onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
-                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
-                      placeholder="Ex: Residencial / Loteamento"
-                      required
-                    />
-                  </label>
-
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs font-semibold tracking-wide text-slate-600">Cidade</span>
-                    <div className="relative">
-                      <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <input
-                        value={form.city}
-                        onChange={(e) => setForm((s) => ({ ...s, city: e.target.value }))}
-                        className="h-11 w-full rounded-xl bg-white pl-10 pr-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
-                        placeholder="Ex: Marabá"
-                      />
-                    </div>
-                  </label>
-
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs font-semibold tracking-wide text-slate-600">Corretor responsável</span>
+                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
                     <select
-                      value={form.corretor_id}
-                      onChange={(e) => setForm((s) => ({ ...s, corretor_id: e.target.value }))}
-                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
+                      value={dispatchSelectionById[selectedId] ?? ""}
+                      onChange={(e) => setDispatchSelectionById((c) => ({ ...c, [selectedId]: e.target.value }))}
+                      className="h-11 w-full rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
                     >
-                      <option value="">Sem corretor</option>
+                      <option value="">Selecione um corretor</option>
                       {brokers.map((b) => (
                         <option key={b.id} value={b.id}>
                           {b.full_name ?? b.id}
                         </option>
                       ))}
                     </select>
-                  </label>
-
-                  <label className="flex items-center gap-3 rounded-xl bg-white px-4 py-3 text-sm text-slate-900 ring-1 ring-slate-200/70">
-                    <input
-                      type="checkbox"
-                      checked={form.is_premium}
-                      onChange={(e) => setForm((s) => ({ ...s, is_premium: e.target.checked }))}
-                      className="h-4 w-4"
-                    />
-                    <span className="text-sm">Marcar como Imóvel Premium (Destaque Dashboard)</span>
-                  </label>
-
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs font-semibold tracking-wide text-slate-600">Valor do Lote (ou Global)</span>
-                    <input
-                      value={form.lot_value}
-                      onChange={(e) => setForm((s) => ({ ...s, lot_value: formatBRLInput(e.target.value) }))}
-                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
-                      placeholder="R$ 0,00"
-                      inputMode="decimal"
-                    />
-                  </label>
-                </>
-              ) : null}
-
-              {activeTab === "tecnicos" ? (
-                <>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <label className="flex flex-col gap-2">
-                      <span className="text-xs font-semibold tracking-wide text-slate-600">Metragem Total (m²)</span>
-                      <input
-                        value={form.total_area_m2}
-                        onChange={(e) => setForm((s) => ({ ...s, total_area_m2: e.target.value }))}
-                        className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
-                        placeholder="0"
-                        inputMode="decimal"
-                      />
-                    </label>
-                    <label className="flex flex-col gap-2">
-                      <span className="text-xs font-semibold tracking-wide text-slate-600">Quantidade de Lotes</span>
-                      <input
-                        value={form.lots_count}
-                        onChange={(e) => setForm((s) => ({ ...s, lots_count: e.target.value }))}
-                        className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
-                        placeholder="0"
-                        inputMode="numeric"
-                      />
-                    </label>
-                  </div>
-
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs font-semibold tracking-wide text-slate-600">Área Verde (m²)</span>
-                    <div className="relative">
-                      <Trees className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <input
-                        value={form.green_area_m2}
-                        onChange={(e) => setForm((s) => ({ ...s, green_area_m2: e.target.value }))}
-                        className="h-11 w-full rounded-xl bg-white pl-10 pr-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
-                        placeholder="0"
-                        inputMode="decimal"
-                      />
-                    </div>
-                  </label>
-                </>
-              ) : null}
-
-              {activeTab === "infra" ? (
-                <>
-                  <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200/70">
-                    <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">INFRAESTRUTURA</div>
-                    <div className="mt-1 text-sm font-semibold text-slate-900">Infraestrutura completa</div>
-                    <div className="mt-1 text-xs text-slate-500">Marque o que o loteamento entrega.</div>
-
-                    <div className="mt-4 grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setForm((s) => ({ ...s, infra_asphalt: !s.infra_asphalt }))}
-                        className={
-                          "flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold ring-1 transition-all duration-300 hover:-translate-y-[1px] " +
-                          infraBadgeCls(form.infra_asphalt)
-                        }
-                      >
-                        <Route className="h-4 w-4" />
-                        Asfalto
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setForm((s) => ({ ...s, infra_power: !s.infra_power }))}
-                        className={
-                          "flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold ring-1 transition-all duration-300 hover:-translate-y-[1px] " +
-                          infraBadgeCls(form.infra_power)
-                        }
-                      >
-                        <Lightbulb className="h-4 w-4" />
-                        Luz
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setForm((s) => ({ ...s, infra_water: !s.infra_water }))}
-                        className={
-                          "flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold ring-1 transition-all duration-300 hover:-translate-y-[1px] " +
-                          infraBadgeCls(form.infra_water)
-                        }
-                      >
-                        <Droplets className="h-4 w-4" />
-                        Água
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setForm((s) => ({ ...s, infra_sewage: !s.infra_sewage }))}
-                        className={
-                          "flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold ring-1 transition-all duration-300 hover:-translate-y-[1px] " +
-                          infraBadgeCls(form.infra_sewage)
-                        }
-                      >
-                        <Waves className="h-4 w-4" />
-                        Esgoto
-                      </button>
-                    </div>
-                  </div>
-                </>
-              ) : null}
-
-              {activeTab === "midia" ? (
-                <>
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs font-semibold tracking-wide text-slate-600">Imagem de Capa (URL)</span>
-                    <input
-                      value={form.cover_url}
-                      onChange={(e) => setForm((s) => ({ ...s, cover_url: e.target.value }))}
-                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
-                      placeholder="https://..."
-                    />
-                  </label>
-
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs font-semibold tracking-wide text-slate-600">Link de Vídeo (Drone/Apresentação)</span>
-                    <div className="relative">
-                      <Video className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <input
-                        value={form.video_url}
-                        onChange={(e) => setForm((s) => ({ ...s, video_url: e.target.value }))}
-                        className="h-11 w-full rounded-xl bg-white pl-10 pr-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
-                        placeholder="https://youtube.com/..."
-                      />
-                    </div>
-                  </label>
-
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs font-semibold tracking-wide text-slate-600">Galeria (1 URL por linha) — plantas/perspectivas 3D</span>
-                    <textarea
-                      value={form.gallery_urls}
-                      onChange={(e) => setForm((s) => ({ ...s, gallery_urls: e.target.value }))}
-                      className="min-h-28 rounded-xl bg-white px-4 py-3 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
-                      placeholder="https://..."
-                    />
-                  </label>
-
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs font-semibold tracking-wide text-slate-600">Material de Venda (Drive/Dropbox)</span>
-                    <input
-                      value={form.sales_material_url}
-                      onChange={(e) => setForm((s) => ({ ...s, sales_material_url: e.target.value }))}
-                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
-                      placeholder="https://..."
-                    />
-                  </label>
-
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs font-semibold tracking-wide text-slate-600">Tabela de Preços (URL)</span>
-                    <input
-                      value={form.price_table_url}
-                      onChange={(e) => setForm((s) => ({ ...s, price_table_url: e.target.value }))}
-                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
-                      placeholder="https://..."
-                    />
-                  </label>
-                </>
-              ) : null}
-
-              {activeTab === "status" ? (
-                <>
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs font-semibold tracking-wide text-slate-600">Status do Lançamento</span>
-                    <select
-                      value={form.status}
-                      onChange={(e) =>
-                        setForm((s) => ({ ...s, status: e.target.value as DevelopmentStatus }))
-                      }
-                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
+                    <button
+                      type="button"
+                      onClick={() => void dispatchToBroker(selectedId)}
+                      disabled={dispatchingId === selectedId}
+                      className="inline-flex h-11 items-center justify-center rounded-xl bg-[#001f3f] px-5 text-sm font-semibold text-white shadow-[0_6px_14px_-10px_rgba(15,23,42,0.45)] transition-all duration-300 hover:bg-[#001a33] disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      <option value="pre_lancamento">{statusLabel.pre_lancamento}</option>
-                      <option value="em_obras">{statusLabel.em_obras}</option>
-                      <option value="pronto_para_construir">{statusLabel.pronto_para_construir}</option>
-                    </select>
-                  </label>
-
-                  <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700 ring-1 ring-slate-200/70">
-                    <span className="font-semibold text-slate-900">Resumo:</span> {statusLabel[form.status]}
+                      {dispatchingId === selectedId ? "Enviando..." : "Confirmar"}
+                    </button>
                   </div>
-                </>
+                </div>
               ) : null}
-
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#ff0000] px-5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <BadgeCheck className="h-4 w-4" />
-                  {isSaving ? "Salvando..." : selectedId ? "Atualizar" : "Cadastrar"}
-                </button>
-              </div>
             </form>
           </div>
-
-          <div className="mt-6 rounded-2xl bg-white p-5 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
-            <div className="text-sm font-semibold text-slate-900">Enviar ao Corretor</div>
-            <div className="mt-1 text-xs text-slate-500">Distribuição manual do lançamento.</div>
-
-            <div className="mt-4 grid grid-cols-1 gap-3">
-              <select
-                value={selectedId ? dispatchSelectionById[selectedId] ?? "" : ""}
-                onChange={(e) => {
-                  if (!selectedId) return;
-                  setDispatchSelectionById((c) => ({ ...c, [selectedId]: e.target.value }));
-                }}
-                disabled={!selectedId}
-                className="h-11 w-full rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15 disabled:cursor-not-allowed disabled:bg-slate-50"
-              >
-                <option value="">Selecione um corretor</option>
-                {brokers.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.full_name ?? b.id}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => (selectedId ? void dispatchToBroker(selectedId) : null)}
-                disabled={!selectedId || dispatchingId === selectedId}
-                className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-[#001f3f] px-5 text-sm font-semibold text-white shadow-[0_6px_14px_-10px_rgba(15,23,42,0.45)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#001a33] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {dispatchingId === selectedId ? "Enviando..." : "Confirmar"}
-              </button>
-            </div>
-
-            <div className="mt-3 text-xs text-slate-600">
-              Atual:{" "}
-              <span className="font-semibold text-slate-900">
-                {(() => {
-                  const current = selectedId ? rows.find((r) => r.id === selectedId) : null;
-                  const id = current?.corretor_id ?? "";
-                  if (!id) return "-";
-                  return brokerById.get(id)?.full_name ?? id;
-                })()}
-              </span>
-            </div>
-          </div>
         </div>
-
-        <div className="lg:col-span-7">
-          <div className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
-            <div className="flex items-start justify-between gap-6">
-              <div>
-                <div className="text-sm font-semibold text-slate-900">Empreendimentos cadastrados</div>
-                <div className="mt-1 text-xs text-slate-500">{rows.length} registros</div>
-              </div>
-            </div>
-
-            <div className="mt-5 overflow-x-auto">
-              <table className="min-w-full border-separate border-spacing-0">
-                <thead>
-                  <tr className="bg-slate-50">
-                    <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">
-                      Empreendimento
-                    </th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">
-                      Local
-                    </th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">
-                      Valor
-                    </th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">
-                      Infra
-                    </th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">
-                      Status
-                    </th>
-                    <th className="px-5 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">
-                      Ações
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {isLoading ? (
-                    <tr>
-                      <td className="px-5 py-10 text-sm text-slate-600" colSpan={6}>
-                        Carregando...
-                      </td>
-                    </tr>
-                  ) : rows.length > 0 ? (
-                    rows.map((r) => {
-                      const infraCount =
-                        (r.infra_asphalt ? 1 : 0) +
-                        (r.infra_power ? 1 : 0) +
-                        (r.infra_water ? 1 : 0) +
-                        (r.infra_sewage ? 1 : 0);
-                      const isActive = selectedId === r.id;
-                      return (
-                        <tr
-                          key={r.id}
-                          className={
-                            "border-t border-slate-100 transition-all duration-300 hover:bg-slate-50/60 " +
-                            (isActive ? "bg-slate-50/70" : "")
-                          }
-                        >
-                          <td className="px-5 py-4 text-sm text-slate-900">
-                            <div className="font-semibold">{r.name}</div>
-                            {r.video_url ? (
-                              <a
-                                className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[#001f3f] underline decoration-[#ff0000]/40 underline-offset-4"
-                                href={r.video_url}
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                <Video className="h-3.5 w-3.5" />
-                                Vídeo
-                              </a>
-                            ) : null}
-                          </td>
-                          <td className="px-5 py-4 text-sm text-slate-700">
-                            {r.city ?? r.localidade ?? "-"}
-                          </td>
-                          <td className="px-5 py-4 text-sm font-semibold text-slate-900">
-                            {typeof r.lot_value === "number"
-                              ? formatBRLIntl(r.lot_value)
-                              : typeof r.preco === "number"
-                                ? formatBRLIntl(r.preco)
-                                : "-"}
-                          </td>
-                          <td className="px-5 py-4 text-sm">
-                            <div className="flex items-center gap-2">
-                              <span className="inline-flex items-center justify-center rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200/70">
-                                {infraCount}/4
-                              </span>
-                              <div className="flex items-center gap-1 text-slate-500">
-                                {r.infra_asphalt ? <Route className="h-4 w-4" /> : null}
-                                {r.infra_power ? <Lightbulb className="h-4 w-4" /> : null}
-                                {r.infra_water ? <Droplets className="h-4 w-4" /> : null}
-                                {r.infra_sewage ? <Waves className="h-4 w-4" /> : null}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-5 py-4">
-                            <span className="inline-flex items-center justify-center rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200/70">
-                              {statusLabel[(r.status ?? "pre_lancamento") as DevelopmentStatus]}
-                            </span>
-                          </td>
-                          <td className="px-5 py-4 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                type="button"
-                                onClick={() => editRow(r)}
-                                className="inline-flex h-10 items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50"
-                              >
-                                Editar
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setSelectedId(r.id)}
-                                className="inline-flex h-10 items-center justify-center rounded-xl bg-[#001f3f] px-4 text-sm font-semibold text-white shadow-[0_6px_14px_-10px_rgba(15,23,42,0.45)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#001a33]"
-                              >
-                                Selecionar
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  ) : (
-                    <tr>
-                      <td className="px-5 py-10 text-sm text-slate-600" colSpan={6}>
-                        Nenhum empreendimento cadastrado.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </section>
+      ) : null}
     </div>
   );
 }
