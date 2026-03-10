@@ -30,7 +30,7 @@ type DueDiligenceState = {
   cert_protesto: CertStatus;
 };
 
-type TimelineStep = "peticao" | "citacao" | "sentenca";
+type TimelineStep = "peticao" | "citacao" | "audiencia" | "sentenca";
 
 type TimelineEvent = {
   id: string;
@@ -191,7 +191,8 @@ function parseTimeline(value: any, fallback: { tribunal_link: string; signature_
   return value
     .map((e) => {
       const step = String(e?.step ?? "").toLowerCase();
-      const stepNorm: TimelineStep = step === "citacao" || step === "sentenca" ? step : "peticao";
+      const stepNorm: TimelineStep =
+        step === "citacao" || step === "sentenca" || step === "audiencia" ? (step as any) : "peticao";
       const signature = String(e?.signature_status ?? fallback.signature_status).toLowerCase();
       return {
         id: String(e?.id ?? crypto.randomUUID()),
@@ -210,8 +211,27 @@ function parseTimeline(value: any, fallback: { tribunal_link: string; signature_
 
 function stepLabel(step: TimelineStep) {
   if (step === "citacao") return "Citação";
+  if (step === "audiencia") return "Audiência";
   if (step === "sentenca") return "Sentença";
   return "Petição";
+}
+
+function officeStatusLabel(args: { red: number; yellow: number; green: number }) {
+  if (args.red > 0) return "ALERTA: risco alto ativo";
+  if (args.yellow > 0) return "Atenção: pendências de diligência";
+  return "Operação jurídica sob controle";
+}
+
+function miniStepState(args: { hasInitial: boolean; hasCitacao: boolean; hasAudiencia: boolean }) {
+  const step = (active: boolean) =>
+    active
+      ? "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200/70"
+      : "bg-slate-100 text-slate-600 ring-1 ring-slate-200/70";
+  return {
+    initial: step(args.hasInitial),
+    citacao: step(args.hasCitacao),
+    audiencia: step(args.hasAudiencia),
+  };
 }
 
 function deadlineBadge(due_date: string | null) {
@@ -251,6 +271,8 @@ export default function JuridicoAdminPage() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  const [activeModal, setActiveModal] = useState<null | "case" | "lawyer" | "minuta">(null);
 
   const [lawyerForm, setLawyerForm] = useState<LawyerForm>({
     full_name: "",
@@ -425,6 +447,7 @@ export default function JuridicoAdminPage() {
       }
 
       setLawyerForm({ full_name: "", email: "", phone: "", oab: "", meeting_link: "", practice_area: "" });
+      setActiveModal(null);
       await loadAll();
     } catch {
       setErrorMessage("Não foi possível salvar o advogado.");
@@ -496,7 +519,7 @@ export default function JuridicoAdminPage() {
         signature_status: "pendente",
         notes: "",
       });
-
+      setActiveModal(null);
       await loadAll();
     } catch {
       setErrorMessage("Não foi possível salvar o processo.");
@@ -535,6 +558,7 @@ export default function JuridicoAdminPage() {
       }
 
       setDocForm({ case_id: "", title: "", doc_type: "contrato", url: "" });
+      setActiveModal(null);
       await loadAll();
     } catch {
       setErrorMessage("Não foi possível salvar o documento.");
@@ -595,23 +619,38 @@ export default function JuridicoAdminPage() {
       <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-start gap-4">
-            <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200/70">
-              <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">SEMÁFORO • DUE DILIGENCE</div>
-              <div className="mt-3 flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full bg-emerald-500" />
-                  <span className="text-xs font-semibold text-slate-700">{dueDiligenceSummary.green}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full bg-amber-500" />
-                  <span className="text-xs font-semibold text-slate-700">{dueDiligenceSummary.yellow}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full bg-red-500" />
-                  <span className="text-xs font-semibold text-slate-700">{dueDiligenceSummary.red}</span>
-                </div>
-                <div className="ml-2 text-xs font-semibold text-slate-500">({dueDiligenceSummary.total} processos)</div>
+            <div className="w-full rounded-2xl bg-slate-50 p-5 shadow-lg ring-1 ring-slate-200/70 md:min-w-[520px]">
+              <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">STATUS DO ESCRITÓRIO</div>
+              <div className="mt-2 text-sm font-semibold text-slate-900">
+                {officeStatusLabel({ red: dueDiligenceSummary.red, yellow: dueDiligenceSummary.yellow, green: dueDiligenceSummary.green })}
               </div>
+              <div className="mt-4 grid grid-cols-3 gap-3">
+                <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200/70">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-xs font-semibold text-slate-600">Verde</div>
+                    <span className="h-3 w-3 rounded-full bg-emerald-500" />
+                  </div>
+                  <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{dueDiligenceSummary.green}</div>
+                  <div className="mt-1 text-xs text-slate-500">Negativas</div>
+                </div>
+                <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200/70">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-xs font-semibold text-slate-600">Amarelo</div>
+                    <span className="h-3 w-3 rounded-full bg-amber-500" />
+                  </div>
+                  <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{dueDiligenceSummary.yellow}</div>
+                  <div className="mt-1 text-xs text-slate-500">Pendentes</div>
+                </div>
+                <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200/70">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-xs font-semibold text-slate-600">Vermelho</div>
+                    <span className="h-3 w-3 rounded-full bg-red-500" />
+                  </div>
+                  <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{dueDiligenceSummary.red}</div>
+                  <div className="mt-1 text-xs text-slate-500">Positivas</div>
+                </div>
+              </div>
+              <div className="mt-3 text-xs font-semibold text-slate-500">Total: {dueDiligenceSummary.total} processos</div>
             </div>
 
             <button
@@ -668,269 +707,8 @@ export default function JuridicoAdminPage() {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        <div className="lg:col-span-4">
-          {tab === "advogados" ? (
-            <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200/70">
-              <div className="h-1 w-full rounded-full bg-[#2b6cff]" />
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="text-sm font-semibold text-slate-900">Novo advogado</div>
-                  <div className="mt-1 text-xs text-slate-500">Cadastro + link de vídeo-chamada.</div>
-                </div>
-                <Gavel className="h-4 w-4 text-slate-400" />
-              </div>
-
-              <form onSubmit={addLawyer} className="mt-5 flex flex-col gap-4">
-                <label className="flex flex-col gap-2">
-                  <span className="text-xs font-semibold tracking-wide text-slate-600">Nome</span>
-                  <input
-                    value={lawyerForm.full_name}
-                    onChange={(e) => setLawyerForm((s) => ({ ...s, full_name: e.target.value }))}
-                    className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                    placeholder="Nome completo"
-                    required
-                  />
-                </label>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs font-semibold tracking-wide text-slate-600">Email</span>
-                    <input
-                      value={lawyerForm.email}
-                      onChange={(e) => setLawyerForm((s) => ({ ...s, email: e.target.value }))}
-                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                      placeholder="email@"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs font-semibold tracking-wide text-slate-600">Telefone</span>
-                    <input
-                      value={lawyerForm.phone}
-                      onChange={(e) => setLawyerForm((s) => ({ ...s, phone: e.target.value }))}
-                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                      placeholder="(DDD) ..."
-                    />
-                  </label>
-                </div>
-
-                <label className="flex flex-col gap-2">
-                  <span className="text-xs font-semibold tracking-wide text-slate-600">OAB (opcional)</span>
-                  <input
-                    value={lawyerForm.oab}
-                    onChange={(e) => setLawyerForm((s) => ({ ...s, oab: e.target.value }))}
-                    className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                    placeholder="UF 123456"
-                  />
-                </label>
-
-                <label className="flex flex-col gap-2">
-                  <span className="text-xs font-semibold tracking-wide text-slate-600">Área de atuação</span>
-                  <input
-                    value={lawyerForm.practice_area}
-                    onChange={(e) => setLawyerForm((s) => ({ ...s, practice_area: e.target.value }))}
-                    className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                    placeholder="Ex: Imobiliário, Contratos, Cível"
-                  />
-                </label>
-
-                <label className="flex flex-col gap-2">
-                  <span className="text-xs font-semibold tracking-wide text-slate-600">Link de vídeo-chamada</span>
-                  <div className="relative">
-                    <LinkIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <input
-                      value={lawyerForm.meeting_link}
-                      onChange={(e) => setLawyerForm((s) => ({ ...s, meeting_link: e.target.value }))}
-                      className="h-11 w-full rounded-xl bg-white pl-10 pr-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                      placeholder="https://meet..."
-                    />
-                  </div>
-                </label>
-
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#ff0000] px-5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <Plus className="h-4 w-4" />
-                  {isSaving ? "Salvando..." : "Adicionar"}
-                </button>
-              </form>
-            </div>
-          ) : tab === "minutas" ? (
-            <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200/70">
-              <div className="h-1 w-full rounded-full bg-[#2b6cff]" />
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="text-sm font-semibold text-slate-900">Adicionar minuta (Contrato padrão)</div>
-                  <div className="mt-1 text-xs text-slate-500">Repositório de contratos sem vínculo com processo.</div>
-                </div>
-                <FileText className="h-4 w-4 text-slate-400" />
-              </div>
-
-              <form onSubmit={addDocument} className="mt-5 flex flex-col gap-4">
-                <input type="hidden" value="" />
-
-                <label className="flex flex-col gap-2">
-                  <span className="text-xs font-semibold tracking-wide text-slate-600">Título</span>
-                  <input
-                    value={docForm.title}
-                    onChange={(e) => setDocForm((s) => ({ ...s, title: e.target.value }))}
-                    className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                    placeholder="Contrato de compra e venda"
-                    required
-                  />
-                </label>
-
-                <label className="flex flex-col gap-2">
-                  <span className="text-xs font-semibold tracking-wide text-slate-600">Tipo</span>
-                  <select
-                    value={docForm.doc_type}
-                    onChange={(e) => setDocForm((s) => ({ ...s, doc_type: e.target.value as DocumentType }))}
-                    className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                  >
-                    <option value="certidao">Certidão</option>
-                    <option value="contrato">Contrato</option>
-                    <option value="outro">Outro</option>
-                  </select>
-                </label>
-
-                <label className="flex flex-col gap-2">
-                  <span className="text-xs font-semibold tracking-wide text-slate-600">URL</span>
-                  <div className="relative">
-                    <LinkIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <input
-                      value={docForm.url}
-                      onChange={(e) => setDocForm((s) => ({ ...s, url: e.target.value }))}
-                      className="h-11 w-full rounded-xl bg-white pl-10 pr-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                      placeholder="https://drive..."
-                      required
-                    />
-                  </div>
-                </label>
-
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#001f3f] px-5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#001a33] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <Plus className="h-4 w-4" />
-                  {isSaving ? "Salvando..." : "Adicionar"}
-                </button>
-              </form>
-            </div>
-          ) : (
-            <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200/70">
-              <div className="h-1 w-full rounded-full bg-[#2b6cff]" />
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="text-sm font-semibold text-slate-900">Novo processo</div>
-                  <div className="mt-1 text-xs text-slate-500">Workflow, certidões, tribunal e honorários.</div>
-                </div>
-                <Briefcase className="h-4 w-4 text-slate-400" />
-              </div>
-
-              <form onSubmit={addCase} className="mt-5 flex flex-col gap-4">
-                <label className="flex flex-col gap-2">
-                  <span className="text-xs font-semibold tracking-wide text-slate-600">Título</span>
-                  <input
-                    value={caseForm.title}
-                    onChange={(e) => setCaseForm((s) => ({ ...s, title: e.target.value }))}
-                    className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                    placeholder="Ex: Regularização / Usucapião / Contrato"
-                    required
-                  />
-                </label>
-
-                <label className="flex flex-col gap-2">
-                  <span className="text-xs font-semibold tracking-wide text-slate-600">Cliente (opcional)</span>
-                  <input
-                    value={caseForm.client_name}
-                    onChange={(e) => setCaseForm((s) => ({ ...s, client_name: e.target.value }))}
-                    className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                    placeholder="Nome"
-                  />
-                </label>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs font-semibold tracking-wide text-slate-600">Status</span>
-                    <select
-                      value={caseForm.status}
-                      onChange={(e) => setCaseForm((s) => ({ ...s, status: e.target.value as CaseStatus }))}
-                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                    >
-                      <option value="aberto">Aberto</option>
-                      <option value="em_andamento">Em andamento</option>
-                      <option value="concluido">Concluído</option>
-                      <option value="suspenso">Suspenso</option>
-                    </select>
-                  </label>
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs font-semibold tracking-wide text-slate-600">Prazo (opcional)</span>
-                    <input
-                      type="date"
-                      value={caseForm.due_date}
-                      onChange={(e) => setCaseForm((s) => ({ ...s, due_date: e.target.value }))}
-                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                    />
-                  </label>
-                </div>
-
-                <label className="flex flex-col gap-2">
-                  <span className="text-xs font-semibold tracking-wide text-slate-600">Advogado (opcional)</span>
-                  <select
-                    value={caseForm.lawyer_id}
-                    onChange={(e) => setCaseForm((s) => ({ ...s, lawyer_id: e.target.value }))}
-                    className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                  >
-                    <option value="">Sem advogado</option>
-                    {lawyers.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.full_name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="flex flex-col gap-2">
-                  <span className="text-xs font-semibold tracking-wide text-slate-600">Link de vídeo-chamada</span>
-                  <div className="relative">
-                    <LinkIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <input
-                      value={caseForm.meeting_link}
-                      onChange={(e) => setCaseForm((s) => ({ ...s, meeting_link: e.target.value }))}
-                      className="h-11 w-full rounded-xl bg-white pl-10 pr-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                      placeholder="https://meet..."
-                    />
-                  </div>
-                </label>
-
-                <label className="flex flex-col gap-2">
-                  <span className="text-xs font-semibold tracking-wide text-slate-600">Observações</span>
-                  <input
-                    value={caseForm.notes}
-                    onChange={(e) => setCaseForm((s) => ({ ...s, notes: e.target.value }))}
-                    className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                    placeholder="Notas rápidas"
-                  />
-                </label>
-
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#ff0000] px-5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <Plus className="h-4 w-4" />
-                  {isSaving ? "Salvando..." : "Adicionar"}
-                </button>
-              </form>
-            </div>
-          )}
-        </div>
-
-        <div className="lg:col-span-8">
-          <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200/70">
+      <section className="w-full">
+        <div className="rounded-2xl bg-white p-6 shadow-lg ring-1 ring-slate-200/70">
             <div className="h-1 w-full rounded-full bg-[#2b6cff]" />
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -939,20 +717,50 @@ export default function JuridicoAdminPage() {
                 </div>
                 <div className="mt-1 text-xs text-slate-500">
                   {tab === "processos"
-                    ? "Semáforo, timeline, tribunal e assinatura digital."
+                    ? "Painel de controle de riscos: semáforo, mini-timeline e urgências."
                     : tab === "advogados"
                       ? "Perfis com área de atuação e contatos."
                       : "Repositório de minutas para uso operacional."}
                 </div>
               </div>
-              <div className="text-xs text-slate-500">
-                {isLoading
-                  ? "Atualizando..."
-                  : tab === "advogados"
-                    ? `${lawyers.length} itens`
-                    : tab === "minutas"
-                      ? `${templateDocs.length} itens`
-                      : `${cases.length} itens`}
+              <div className="flex items-center gap-2">
+                <div className="text-xs font-semibold text-slate-500">
+                  {isLoading
+                    ? "Atualizando..."
+                    : tab === "advogados"
+                      ? `${lawyers.length} itens`
+                      : tab === "minutas"
+                        ? `${templateDocs.length} itens`
+                        : `${cases.length} itens`}
+                </div>
+                {tab === "processos" ? (
+                  <button
+                    type="button"
+                    onClick={() => setActiveModal("case")}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#ff0000] px-4 text-xs font-semibold text-white shadow-lg transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#e60000]"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Novo Processo
+                  </button>
+                ) : tab === "advogados" ? (
+                  <button
+                    type="button"
+                    onClick={() => setActiveModal("lawyer")}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#001f3f] px-4 text-xs font-semibold text-white shadow-lg transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#001a33]"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Novo Advogado
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setActiveModal("minuta")}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#001f3f] px-4 text-xs font-semibold text-white shadow-lg transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#001a33]"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Nova Minuta
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1044,17 +852,39 @@ export default function JuridicoAdminPage() {
                     signature_status: signatureStatus,
                   });
 
+                  const isUrgent = Boolean(
+                    badge && (badge.label === "Vencido" || badge.label.startsWith("Vence")),
+                  );
+
+                  const hasInitial = true;
+                  const hasCitacao = workflow.some((w) => w.step === "citacao");
+                  const hasAudiencia = workflow.some((w) => String((w as any)?.step ?? "").toLowerCase() === "audiencia");
+                  const mini = miniStepState({ hasInitial, hasCitacao, hasAudiencia });
+
                   return (
                     <div
                       key={c.id}
                       className={
-                        "rounded-2xl px-5 py-4 ring-1 " +
-                        (badge && (badge.label === "Vencido" || badge.label.startsWith("Vence"))
-                          ? "bg-red-50/60 ring-red-200/70"
-                          : "bg-slate-50 ring-slate-200/70")
+                        "relative rounded-2xl bg-white px-6 py-5 shadow-lg ring-1 ring-slate-200/70 border-t-4 " +
+                        (isUrgent ? "border-t-red-500" : "border-t-[#2b6cff]")
                       }
                     >
-                      <div className="mb-4 h-1 w-full rounded-full bg-[#2b6cff]" />
+                      <div
+                        className={
+                          "absolute right-4 top-4 rounded-2xl px-4 py-2 text-sm font-bold ring-1 " +
+                          riskUi.card +
+                          " " +
+                          riskUi.ring +
+                          " " +
+                          riskUi.text
+                        }
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={"h-3 w-3 rounded-full " + riskUi.dot} />
+                          {riskUi.label.toUpperCase()}
+                        </div>
+                      </div>
+
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="truncate text-sm font-semibold text-slate-900">{c.title}</div>
@@ -1062,17 +892,25 @@ export default function JuridicoAdminPage() {
                             Cliente: {c.client_name ?? "-"} • Status: {c.status}
                           </div>
                         </div>
-                        <div className="flex flex-col items-end gap-2">
-                          <div className={"inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ring-1 " + riskUi.card + " " + riskUi.ring + " " + riskUi.text}>
-                            <span className={"h-2.5 w-2.5 rounded-full " + riskUi.dot} />
-                            {riskUi.label}
-                          </div>
-                          {badge ? (
-                            <span className={"inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold " + badge.cls}>
-                              {BadgeIcon ? <BadgeIcon className="h-4 w-4" /> : null}
-                              {badge.label}
-                            </span>
-                          ) : null}
+                        {badge ? (
+                          <span className={"inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold " + badge.cls}>
+                            {BadgeIcon ? <BadgeIcon className="h-4 w-4" /> : null}
+                            {badge.label}
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <div className="mt-4 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200/70">
+                        <div className="flex items-center justify-between gap-2 text-xs font-semibold text-slate-600">
+                          <div>Mini-timeline</div>
+                          <div className="text-[11px] font-semibold text-slate-500">[Inicial] → [Citação] → [Audiência]</div>
+                        </div>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <span className={"rounded-full px-3 py-1 text-xs font-semibold " + mini.initial}>Inicial</span>
+                          <span className="text-xs font-bold text-slate-400">→</span>
+                          <span className={"rounded-full px-3 py-1 text-xs font-semibold " + mini.citacao}>Citação</span>
+                          <span className="text-xs font-bold text-slate-400">→</span>
+                          <span className={"rounded-full px-3 py-1 text-xs font-semibold " + mini.audiencia}>Audiência</span>
                         </div>
                       </div>
 
@@ -1262,9 +1100,287 @@ export default function JuridicoAdminPage() {
                 </div>
               )}
             </div>
-          </div>
         </div>
       </section>
+
+      {activeModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8">
+          <button
+            type="button"
+            onClick={() => {
+              if (isSaving) return;
+              setActiveModal(null);
+            }}
+            className="absolute inset-0 bg-slate-900/40"
+            aria-label="Fechar"
+          />
+
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="relative w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-slate-200/70"
+          >
+            <div className="border-b border-slate-100 px-6 py-5">
+              <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">
+                {activeModal === "case" ? "NOVO PROCESSO" : activeModal === "lawyer" ? "NOVO ADVOGADO" : "NOVA MINUTA"}
+              </div>
+              <div className="mt-2 text-xl font-semibold tracking-tight text-slate-900">
+                {activeModal === "case"
+                  ? "Cadastro de Processo"
+                  : activeModal === "lawyer"
+                    ? "Cadastro de Advogado"
+                    : "Cadastro de Minuta"}
+              </div>
+            </div>
+
+            <div className="px-6 py-6">
+              {activeModal === "case" ? (
+                <form onSubmit={addCase} className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <label className="flex flex-col gap-2 md:col-span-2">
+                    <span className="text-xs font-semibold tracking-wide text-slate-600">Título</span>
+                    <input
+                      value={caseForm.title}
+                      onChange={(e) => setCaseForm((s) => ({ ...s, title: e.target.value }))}
+                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
+                      placeholder="Ex: Regularização / Usucapião / Contrato"
+                      required
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-2 md:col-span-2">
+                    <span className="text-xs font-semibold tracking-wide text-slate-600">Cliente (opcional)</span>
+                    <input
+                      value={caseForm.client_name}
+                      onChange={(e) => setCaseForm((s) => ({ ...s, client_name: e.target.value }))}
+                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
+                      placeholder="Nome"
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-2">
+                    <span className="text-xs font-semibold tracking-wide text-slate-600">Status</span>
+                    <select
+                      value={caseForm.status}
+                      onChange={(e) => setCaseForm((s) => ({ ...s, status: e.target.value as CaseStatus }))}
+                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                    >
+                      <option value="aberto">Aberto</option>
+                      <option value="em_andamento">Em andamento</option>
+                      <option value="concluido">Concluído</option>
+                      <option value="suspenso">Suspenso</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-2">
+                    <span className="text-xs font-semibold tracking-wide text-slate-600">Prazo (opcional)</span>
+                    <input
+                      type="date"
+                      value={caseForm.due_date}
+                      onChange={(e) => setCaseForm((s) => ({ ...s, due_date: e.target.value }))}
+                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-2 md:col-span-2">
+                    <span className="text-xs font-semibold tracking-wide text-slate-600">Advogado (opcional)</span>
+                    <select
+                      value={caseForm.lawyer_id}
+                      onChange={(e) => setCaseForm((s) => ({ ...s, lawyer_id: e.target.value }))}
+                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                    >
+                      <option value="">Sem advogado</option>
+                      {lawyers.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.full_name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="flex flex-col gap-2 md:col-span-2">
+                    <span className="text-xs font-semibold tracking-wide text-slate-600">Link de vídeo-chamada</span>
+                    <div className="relative">
+                      <LinkIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <input
+                        value={caseForm.meeting_link}
+                        onChange={(e) => setCaseForm((s) => ({ ...s, meeting_link: e.target.value }))}
+                        className="h-11 w-full rounded-xl bg-white pl-10 pr-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                        placeholder="https://meet..."
+                      />
+                    </div>
+                  </label>
+
+                  <label className="flex flex-col gap-2 md:col-span-2">
+                    <span className="text-xs font-semibold tracking-wide text-slate-600">Observações</span>
+                    <input
+                      value={caseForm.notes}
+                      onChange={(e) => setCaseForm((s) => ({ ...s, notes: e.target.value }))}
+                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                      placeholder="Notas rápidas"
+                    />
+                  </label>
+
+                  <div className="mt-2 flex items-center justify-end gap-2 md:col-span-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isSaving) return;
+                        setActiveModal(null);
+                      }}
+                      className="inline-flex h-11 items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200/70 hover:bg-slate-50"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSaving}
+                      className="inline-flex h-11 items-center justify-center rounded-xl bg-[#ff0000] px-6 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isSaving ? "Salvando..." : "Salvar Processo"}
+                    </button>
+                  </div>
+                </form>
+              ) : activeModal === "lawyer" ? (
+                <form onSubmit={addLawyer} className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <label className="flex flex-col gap-2 md:col-span-2">
+                    <span className="text-xs font-semibold tracking-wide text-slate-600">Nome</span>
+                    <input
+                      value={lawyerForm.full_name}
+                      onChange={(e) => setLawyerForm((s) => ({ ...s, full_name: e.target.value }))}
+                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                      placeholder="Nome completo"
+                      required
+                    />
+                  </label>
+                  <label className="flex flex-col gap-2">
+                    <span className="text-xs font-semibold tracking-wide text-slate-600">Email</span>
+                    <input
+                      value={lawyerForm.email}
+                      onChange={(e) => setLawyerForm((s) => ({ ...s, email: e.target.value }))}
+                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                      placeholder="email@"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-2">
+                    <span className="text-xs font-semibold tracking-wide text-slate-600">Telefone</span>
+                    <input
+                      value={lawyerForm.phone}
+                      onChange={(e) => setLawyerForm((s) => ({ ...s, phone: e.target.value }))}
+                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                      placeholder="(DDD) ..."
+                    />
+                  </label>
+                  <label className="flex flex-col gap-2">
+                    <span className="text-xs font-semibold tracking-wide text-slate-600">OAB (opcional)</span>
+                    <input
+                      value={lawyerForm.oab}
+                      onChange={(e) => setLawyerForm((s) => ({ ...s, oab: e.target.value }))}
+                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                      placeholder="UF 123456"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-2">
+                    <span className="text-xs font-semibold tracking-wide text-slate-600">Área de atuação</span>
+                    <input
+                      value={lawyerForm.practice_area}
+                      onChange={(e) => setLawyerForm((s) => ({ ...s, practice_area: e.target.value }))}
+                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                      placeholder="Ex: Imobiliário, Contratos, Cível"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-2 md:col-span-2">
+                    <span className="text-xs font-semibold tracking-wide text-slate-600">Link de vídeo-chamada</span>
+                    <div className="relative">
+                      <LinkIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <input
+                        value={lawyerForm.meeting_link}
+                        onChange={(e) => setLawyerForm((s) => ({ ...s, meeting_link: e.target.value }))}
+                        className="h-11 w-full rounded-xl bg-white pl-10 pr-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                        placeholder="https://meet..."
+                      />
+                    </div>
+                  </label>
+                  <div className="mt-2 flex items-center justify-end gap-2 md:col-span-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isSaving) return;
+                        setActiveModal(null);
+                      }}
+                      className="inline-flex h-11 items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200/70 hover:bg-slate-50"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSaving}
+                      className="inline-flex h-11 items-center justify-center rounded-xl bg-[#001f3f] px-6 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:bg-[#001a33] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isSaving ? "Salvando..." : "Salvar Advogado"}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={addDocument} className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <label className="flex flex-col gap-2 md:col-span-2">
+                    <span className="text-xs font-semibold tracking-wide text-slate-600">Título</span>
+                    <input
+                      value={docForm.title}
+                      onChange={(e) => setDocForm((s) => ({ ...s, title: e.target.value }))}
+                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                      placeholder="Contrato de compra e venda"
+                      required
+                    />
+                  </label>
+                  <label className="flex flex-col gap-2">
+                    <span className="text-xs font-semibold tracking-wide text-slate-600">Tipo</span>
+                    <select
+                      value={docForm.doc_type}
+                      onChange={(e) => setDocForm((s) => ({ ...s, doc_type: e.target.value as DocumentType }))}
+                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                    >
+                      <option value="contrato">Contrato</option>
+                      <option value="certidao">Certidão</option>
+                      <option value="outro">Outro</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-2 md:col-span-2">
+                    <span className="text-xs font-semibold tracking-wide text-slate-600">URL</span>
+                    <div className="relative">
+                      <LinkIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <input
+                        value={docForm.url}
+                        onChange={(e) => setDocForm((s) => ({ ...s, url: e.target.value }))}
+                        className="h-11 w-full rounded-xl bg-white pl-10 pr-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                        placeholder="https://drive..."
+                        required
+                      />
+                    </div>
+                  </label>
+                  <div className="mt-2 flex items-center justify-end gap-2 md:col-span-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isSaving) return;
+                        setActiveModal(null);
+                      }}
+                      className="inline-flex h-11 items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200/70 hover:bg-slate-50"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSaving}
+                      className="inline-flex h-11 items-center justify-center rounded-xl bg-[#001f3f] px-6 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:bg-[#001a33] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isSaving ? "Salvando..." : "Salvar Minuta"}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
       </div>
     </div>
   );
