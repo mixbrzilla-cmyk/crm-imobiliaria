@@ -81,13 +81,6 @@ export default function AdminLayout({
             Empreendimentos
           </Link>
           <Link
-            href="/admin/avulsos"
-            className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-100/90 transition-all duration-300 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff0000]/40"
-          >
-            <Home className="h-4 w-4 text-slate-200/80 transition-all duration-300 group-hover:text-white" />
-            Imóveis Avulsos
-          </Link>
-          <Link
             href="/admin/corretores"
             className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-100/90 transition-all duration-300 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff0000]/40"
           >

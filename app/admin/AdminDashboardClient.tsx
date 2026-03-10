@@ -32,20 +32,6 @@ type TopProperty = {
   address: string | null;
 };
 
-type PremiumItem = {
-  source: "standalone_properties" | "properties" | "developments";
-  id: string;
-  title: string;
-  typeLabel: string;
-  price: number;
-};
-
-type MetricByType = {
-  typeLabel: string;
-  count: number;
-  totalValue: number;
-};
-
 type ObraMaterialRow = {
   id: string;
   status: string | null;
@@ -150,9 +136,6 @@ export default function AdminDashboardClient() {
   });
   const [topProperties, setTopProperties] = useState<TopProperty[]>([]);
 
-  const [metricsByType, setMetricsByType] = useState<MetricByType[]>([]);
-  const [premiumTop5, setPremiumTop5] = useState<PremiumItem[]>([]);
-
   const [whatsActivityLines, setWhatsActivityLines] = useState<WhatsActivityLine[]>([]);
 
   const hasRows = useMemo(() => rows.length > 0, [rows.length]);
@@ -185,8 +168,6 @@ export default function AdminDashboardClient() {
         outros: 0,
       });
       setTopProperties([]);
-      setMetricsByType([]);
-      setPremiumTop5([]);
       return;
     }
 
@@ -224,9 +205,6 @@ export default function AdminDashboardClient() {
         avulsosIdsRes,
         devIdsRes,
         inventarioIdsRes,
-        avulsosFullRes,
-        propertiesFullRes,
-        developmentsFullRes,
       ] =
         await Promise.allSettled([
           brokerProfilesQuery,
@@ -263,17 +241,6 @@ export default function AdminDashboardClient() {
           supabase.from("standalone_properties").select("id, corretor_id"),
           (supabase as any).from("developments").select("id, corretor_id"),
           supabase.from("properties").select("id, corretor_id"),
-
-          // métricas unificadas + premium
-          supabase
-            .from("standalone_properties")
-            .select("id, property_type, purpose, price, address, is_premium"),
-          supabase
-            .from("properties")
-            .select("id, title, property_type, purpose, price, neighborhood, city, is_premium"),
-          (supabase as any)
-            .from("developments")
-            .select("id, name, city, localidade, lot_value, preco, is_premium"),
         ]);
 
       if (profilesRes.status === "fulfilled" && profilesRes.value.error) {
@@ -342,120 +309,6 @@ export default function AdminDashboardClient() {
       setTotalImoveisCount(totalCount);
       setAssignedImoveisCount(assignedCount);
       setUnassignedImoveisCount(unassignedCount);
-
-      const typeAgg = new Map<string, { count: number; totalValue: number }>();
-      const premiumItems: PremiumItem[] = [];
-
-      const addMetric = (typeLabel: string, price: number | null | undefined) => {
-        const key = (typeLabel || "-").trim() || "-";
-        const current = typeAgg.get(key) ?? { count: 0, totalValue: 0 };
-        current.count += 1;
-        if (typeof price === "number" && Number.isFinite(price)) current.totalValue += price;
-        typeAgg.set(key, current);
-      };
-
-      const addPremiumItem = (item: PremiumItem | null) => {
-        if (!item) return;
-        premiumItems.push(item);
-      };
-
-      if (avulsosFullRes.status === "fulfilled") {
-        const value: any = avulsosFullRes.value;
-        if (!value?.error) {
-          const data = (value?.data ?? []) as Array<{
-            id: string;
-            property_type: string | null;
-            purpose: string | null;
-            price: number | null;
-            address: string | null;
-            is_premium?: boolean | null;
-          }>;
-          for (const row of data) {
-            addMetric(row.property_type ?? "-", row.price);
-            if (row.is_premium && typeof row.price === "number") {
-              addPremiumItem({
-                source: "standalone_properties",
-                id: row.id,
-                title: row.address ?? row.property_type ?? "Imóvel",
-                typeLabel: row.property_type ?? "-",
-                price: row.price,
-              });
-            }
-          }
-        }
-      }
-
-      if (propertiesFullRes.status === "fulfilled") {
-        const value: any = propertiesFullRes.value;
-        if (!value?.error) {
-          const data = (value?.data ?? []) as Array<{
-            id: string;
-            title: string | null;
-            property_type: string | null;
-            purpose: string | null;
-            price: number | null;
-            neighborhood: string | null;
-            city: string | null;
-            is_premium?: boolean | null;
-          }>;
-          for (const row of data) {
-            addMetric(row.property_type ?? "-", row.price);
-            if (row.is_premium && typeof row.price === "number") {
-              const subtitle = [row.neighborhood, row.city].filter(Boolean).join(" • ");
-              addPremiumItem({
-                source: "properties",
-                id: row.id,
-                title: (row.title ?? "").trim() || subtitle || row.property_type || "Imóvel",
-                typeLabel: row.property_type ?? "-",
-                price: row.price,
-              });
-            }
-          }
-        }
-      }
-
-      if (developmentsFullRes.status === "fulfilled") {
-        const value: any = developmentsFullRes.value;
-        if (!value?.error) {
-          const data = (value?.data ?? []) as Array<{
-            id: string;
-            name: string | null;
-            city?: string | null;
-            localidade?: string | null;
-            lot_value?: number | null;
-            preco?: number | null;
-            is_premium?: boolean | null;
-          }>;
-          for (const row of data) {
-            const devPrice = typeof row.lot_value === "number" ? row.lot_value : row.preco ?? null;
-            addMetric("Empreendimento", devPrice);
-            if (row.is_premium && typeof devPrice === "number") {
-              addPremiumItem({
-                source: "developments",
-                id: row.id,
-                title: (row.name ?? "").trim() || row.localidade || row.city || "Empreendimento",
-                typeLabel: "Empreendimento",
-                price: devPrice,
-              });
-            }
-          }
-        }
-      }
-
-      const nextMetrics: MetricByType[] = Array.from(typeAgg.entries())
-        .map(([typeLabel, info]) => ({
-          typeLabel,
-          count: info.count,
-          totalValue: info.totalValue,
-        }))
-        .sort((a, b) => b.totalValue - a.totalValue);
-      setMetricsByType(nextMetrics);
-
-      const nextPremiumTop5 = premiumItems
-        .filter((p) => typeof p.price === "number" && Number.isFinite(p.price))
-        .sort((a, b) => b.price - a.price)
-        .slice(0, 5);
-      setPremiumTop5(nextPremiumTop5);
 
       if (leadsRes.status === "fulfilled") {
         if (leadsRes.value.error) {
@@ -624,8 +477,6 @@ export default function AdminDashboardClient() {
       });
       setTopProperties([]);
       setWhatsActivityLines([]);
-      setMetricsByType([]);
-      setPremiumTop5([]);
     }
   }, [supabase]);
 
@@ -704,72 +555,6 @@ export default function AdminDashboardClient() {
             {unassignedImoveisCount}
           </div>
           <div className="mt-2 text-xs text-slate-500">Ações pendentes de distribuição</div>
-        </div>
-      </section>
-
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70 lg:col-span-2">
-          <div className="flex items-start justify-between gap-6">
-            <div>
-              <div className="text-sm font-semibold text-slate-900">Inventário por Tipo</div>
-              <div className="mt-1 text-xs text-slate-500">Quantidade e valor total (unificado)</div>
-            </div>
-          </div>
-
-          <div className="mt-5 overflow-x-auto">
-            <table className="min-w-full border-separate border-spacing-0">
-              <thead>
-                <tr className="bg-slate-50">
-                  <th className="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Tipo</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">Quantidade</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">Valor total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {metricsByType.length > 0 ? (
-                  metricsByType.slice(0, 10).map((m) => (
-                    <tr key={m.typeLabel} className="border-t border-slate-100">
-                      <td className="px-4 py-3 text-sm text-slate-900">{m.typeLabel}</td>
-                      <td className="px-4 py-3 text-right text-sm font-semibold text-slate-900">{m.count}</td>
-                      <td className="px-4 py-3 text-right text-sm font-semibold text-slate-900">
-                        {formatCurrencyBRL(m.totalValue)}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td className="px-4 py-6 text-sm text-slate-600" colSpan={3}>
-                      Nenhuma métrica disponível.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
-          <div className="text-sm font-semibold text-slate-900">Top 5 Imóveis Premium</div>
-          <div className="mt-1 text-xs text-slate-500">Maior → menor preço</div>
-
-          <div className="mt-4 flex flex-col gap-3">
-            {premiumTop5.length > 0 ? (
-              premiumTop5.map((p) => (
-                <div
-                  key={`${p.source}-${p.id}`}
-                  className="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70"
-                >
-                  <div className="text-sm font-semibold text-slate-900">{p.title}</div>
-                  <div className="mt-1 text-xs text-slate-500">{p.typeLabel}</div>
-                  <div className="mt-2 text-sm font-semibold text-slate-900">{formatCurrencyBRL(p.price)}</div>
-                </div>
-              ))
-            ) : (
-              <div className="rounded-xl bg-slate-50 px-4 py-6 text-sm text-slate-600 ring-1 ring-slate-200/70">
-                Nenhum imóvel premium marcado.
-              </div>
-            )}
-          </div>
         </div>
       </section>
 
