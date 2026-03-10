@@ -269,7 +269,7 @@ export default function CorretoresAdminPage() {
         <header className="flex items-end justify-between gap-4">
           <div className="flex flex-col gap-2">
             <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">GESTÃO DE CORRETORES</div>
-            <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Performance</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Gestão de Corretores</h1>
           </div>
 
           <button
@@ -287,18 +287,16 @@ export default function CorretoresAdminPage() {
         </div>
       ) : null}
 
-        <section className="rounded-2xl bg-white p-6 shadow-lg ring-1 ring-slate-200/70">
-
-          {isLoading ? (
-            <div className="rounded-2xl bg-slate-50 px-5 py-6 text-sm text-slate-600 ring-1 ring-slate-200/70">
-              Carregando...
-            </div>
-          ) : rows.length === 0 ? (
-            <div className="rounded-2xl bg-slate-50 px-5 py-6 text-sm text-slate-600 ring-1 ring-slate-200/70">
-              Nenhum corretor encontrado.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {isLoading ? (
+          <div className="rounded-2xl bg-white px-6 py-6 text-sm text-slate-600 shadow-lg">
+            Carregando...
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="rounded-2xl bg-white px-6 py-6 text-sm text-slate-600 shadow-lg">
+            Nenhum corretor encontrado.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
               {rows.map((r) => {
                 const showTags = r.assignedProperties.slice(0, 6);
                 const hiddenCount = Math.max(0, r.assignedProperties.length - showTags.length);
@@ -307,7 +305,7 @@ export default function CorretoresAdminPage() {
                 return (
                   <div
                     key={r.id}
-                    className="group relative rounded-2xl border-t-4 border-blue-600 bg-white p-6 shadow-lg ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[2px]"
+                    className="group relative rounded-2xl border-t-4 border-blue-600 bg-white p-6 shadow-lg transition-all duration-300 hover:-translate-y-[2px]"
                   >
                     <div className="absolute right-4 top-4 flex items-center gap-2">
                       <button
@@ -382,7 +380,7 @@ export default function CorretoresAdminPage() {
                           {r.whatsClicks}
                         </div>
                         <div className={"mt-0.5 text-[10px] font-semibold " + (hasClicks ? "text-emerald-50" : "text-slate-400")}>
-                          cliques
+                          {hasClicks ? "cliques" : "0 cliques"}
                         </div>
                       </div>
                     </div>
@@ -415,9 +413,8 @@ export default function CorretoresAdminPage() {
                   </div>
                 );
               })}
-            </div>
-          )}
-        </section>
+          </div>
+        )}
 
         {selectedBroker ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8">

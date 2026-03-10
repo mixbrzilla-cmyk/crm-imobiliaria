@@ -1,0 +1,200 @@
+﻿Diagnose log at 2026-03-10T05:08:28Z
+
+AppPath: C:\Program Files\Git\mingw64\bin\git-credential-manager.exe
+InstallDir: C:\Program Files\Git\mingw64\bin\
+Version: 2.7.0+d1dd8a4ded75a2b1faae653157ac1699609442ad
+
+------------
+Diagnostic: Environment
+Skipped: False
+Success: True
+Exception: None
+Log:
+OSType: Windows
+OSVersion: 10.0 (build 26200)
+Reading environment variables... OK
+ Variables:
+SystemDrive=C:
+ProgramFiles(x86)=C:\Program Files (x86)
+MSYSTEM=MINGW64
+ProgramW6432=C:\Program Files
+PAGER=cat
+WINDSURF_CASCADE_TERMINAL_KIND=inherit
+PROCESSOR_IDENTIFIER=Intel64 Family 6 Model 126 Stepping 5, GenuineIntel
+TMP=C:\Users\flavi\AppData\Local\Temp
+PROCESSOR_ARCHITECTURE=AMD64
+VSCODE_GIT_ASKPASS_MAIN=c:\Users\flavi\AppData\Local\Programs\Windsurf\resources\app\extensions\git\dist\askpass-main.js
+Path=C:/Program Files/Git/mingw64/libexec/git-core;C:\Program Files\Git\mingw64\bin;C:\Program Files\Git\usr\bin;C:\Users\flavi\bin;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\WINDOWS\System32\OpenSSH\;C:\Program Files (x86)\Bitvise SSH Client;C:\Program Files\nodejs\;C:\Program Files\Git\cmd;C:\Users\flavi\AppData\Local\Microsoft\WindowsApps;C:\Users\flavi\AppData\Local\GitHubDesktop\bin;C:\Users\flavi\AppData\Local\Programs\Windsurf\bin;C:\Users\flavi\AppData\Roaming\npm
+USERPROFILE=C:\Users\flavi
+VSCODE_GIT_IPC_HANDLE=\\.\pipe\vscode-git-6022c561ca-sock
+EFC_8396_2283032206=1
+USERDOMAIN=FLAVIO
+PROCESSOR_REVISION=7e05
+TEMP=C:\Users\flavi\AppData\Local\Temp
+FPS_BROWSER_APP_PROFILE_STRING=Internet Explorer
+FPS_BROWSER_USER_PROFILE_STRING=Default
+LOGONSERVER=\\FLAVIO
+EFC_8396_1592913036=1
+USERNAME=flavi
+SystemRoot=C:\WINDOWS
+CHROME_CRASHPAD_PIPE_NAME=\\.\pipe\crashpad_20056_GSJMXWRBEHUQQXMM
+GIT_EXEC_PATH=C:/Program Files/Git/mingw64/libexec/git-core
+PLINK_PROTOCOL=ssh
+EFC_8396_3789132940=1
+GIT_PAGER=cat
+OneDrive=C:\Users\flavi\OneDrive
+USERDOMAIN_ROAMINGPROFILE=FLAVIO
+__PSLockDownPolicy=0
+CommonProgramFiles=C:\Program Files\Common Files
+ZES_ENABLE_SYSMAN=1
+VSCODE_PYTHON_AUTOACTIVATE_GUARD=1
+ProgramData=C:\ProgramData
+LANG=en_US.UTF-8
+GIT_ASKPASS=c:\Users\flavi\AppData\Local\Programs\Windsurf\resources\app\extensions\git\dist\askpass.sh
+HOMEPATH=\Users\flavi
+COMPUTERNAME=FLAVIO
+VSCODE_INJECTION=1
+ALLUSERSPROFILE=C:\ProgramData
+CommonProgramW6432=C:\Program Files\Common Files
+EFC_8396_1262719628=1
+TERM=xterm-256color
+SESSIONNAME=Console
+DriverData=C:\Windows\System32\Drivers\DriverData
+HOMEDRIVE=C:
+WINDSURF_CASCADE_TERMINAL=1
+windir=C:\WINDOWS
+GIT_TRACE2_PARENT_SID=a98ec857-34ca-48ae-a3f9-97404d4fc0da
+VSCODE_GIT_ASKPASS_NODE=C:\Users\flavi\AppData\Local\Programs\Windsurf\Windsurf.exe
+NUMBER_OF_PROCESSORS=8
+OS=Windows_NT
+ProgramFiles=C:\Program Files
+ComSpec=C:\WINDOWS\system32\cmd.exe
+PATHEXT=.COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC;.CPL
+HOME=C:\Users\flavi
+PSModulePath=C:\Users\flavi\Documents\WindowsPowerShell\Modules;C:\Program Files\WindowsPowerShell\Modules;C:\WINDOWS\system32\WindowsPowerShell\v1.0\Modules
+TMPDIR=C:\Users\flavi\AppData\Local\Temp
+APPDATA=C:\Users\flavi\AppData\Roaming
+EFC_8396_2775293581=1
+PROCESSOR_LEVEL=6
+LOCALAPPDATA=C:\Users\flavi\AppData\Local
+TERM_PROGRAM_VERSION=1.108.2
+CommonProgramFiles(x86)=C:\Program Files (x86)\Common Files
+COLORTERM=truecolor
+PUBLIC=C:\Users\Public
+TERM_PROGRAM=vscode
+VSCODE_GIT_ASKPASS_EXTRA_ARGS=
+
+
+------------
+Diagnostic: File system
+Skipped: False
+Success: True
+Exception: None
+Log:
+Temporary directory is 'C:\Users\flavi\AppData\Local\Temp\'...
+Checking basic file I/O...
+Writing to temporary file 'C:\Users\flavi\AppData\Local\Temp\ef3b453781474978eb8e5c51'... OK
+Reading from temporary file 'C:\Users\flavi\AppData\Local\Temp\ef3b453781474978eb8e5c51'... OK
+Deleting temporary file 'C:\Users\flavi\AppData\Local\Temp\ef3b453781474978eb8e5c51'... OK
+Testing IFileSystem instance...
+UserHomePath: C:\Users\flavi
+UserDataDirectoryPath: C:\Users\flavi\.gcm
+GetCurrentDirectory(): C:\Users\flavi\Desktop\super-crm-imob
+
+------------
+Diagnostic: Networking
+Skipped: False
+Success: True
+Exception: None
+Log:
+Checking networking and HTTP stack...
+Creating HTTP client... OK
+IsNetworkAvailable: True
+Sending HEAD request to http://example.com...Sending HEAD request to https://example.com... OK
+ OK
+Acquiring free TCP port... OK
+Testing local HTTP loopback connections...
+Creating new HTTP listener for http://localhost:57208/... OK
+Waiting for loopback connection... OK
+Writing response... OK
+Waiting for response data... OK
+Loopback connection data OK
+
+------------
+Diagnostic: Git
+Skipped: False
+Success: True
+Exception: None
+Log:
+Getting Git version... OK
+Git version is '2.53.0.windows.1'
+Locating current repository...Git repository at 'C:/Users/flavi/Desktop/super-crm-imob/.git'
+ OK
+Listing all Git configuration... OK
+Git configuration:
+file:C:/Program Files/Git/etc/gitconfig	diff.astextplain.textconv=astextplain
+file:C:/Program Files/Git/etc/gitconfig	filter.lfs.clean=git-lfs clean -- %f
+file:C:/Program Files/Git/etc/gitconfig	filter.lfs.smudge=git-lfs smudge -- %f
+file:C:/Program Files/Git/etc/gitconfig	filter.lfs.process=git-lfs filter-process
+file:C:/Program Files/Git/etc/gitconfig	filter.lfs.required=true
+file:C:/Program Files/Git/etc/gitconfig	http.sslbackend=schannel
+file:C:/Program Files/Git/etc/gitconfig	core.autocrlf=true
+file:C:/Program Files/Git/etc/gitconfig	core.fscache=true
+file:C:/Program Files/Git/etc/gitconfig	core.symlinks=false
+file:C:/Program Files/Git/etc/gitconfig	pull.rebase=false
+file:C:/Program Files/Git/etc/gitconfig	credential.helper=manager
+file:C:/Program Files/Git/etc/gitconfig	credential.https://dev.azure.com.usehttppath=true
+file:C:/Program Files/Git/etc/gitconfig	init.defaultbranch=master
+file:C:/Users/flavi/.gitconfig	filter.lfs.required=true
+file:C:/Users/flavi/.gitconfig	filter.lfs.clean=git-lfs clean -- %f
+file:C:/Users/flavi/.gitconfig	filter.lfs.smudge=git-lfs smudge -- %f
+file:C:/Users/flavi/.gitconfig	filter.lfs.process=git-lfs filter-process
+file:C:/Users/flavi/.gitconfig	user.name=paraleiloes2026-star
+file:C:/Users/flavi/.gitconfig	user.email=mix.br.zilla@gmail.com
+file:.git/config	core.repositoryformatversion=0
+file:.git/config	core.filemode=false
+file:.git/config	core.bare=false
+file:.git/config	core.logallrefupdates=true
+file:.git/config	core.symlinks=false
+file:.git/config	core.ignorecase=true
+file:.git/config	remote.origin.url=https://github.com/mixbrzilla-cmyk/crm-imobiliaria.git
+file:.git/config	remote.origin.fetch=+refs/heads/*:refs/remotes/origin/*
+file:.git/config	branch.main.remote=origin
+file:.git/config	branch.main.merge=refs/heads/main
+
+
+------------
+Diagnostic: Credential storage
+Skipped: False
+Success: True
+Exception: None
+Log:
+ICredentialStore instance is of type: CredentialStore
+Writing test credential... OK
+Reading test credential... OK
+Deleting test credential... OK
+
+------------
+Diagnostic: Microsoft authentication (AAD/MSA)
+Skipped: False
+Success: True
+Exception: None
+Log:
+Broker is not enabled.
+Flow type is: Auto
+Gathering MSAL token cache data... OK
+CacheDirectory: C:\Users\flavi\AppData\Local\.IdentityService
+CacheFileName: msal.cache
+CacheFilePath: C:\Users\flavi\AppData\Local\.IdentityService\msal.cache
+Creating cache helper... OK
+Verifying MSAL token cache persistence... OK
+
+------------
+Diagnostic: GitHub API
+Skipped: False
+Success: True
+Exception: None
+Log:
+Using 'https://github.com/' as API target.
+Querying '/meta' endpoint... OK
+
