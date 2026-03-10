@@ -268,6 +268,9 @@ export default function InventarioImoveisPage() {
     const nextBrokerId = brokerId || null;
     const nowIso = nextBrokerId ? new Date().toISOString() : null;
 
+    const payload = { corretor_id: nextBrokerId, data_direcionamento: nowIso };
+    console.log("[Inventário] Salvando corretor/data_direcionamento", { rowId, payload });
+
     setUpdatingFieldByRowId((c) => ({ ...c, [rowId]: "corretor" }));
     setRows((current) =>
       current.map((r) =>
@@ -278,15 +281,28 @@ export default function InventarioImoveisPage() {
     try {
       const { error } = await (supabase as any)
         .from("properties")
-        .update({ corretor_id: nextBrokerId, data_direcionamento: nowIso })
+        .update(payload)
         .eq("id", rowId);
 
       if (error) {
-        setErrorMessage(error.message);
+        console.log("[Inventário] Erro ao salvar corretor/data_direcionamento", { rowId, error, payload });
+        const msg = String(error.message ?? "");
+        if (msg.toLowerCase().includes("data_direcionamento") && msg.toLowerCase().includes("does not exist")) {
+          setErrorMessage(
+            'Coluna "data_direcionamento" não existe na tabela properties (ou não está exposta). Crie a coluna (timestamptz) no Supabase e tente novamente.',
+          );
+        } else if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("rls")) {
+          setErrorMessage(
+            'Permissão negada ao salvar "data_direcionamento". Verifique RLS/policies da tabela properties para update desse campo.',
+          );
+        } else {
+          setErrorMessage(msg || "Erro ao salvar.");
+        }
         await load();
         return;
       }
     } catch {
+      console.log("[Inventário] Falha inesperada ao salvar corretor/data_direcionamento", { rowId, payload });
       setErrorMessage("Não foi possível salvar o corretor agora.");
       await load();
     } finally {
