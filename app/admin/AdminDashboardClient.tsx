@@ -380,7 +380,7 @@ export default function AdminDashboardClient() {
               const brokerName = (profilesById.get(brokerId)?.full_name ?? "").trim() || brokerId;
               const loc = [r.neighborhood, r.city].filter(Boolean).join(" • ");
               const propertyLabel = (r.title ?? "").trim() || loc || r.id;
-              const directedAt = r.data_direcionamento ?? r.created_at ?? "";
+              const directedAt = r.data_direcionamento ?? "";
               const directedTs = directedAt ? new Date(directedAt).getTime() : NaN;
               const daysSince = Number.isFinite(directedTs)
                 ? Math.max(0, Math.floor((nowTs - directedTs) / (24 * 60 * 60 * 1000)))
@@ -678,10 +678,12 @@ export default function AdminDashboardClient() {
                     <td className="px-4 py-3 text-sm font-semibold text-slate-900">{r.brokerName}</td>
                     <td className="px-4 py-3 text-sm text-slate-700">{r.propertyLabel}</td>
                     <td className="px-4 py-3 text-sm text-slate-700">
-                      {r.directedAtIso ? new Date(r.directedAtIso).toLocaleDateString("pt-BR") : "-"}
+                      {r.directedAtIso
+                        ? new Date(r.directedAtIso).toLocaleDateString("pt-BR")
+                        : "Aguardando registro"}
                     </td>
                     <td className="px-4 py-3 text-sm font-semibold text-slate-900">
-                      {formatDaysSinceLabel(r.daysSince)}
+                      {r.directedAtIso ? formatDaysSinceLabel(r.daysSince) : "-"}
                     </td>
                   </tr>
                 ))
