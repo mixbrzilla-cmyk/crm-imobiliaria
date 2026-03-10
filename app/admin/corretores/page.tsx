@@ -17,6 +17,7 @@ type BrokerRowView = {
   full_name: string;
   email: string;
   propertiesInHands: number;
+  assignedPropertyTitles: string[];
   whatsClicks: number;
 };
 
@@ -56,6 +57,7 @@ export default function CorretoresAdminPage() {
     const brokerRows = (brokersRes.data ?? []) as BrokerProfile[];
 
     const propertiesInHandsByBroker = new Map<string, number>();
+    const titlesByBroker = new Map<string, string[]>();
     const whatsClicksByBroker = new Map<string, number>();
 
     function addClicks(brokerId: string, value: unknown) {
@@ -64,7 +66,12 @@ export default function CorretoresAdminPage() {
       whatsClicksByBroker.set(brokerId, (whatsClicksByBroker.get(brokerId) ?? 0) + v);
     }
 
-    const clickColumnsToTry = ["whatsapp_clicks", "whats_clicks", "clicks_whatsapp", "whatsapp_click_count"];
+    const clickColumnsToTry = [
+      "whatsapp_clicks",
+      "whats_clicks",
+      "clicks_whatsapp",
+      "whatsapp_click_count",
+    ];
 
     let propertiesClickColumn: string | null = null;
     for (const col of clickColumnsToTry) {
@@ -76,43 +83,47 @@ export default function CorretoresAdminPage() {
     }
 
     const propsSelect = propertiesClickColumn
-      ? `id, corretor_id, ${propertiesClickColumn}`
-      : "id, corretor_id";
+      ? `id, title, corretor_id, ${propertiesClickColumn}`
+      : "id, title, corretor_id";
 
-    const [propsRes, devsRes] = await Promise.allSettled([
-      supabase.from("properties").select(propsSelect),
-      (supabase as any).from("developments").select("id, corretor_id"),
-    ]);
+    const propsRes = await supabase.from("properties").select(propsSelect);
 
-    if (propsRes.status === "fulfilled" && !propsRes.value.error) {
-      const props = (propsRes.value.data ?? []) as Array<any>;
-      for (const row of props) {
-        const id = (row?.corretor_id ?? "").trim();
-        if (!id) continue;
-        propertiesInHandsByBroker.set(id, (propertiesInHandsByBroker.get(id) ?? 0) + 1);
-        if (propertiesClickColumn) addClicks(id, row?.[propertiesClickColumn]);
-      }
+    if (propsRes.error) {
+      setErrorMessage(propsRes.error.message);
+      setRows([]);
+      setIsLoading(false);
+      return;
     }
 
-    if (devsRes.status === "fulfilled" && !devsRes.value.error) {
-      const devs = (devsRes.value.data ?? []) as Array<any>;
-      for (const row of devs) {
-        const id = (row?.corretor_id ?? "").trim();
-        if (!id) continue;
-        propertiesInHandsByBroker.set(id, (propertiesInHandsByBroker.get(id) ?? 0) + 1);
+    const props = (propsRes.data ?? []) as Array<any>;
+    for (const row of props) {
+      const id = (row?.corretor_id ?? "").trim();
+      if (!id) continue;
+
+      propertiesInHandsByBroker.set(id, (propertiesInHandsByBroker.get(id) ?? 0) + 1);
+
+      const title = String(row?.title ?? "").trim();
+      if (title) {
+        const arr = titlesByBroker.get(id) ?? [];
+        arr.push(title);
+        titlesByBroker.set(id, arr);
       }
+
+      if (propertiesClickColumn) addClicks(id, row?.[propertiesClickColumn]);
     }
 
     const view: BrokerRowView[] = brokerRows.map((b) => {
       const name = (b.full_name ?? "").trim() || "-";
       const email = (b.email ?? "").trim() || "-";
       const inHands = propertiesInHandsByBroker.get(b.id) ?? 0;
+      const assignedPropertyTitles = titlesByBroker.get(b.id) ?? [];
       const clicks = whatsClicksByBroker.get(b.id) ?? 0;
       return {
         id: b.id,
         full_name: name,
         email,
         propertiesInHands: inHands,
+        assignedPropertyTitles,
         whatsClicks: clicks,
       };
     });
@@ -127,7 +138,7 @@ export default function CorretoresAdminPage() {
     }, 0);
 
     return () => clearTimeout(timeoutId);
-  }, []);
+  }, [loadBaseData]);
 
   async function deleteBroker(brokerId: string) {
     setErrorMessage(null);
@@ -153,15 +164,6 @@ export default function CorretoresAdminPage() {
 
       if (releaseProps.error) {
         setErrorMessage(releaseProps.error.message);
-        return;
-      }
-
-      const releaseDevs = await (supabase as any)
-        .from("developments")
-        .update({ corretor_id: null })
-        .eq("corretor_id", brokerId);
-      if (releaseDevs.error) {
-        setErrorMessage(releaseDevs.error.message);
         return;
       }
 
@@ -216,7 +218,7 @@ export default function CorretoresAdminPage() {
                   Email
                 </th>
                 <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-zinc-700">
-                  Imóveis em Mãos
+                  Imóveis Atribuídos
                 </th>
                 <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-zinc-700">
                   Cliques no Whats (Performance)
@@ -244,8 +246,29 @@ export default function CorretoresAdminPage() {
                   <tr key={r.id} className="border-t border-zinc-100">
                     <td className="px-5 py-4 text-sm font-semibold text-zinc-900">{r.full_name}</td>
                     <td className="px-5 py-4 text-sm text-zinc-700">{r.email}</td>
-                    <td className="px-5 py-4 text-sm font-semibold text-zinc-900">
-                      {r.propertiesInHands}
+                    <td className="px-5 py-4">
+                      {r.assignedPropertyTitles.length > 0 ? (
+                        <div className="flex max-w-[560px] flex-wrap gap-2">
+                          {r.assignedPropertyTitles.slice(0, 12).map((t, idx) => (
+                            <span
+                              key={`${r.id}-${idx}`}
+                              className="inline-flex items-center rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200/70"
+                            >
+                              {t}
+                            </span>
+                          ))}
+                          {r.assignedPropertyTitles.length > 12 ? (
+                            <span className="text-xs font-semibold text-slate-500">
+                              +{r.assignedPropertyTitles.length - 12}
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-zinc-500">-</div>
+                      )}
+                      <div className="mt-2 text-xs text-zinc-500">
+                        Total: <span className="font-semibold text-zinc-700">{r.propertiesInHands}</span>
+                      </div>
                     </td>
                     <td className="px-5 py-4 text-sm font-semibold text-zinc-900">{r.whatsClicks}</td>
                     <td className="px-5 py-4 text-right">
