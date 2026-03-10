@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { getSupabaseClient } from "@/lib/supabaseClient";
 
@@ -12,47 +12,24 @@ type BrokerProfile = {
   role?: string | null;
 };
 
-type BrokerMonitor = {
-  brokerId: string;
-  leadsInHands: number;
-  propertiesSent: number;
-  developmentsSent: number;
+type BrokerRowView = {
+  id: string;
+  full_name: string;
+  email: string;
+  propertiesInHands: number;
   whatsClicks: number;
-  visitsMarked: number;
-  meetings: number;
-};
-
-type Development = {
-  id: string;
-  name: string;
-};
-
-type StandaloneProperty = {
-  id: string;
-  property_type: string;
-  purpose: string;
-  address: string | null;
 };
 
 export default function CorretoresAdminPage() {
-  const supabase = getSupabaseClient();
+  const supabase = useMemo(() => getSupabaseClient(), []);
 
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const [brokers, setBrokers] = useState<BrokerProfile[]>([]);
-  const [selectedBrokerId, setSelectedBrokerId] = useState<string | null>(null);
+  const [rows, setRows] = useState<BrokerRowView[]>([]);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const [monitorByBrokerId, setMonitorByBrokerId] = useState<Record<string, BrokerMonitor>>({});
-
-  const [developments, setDevelopments] = useState<Development[]>([]);
-  const [standalones, setStandalones] = useState<StandaloneProperty[]>([]);
-
-  const [selectedDevelopmentIds, setSelectedDevelopmentIds] = useState<Set<string>>(new Set());
-  const [selectedStandaloneIds, setSelectedStandaloneIds] = useState<Set<string>>(new Set());
-
-  async function loadBaseData() {
+  const loadBaseData = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage(null);
 
@@ -60,9 +37,7 @@ export default function CorretoresAdminPage() {
       setErrorMessage(
         "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
       );
-      setBrokers([]);
-      setDevelopments([]);
-      setStandalones([]);
+      setRows([]);
       setIsLoading(false);
       return;
     }
@@ -78,154 +53,73 @@ export default function CorretoresAdminPage() {
       setIsLoading(false);
       return;
     }
-
-    const devRes = await supabase
-      .from("developments")
-      .select("id, name")
-      .order("name", { ascending: true });
-
-    if (devRes.error) {
-      setErrorMessage(devRes.error.message);
-      setIsLoading(false);
-      return;
-    }
-
-    const avRes = await supabase
-      .from("standalone_properties")
-      .select("id, property_type, purpose, address")
-      .order("created_at", { ascending: false });
-
-    if (avRes.error) {
-      setErrorMessage(avRes.error.message);
-      setIsLoading(false);
-      return;
-    }
-
     const brokerRows = (brokersRes.data ?? []) as BrokerProfile[];
-    setBrokers(brokerRows);
 
-    void loadMonitor(brokerRows.map((b) => b.id));
+    const propertiesInHandsByBroker = new Map<string, number>();
+    const whatsClicksByBroker = new Map<string, number>();
 
-    const devRows = (devRes.data ?? []) as Development[];
-    setDevelopments(devRows);
-
-    const avRows = (avRes.data ?? []) as StandaloneProperty[];
-    setStandalones(avRows);
-
-    if (!selectedBrokerId && brokerRows.length > 0) {
-      setSelectedBrokerId(brokerRows[0].id);
+    function addClicks(brokerId: string, value: unknown) {
+      const v = typeof value === "number" ? value : Number(value ?? 0);
+      if (!Number.isFinite(v)) return;
+      whatsClicksByBroker.set(brokerId, (whatsClicksByBroker.get(brokerId) ?? 0) + v);
     }
 
+    const clickColumnsToTry = ["whatsapp_clicks", "whats_clicks", "clicks_whatsapp", "whatsapp_click_count"];
+
+    let propertiesClickColumn: string | null = null;
+    for (const col of clickColumnsToTry) {
+      const test = await supabase.from("properties").select(`id, corretor_id, ${col}`).limit(1);
+      if (!test.error) {
+        propertiesClickColumn = col;
+        break;
+      }
+    }
+
+    const propsSelect = propertiesClickColumn
+      ? `id, corretor_id, ${propertiesClickColumn}`
+      : "id, corretor_id";
+
+    const [propsRes, devsRes] = await Promise.allSettled([
+      supabase.from("properties").select(propsSelect),
+      (supabase as any).from("developments").select("id, corretor_id"),
+    ]);
+
+    if (propsRes.status === "fulfilled" && !propsRes.value.error) {
+      const props = (propsRes.value.data ?? []) as Array<any>;
+      for (const row of props) {
+        const id = (row?.corretor_id ?? "").trim();
+        if (!id) continue;
+        propertiesInHandsByBroker.set(id, (propertiesInHandsByBroker.get(id) ?? 0) + 1);
+        if (propertiesClickColumn) addClicks(id, row?.[propertiesClickColumn]);
+      }
+    }
+
+    if (devsRes.status === "fulfilled" && !devsRes.value.error) {
+      const devs = (devsRes.value.data ?? []) as Array<any>;
+      for (const row of devs) {
+        const id = (row?.corretor_id ?? "").trim();
+        if (!id) continue;
+        propertiesInHandsByBroker.set(id, (propertiesInHandsByBroker.get(id) ?? 0) + 1);
+      }
+    }
+
+    const view: BrokerRowView[] = brokerRows.map((b) => {
+      const name = (b.full_name ?? "").trim() || "-";
+      const email = (b.email ?? "").trim() || "-";
+      const inHands = propertiesInHandsByBroker.get(b.id) ?? 0;
+      const clicks = whatsClicksByBroker.get(b.id) ?? 0;
+      return {
+        id: b.id,
+        full_name: name,
+        email,
+        propertiesInHands: inHands,
+        whatsClicks: clicks,
+      };
+    });
+
+    setRows(view);
     setIsLoading(false);
-  }
-
-  async function loadMonitor(brokerIds: string[]) {
-    if (!supabase) {
-      setMonitorByBrokerId({});
-      return;
-    }
-
-    if (brokerIds.length === 0) {
-      setMonitorByBrokerId({});
-      return;
-    }
-
-    try {
-      const base: Record<string, BrokerMonitor> = {};
-      for (const id of brokerIds) {
-        base[id] = {
-          brokerId: id,
-          leadsInHands: 0,
-          propertiesSent: 0,
-          developmentsSent: 0,
-          whatsClicks: 0,
-          visitsMarked: 0,
-          meetings: 0,
-        };
-      }
-
-      const [leadsRes, standalonesRes, developmentsRes] = await Promise.allSettled([
-        (supabase as any)
-          .from("leads")
-          .select("id, assigned_broker_profile_id"),
-        (supabase as any)
-          .from("standalone_properties")
-          .select("id, assigned_broker_profile_id"),
-        (supabase as any)
-          .from("developments")
-          .select("id, assigned_broker_profile_id"),
-      ]);
-
-      if (leadsRes.status === "fulfilled" && !leadsRes.value.error) {
-        const leads = (leadsRes.value.data ?? []) as Array<{ assigned_broker_profile_id: string | null }>;
-        for (const row of leads) {
-          const id = row.assigned_broker_profile_id ?? "";
-          if (id && base[id]) base[id].leadsInHands += 1;
-        }
-      }
-
-      if (standalonesRes.status === "fulfilled" && !standalonesRes.value.error) {
-        const props = (standalonesRes.value.data ?? []) as Array<{ assigned_broker_profile_id: string | null }>;
-        for (const row of props) {
-          const id = row.assigned_broker_profile_id ?? "";
-          if (id && base[id]) base[id].propertiesSent += 1;
-        }
-      }
-
-      if (developmentsRes.status === "fulfilled" && !developmentsRes.value.error) {
-        const devs = (developmentsRes.value.data ?? []) as Array<{ assigned_broker_profile_id: string | null }>;
-        for (const row of devs) {
-          const id = row.assigned_broker_profile_id ?? "";
-          if (id && base[id]) base[id].developmentsSent += 1;
-        }
-      }
-
-      setMonitorByBrokerId(base);
-    } catch {
-      setMonitorByBrokerId({});
-    }
-  }
-
-  const selectedMonitor = useMemo(() => {
-    if (!selectedBrokerId) return null;
-    return monitorByBrokerId[selectedBrokerId] ?? null;
-  }, [monitorByBrokerId, selectedBrokerId]);
-
-  async function loadPermissions(brokerId: string) {
-    setErrorMessage(null);
-
-    if (!supabase) return;
-
-    const devRes = await supabase
-      .from("broker_developments")
-      .select("development_id")
-      .eq("broker_profile_id", brokerId);
-
-    if (devRes.error) {
-      setErrorMessage(devRes.error.message);
-      return;
-    }
-
-    const avRes = await supabase
-      .from("broker_standalone_properties")
-      .select("standalone_property_id")
-      .eq("broker_profile_id", brokerId);
-
-    if (avRes.error) {
-      setErrorMessage(avRes.error.message);
-      return;
-    }
-
-    const devIds = new Set<string>(
-      ((devRes.data ?? []) as any[]).map((r) => r.development_id as string),
-    );
-    const avIds = new Set<string>(
-      ((avRes.data ?? []) as any[]).map((r) => r.standalone_property_id as string),
-    );
-
-    setSelectedDevelopmentIds(devIds);
-    setSelectedStandaloneIds(avIds);
-  }
+  }, [supabase]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -235,26 +129,8 @@ export default function CorretoresAdminPage() {
     return () => clearTimeout(timeoutId);
   }, []);
 
-  useEffect(() => {
-    if (!selectedBrokerId) return;
-
-    const timeoutId = setTimeout(() => {
-      void loadPermissions(selectedBrokerId);
-    }, 0);
-
-    return () => clearTimeout(timeoutId);
-  }, [selectedBrokerId]);
-
-  function toggleSet(setter: (next: Set<string>) => void, current: Set<string>, id: string) {
-    const next = new Set(current);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setter(next);
-  }
-
-  async function savePermissions() {
+  async function deleteBroker(brokerId: string) {
     setErrorMessage(null);
-
     if (!supabase) {
       setErrorMessage(
         "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
@@ -262,68 +138,45 @@ export default function CorretoresAdminPage() {
       return;
     }
 
-    if (!selectedBrokerId) {
-      setErrorMessage("Selecione um corretor.");
-      return;
-    }
+    const brokerName = (rows.find((r) => r.id === brokerId)?.full_name ?? "").trim() || brokerId;
+    const ok = window.confirm(
+      `Excluir o corretor "${brokerName}"? Isso vai remover o perfil e liberar os imóveis atribuídos.`,
+    );
+    if (!ok) return;
 
-    setIsSaving(true);
+    setDeletingId(brokerId);
+    try {
+      const releaseProps = await supabase
+        .from("properties")
+        .update({ corretor_id: null, data_direcionamento: null })
+        .eq("corretor_id", brokerId);
 
-    const delDev = await (supabase as any)
-      .from("broker_developments")
-      .delete()
-      .eq("broker_profile_id", selectedBrokerId);
-
-    if (delDev.error) {
-      setErrorMessage(delDev.error.message);
-      setIsSaving(false);
-      return;
-    }
-
-    const delAv = await (supabase as any)
-      .from("broker_standalone_properties")
-      .delete()
-      .eq("broker_profile_id", selectedBrokerId);
-
-    if (delAv.error) {
-      setErrorMessage(delAv.error.message);
-      setIsSaving(false);
-      return;
-    }
-
-    const devPayload = Array.from(selectedDevelopmentIds).map((developmentId) => ({
-      id: crypto.randomUUID(),
-      broker_profile_id: selectedBrokerId,
-      development_id: developmentId,
-    }));
-
-    const avPayload = Array.from(selectedStandaloneIds).map((propertyId) => ({
-      id: crypto.randomUUID(),
-      broker_profile_id: selectedBrokerId,
-      standalone_property_id: propertyId,
-    }));
-
-    if (devPayload.length > 0) {
-      const ins = await (supabase as any).from("broker_developments").insert(devPayload);
-      if (ins.error) {
-        setErrorMessage(ins.error.message);
-        setIsSaving(false);
+      if (releaseProps.error) {
+        setErrorMessage(releaseProps.error.message);
         return;
       }
-    }
 
-    if (avPayload.length > 0) {
-      const ins = await (supabase as any)
-        .from("broker_standalone_properties")
-        .insert(avPayload);
-      if (ins.error) {
-        setErrorMessage(ins.error.message);
-        setIsSaving(false);
+      const releaseDevs = await (supabase as any)
+        .from("developments")
+        .update({ corretor_id: null })
+        .eq("corretor_id", brokerId);
+      if (releaseDevs.error) {
+        setErrorMessage(releaseDevs.error.message);
         return;
       }
-    }
 
-    setIsSaving(false);
+      const delProfile = await supabase.from("profiles").delete().eq("id", brokerId);
+      if (delProfile.error) {
+        setErrorMessage(delProfile.error.message);
+        return;
+      }
+
+      await loadBaseData();
+    } catch {
+      setErrorMessage("Não foi possível excluir o corretor agora.");
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   return (
@@ -332,9 +185,6 @@ export default function CorretoresAdminPage() {
         <h1 className="text-3xl font-semibold tracking-tight text-[#1e3a8a]">
           Gestão de Corretores
         </h1>
-        <p className="text-sm text-zinc-600">
-          Tripulação: veja quem está ativo e distribua a carga (permissões de inventário).
-        </p>
       </header>
 
       {errorMessage ? (
@@ -343,204 +193,76 @@ export default function CorretoresAdminPage() {
         </div>
       ) : null}
 
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="rounded-xl border border-zinc-200 bg-white">
-          <div className="border-b border-zinc-200 px-5 py-4">
-            <div className="text-sm font-semibold text-[#1e3a8a]">Corretores</div>
-          </div>
+      <section className="rounded-xl border border-zinc-200 bg-white">
+        <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-4">
+          <div className="text-sm font-semibold text-[#1e3a8a]">Corretores</div>
+          <button
+            type="button"
+            onClick={() => void loadBaseData()}
+            className="inline-flex h-10 items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 text-sm font-semibold text-[#1e3a8a] hover:bg-zinc-50"
+          >
+            Recarregar
+          </button>
+        </div>
 
-          <div className="p-4">
-            {isLoading ? (
-              <div className="text-sm text-zinc-600">Carregando...</div>
-            ) : brokers.length === 0 ? (
-              <div className="text-sm text-zinc-600">Nenhum corretor encontrado.</div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {brokers.map((b) => {
-                  const isActive = selectedBrokerId === b.id;
-                  const isOk = b.status === "ativo";
-                  const monitor = monitorByBrokerId[b.id];
-
-                  return (
-                    <button
-                      key={b.id}
-                      type="button"
-                      onClick={() => setSelectedBrokerId(b.id)}
-                      className={
-                        "flex w-full items-start justify-between rounded-lg border px-3 py-3 text-left transition-colors " +
-                        (isActive
-                          ? "border-[#1e3a8a] bg-[#1e3a8a]/5"
-                          : "border-zinc-200 bg-white hover:bg-zinc-50")
-                      }
-                    >
-                      <div className="flex flex-col">
-                        <div className="text-sm font-semibold text-zinc-900">
-                          {b.full_name ?? "-"}
-                        </div>
-                        <div className="mt-0.5 text-xs text-zinc-500">{b.email ?? "-"}</div>
-                        <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-zinc-600">
-                          <div>
-                            Leads em mãos: <span className="font-semibold text-zinc-900">{monitor?.leadsInHands ?? 0}</span>
-                          </div>
-                          <div>
-                            Imóveis enviados:{" "}
-                            <span className="font-semibold text-zinc-900">{monitor?.propertiesSent ?? 0}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div
-                        className={
-                          "rounded-full px-2 py-1 text-xs font-semibold " +
-                          (isOk
-                            ? "bg-emerald-50 text-emerald-700"
-                            : "bg-amber-50 text-amber-700")
-                        }
+        <div className="overflow-x-auto">
+          <table className="min-w-full border-separate border-spacing-0">
+            <thead>
+              <tr className="bg-zinc-50">
+                <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-zinc-700">
+                  Nome
+                </th>
+                <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-zinc-700">
+                  Email
+                </th>
+                <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-zinc-700">
+                  Imóveis em Mãos
+                </th>
+                <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-zinc-700">
+                  Cliques no Whats (Performance)
+                </th>
+                <th className="px-5 py-3 text-right text-xs font-semibold tracking-wide text-zinc-700">
+                  Ações
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr>
+                  <td className="px-5 py-6 text-sm text-zinc-600" colSpan={5}>
+                    Carregando...
+                  </td>
+                </tr>
+              ) : rows.length === 0 ? (
+                <tr>
+                  <td className="px-5 py-6 text-sm text-zinc-600" colSpan={5}>
+                    Nenhum corretor encontrado.
+                  </td>
+                </tr>
+              ) : (
+                rows.map((r) => (
+                  <tr key={r.id} className="border-t border-zinc-100">
+                    <td className="px-5 py-4 text-sm font-semibold text-zinc-900">{r.full_name}</td>
+                    <td className="px-5 py-4 text-sm text-zinc-700">{r.email}</td>
+                    <td className="px-5 py-4 text-sm font-semibold text-zinc-900">
+                      {r.propertiesInHands}
+                    </td>
+                    <td className="px-5 py-4 text-sm font-semibold text-zinc-900">{r.whatsClicks}</td>
+                    <td className="px-5 py-4 text-right">
+                      <button
+                        type="button"
+                        onClick={() => void deleteBroker(r.id)}
+                        disabled={deletingId === r.id}
+                        className="inline-flex h-10 items-center justify-center rounded-lg bg-[#dc2626] px-4 text-sm font-semibold text-white hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        {b.status ?? "-"}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-zinc-200 bg-white lg:col-span-2">
-          <div className="border-b border-zinc-200 px-5 py-4">
-            <div className="text-sm font-semibold text-[#1e3a8a]">Monitoramento (Líder)</div>
-            <div className="mt-0.5 text-xs text-zinc-500">
-              Preparado para o painel do corretor: contagens e interações.
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-3">
-            <div className="rounded-xl border border-zinc-200 bg-white px-4 py-4">
-              <div className="text-xs font-semibold text-zinc-600">Leads em Mãos</div>
-              <div className="mt-2 text-2xl font-semibold text-zinc-900">
-                {selectedMonitor?.leadsInHands ?? 0}
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-zinc-200 bg-white px-4 py-4">
-              <div className="text-xs font-semibold text-zinc-600">Imóveis Enviados</div>
-              <div className="mt-2 text-2xl font-semibold text-zinc-900">
-                {(selectedMonitor?.propertiesSent ?? 0) + (selectedMonitor?.developmentsSent ?? 0)}
-              </div>
-              <div className="mt-1 text-[11px] text-zinc-500">
-                Avulsos: {selectedMonitor?.propertiesSent ?? 0} • Empreend.: {selectedMonitor?.developmentsSent ?? 0}
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-zinc-200 bg-white px-4 py-4">
-              <div className="text-xs font-semibold text-zinc-600">Interações (Futuro)</div>
-              <div className="mt-2 grid grid-cols-1 gap-1 text-sm text-zinc-700">
-                <div>
-                  Cliques no Whats: <span className="font-semibold text-zinc-900">{selectedMonitor?.whatsClicks ?? 0}</span>
-                </div>
-                <div>
-                  Visitas marcadas: <span className="font-semibold text-zinc-900">{selectedMonitor?.visitsMarked ?? 0}</span>
-                </div>
-                <div>
-                  Encontros: <span className="font-semibold text-zinc-900">{selectedMonitor?.meetings ?? 0}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-zinc-200 bg-white lg:col-span-3">
-          <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-4">
-            <div>
-              <div className="text-sm font-semibold text-[#1e3a8a]">Distribuição de Carga</div>
-              <div className="mt-0.5 text-xs text-zinc-500">
-                Marque o que o corretor pode trabalhar e acessar.
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => void loadBaseData()}
-                className="inline-flex h-10 items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 text-sm font-semibold text-[#1e3a8a] hover:bg-zinc-50"
-              >
-                Recarregar
-              </button>
-              <button
-                type="button"
-                disabled={isSaving || !selectedBrokerId}
-                onClick={() => void savePermissions()}
-                className="inline-flex h-10 items-center justify-center rounded-lg bg-[#dc2626] px-4 text-sm font-semibold text-white hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isSaving ? "Salvando..." : "Salvar permissões"}
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 p-5 lg:grid-cols-2">
-            <div className="rounded-xl border border-zinc-200">
-              <div className="border-b border-zinc-200 px-4 py-3">
-                <div className="text-xs font-semibold text-[#1e3a8a]">Empreendimentos</div>
-              </div>
-              <div className="flex max-h-[460px] flex-col gap-2 overflow-auto p-4">
-                {isLoading ? (
-                  <div className="text-sm text-zinc-600">Carregando...</div>
-                ) : developments.length === 0 ? (
-                  <div className="text-sm text-zinc-600">Nenhum empreendimento cadastrado.</div>
-                ) : (
-                  developments.map((d) => (
-                    <label
-                      key={d.id}
-                      className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2"
-                    >
-                      <div className="text-sm text-zinc-900">{d.name}</div>
-                      <input
-                        type="checkbox"
-                        checked={selectedDevelopmentIds.has(d.id)}
-                        onChange={() =>
-                          toggleSet(setSelectedDevelopmentIds, selectedDevelopmentIds, d.id)
-                        }
-                      />
-                    </label>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-zinc-200">
-              <div className="border-b border-zinc-200 px-4 py-3">
-                <div className="text-xs font-semibold text-[#1e3a8a]">Imóveis Avulsos</div>
-              </div>
-              <div className="flex max-h-[460px] flex-col gap-2 overflow-auto p-4">
-                {isLoading ? (
-                  <div className="text-sm text-zinc-600">Carregando...</div>
-                ) : standalones.length === 0 ? (
-                  <div className="text-sm text-zinc-600">Nenhum imóvel avulso cadastrado.</div>
-                ) : (
-                  standalones.map((p) => (
-                    <label
-                      key={p.id}
-                      className="flex items-start justify-between gap-3 rounded-lg border border-zinc-200 bg-white px-3 py-2"
-                    >
-                      <div className="flex flex-col">
-                        <div className="text-sm text-zinc-900">
-                          {p.property_type} • {p.purpose}
-                        </div>
-                        <div className="text-xs text-zinc-500">{p.address ?? "-"}</div>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={selectedStandaloneIds.has(p.id)}
-                        onChange={() =>
-                          toggleSet(setSelectedStandaloneIds, selectedStandaloneIds, p.id)
-                        }
-                      />
-                    </label>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
+                        {deletingId === r.id ? "Excluindo..." : "Excluir"}
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </section>
     </div>
