@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { MessageCircle, Trash2 } from "lucide-react";
+import { MessageCircle, Trash2, X } from "lucide-react";
 
 import { getSupabaseClient } from "@/lib/supabaseClient";
 
@@ -56,6 +56,30 @@ function statusBadge(status: string | null) {
   };
 }
 
+function initialsFromName(name: string) {
+  const parts = (name ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (parts.length === 0) return "-";
+  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
+  return `${parts[0]!.slice(0, 1)}${parts[parts.length - 1]!.slice(0, 1)}`.toUpperCase();
+}
+
+function WhatsappIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 32 32"
+      aria-hidden="true"
+      className={className}
+      fill="currentColor"
+    >
+      <path d="M16.03 3.2c-7.07 0-12.82 5.75-12.82 12.82 0 2.27.6 4.48 1.73 6.43L3.1 28.8l6.54-1.72a12.76 12.76 0 0 0 6.39 1.72h.01c7.07 0 12.82-5.75 12.82-12.82S23.1 3.2 16.03 3.2Zm7.47 18.18c-.31.87-1.55 1.61-2.48 1.81-.63.14-1.45.25-4.21-.91-3.53-1.46-5.8-5.05-5.98-5.28-.17-.23-1.43-1.9-1.43-3.63 0-1.72.89-2.56 1.21-2.9.31-.35.68-.43.91-.43h.66c.21 0 .5-.08.78.6.31.74 1.06 2.56 1.15 2.74.1.19.16.41.04.66-.12.25-.19.41-.37.63-.18.23-.39.5-.56.66-.19.19-.38.39-.17.76.21.37.93 1.54 1.99 2.49 1.37 1.22 2.52 1.6 2.89 1.78.37.19.58.16.8-.1.21-.25.91-1.06 1.15-1.43.25-.37.5-.31.84-.19.35.12 2.2 1.04 2.58 1.23.37.19.63.29.72.45.08.17.08.93-.23 1.8Z" />
+    </svg>
+  );
+}
+
 export default function CorretoresAdminPage() {
   const supabase = useMemo(() => getSupabaseClient(), []);
 
@@ -64,6 +88,12 @@ export default function CorretoresAdminPage() {
 
   const [rows, setRows] = useState<BrokerRowView[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedBrokerId, setSelectedBrokerId] = useState<string | null>(null);
+
+  const selectedBroker = useMemo(() => {
+    if (!selectedBrokerId) return null;
+    return rows.find((r) => r.id === selectedBrokerId) ?? null;
+  }, [rows, selectedBrokerId]);
 
   const loadBaseData = useCallback(async () => {
     setIsLoading(true);
@@ -234,11 +264,22 @@ export default function CorretoresAdminPage() {
   }
 
   return (
-    <div className="flex w-full flex-col gap-8">
-      <header className="flex flex-col gap-2">
-        <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">GESTÃO DE CORRETORES</div>
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Performance & Carteira</h1>
-      </header>
+    <div className="min-h-screen w-full bg-slate-50 px-6 py-6">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+        <header className="flex items-end justify-between gap-4">
+          <div className="flex flex-col gap-2">
+            <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">GESTÃO DE CORRETORES</div>
+            <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Performance</h1>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => void loadBaseData()}
+            className="inline-flex h-11 items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50"
+          >
+            Recarregar
+          </button>
+        </header>
 
       {errorMessage ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -246,140 +287,237 @@ export default function CorretoresAdminPage() {
         </div>
       ) : null}
 
-      <section className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
-        <div className="flex items-start justify-between gap-6">
-          <div>
-            <div className="text-sm font-semibold text-slate-900">Corretores</div>
-            <div className="mt-1 text-xs text-slate-500">
-              Cards de performance com carteira e cliques no WhatsApp.
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => void loadBaseData()}
-            className="inline-flex h-11 items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-slate-900 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50"
-          >
-            Recarregar
-          </button>
-        </div>
+        <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200/70">
 
-        {isLoading ? (
-          <div className="mt-6 rounded-2xl bg-slate-50 px-5 py-6 text-sm text-slate-600 ring-1 ring-slate-200/70">
-            Carregando...
-          </div>
-        ) : rows.length === 0 ? (
-          <div className="mt-6 rounded-2xl bg-slate-50 px-5 py-6 text-sm text-slate-600 ring-1 ring-slate-200/70">
-            Nenhum corretor encontrado.
-          </div>
-        ) : (
-          <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {rows.map((r) => {
-              return (
-                <div
-                  key={r.id}
-                  className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <div className="text-base font-semibold text-slate-900">{r.full_name}</div>
-                      <div className="mt-1 text-sm text-slate-600">{r.email}</div>
-                      <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200/70">
-                        <span
+          {isLoading ? (
+            <div className="rounded-2xl bg-slate-50 px-5 py-6 text-sm text-slate-600 ring-1 ring-slate-200/70">
+              Carregando...
+            </div>
+          ) : rows.length === 0 ? (
+            <div className="rounded-2xl bg-slate-50 px-5 py-6 text-sm text-slate-600 ring-1 ring-slate-200/70">
+              Nenhum corretor encontrado.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {rows.map((r) => {
+                const showTags = r.assignedProperties.slice(0, 6);
+                const hiddenCount = Math.max(0, r.assignedProperties.length - showTags.length);
+                const isHot = r.whatsClicks >= 50;
+
+                return (
+                  <div
+                    key={r.id}
+                    className="group relative rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[2px] hover:shadow-md"
+                  >
+                    <div className="absolute right-4 top-4 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedBrokerId(r.id)}
+                        className="inline-flex h-10 items-center justify-center rounded-xl bg-white px-4 text-xs font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
+                      >
+                        Ver relatório
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void deleteBroker(r.id)}
+                        disabled={deletingId === r.id}
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-700 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        aria-label="Excluir corretor"
+                        title="Excluir"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-start gap-4 pr-28">
+                      <div className="relative">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">
+                          {initialsFromName(r.full_name)}
+                        </div>
+                        <div
                           className={
-                            "h-2 w-2 rounded-full " +
-                            (r.isActive
-                              ? "bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.15)] animate-pulse"
-                              : "bg-slate-300")
+                            "absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full ring-2 ring-white " +
+                            (r.isActive ? "bg-emerald-500" : "bg-slate-300")
                           }
                         />
-                        {r.statusLabel}
                       </div>
-                    </div>
 
-                    <button
-                      type="button"
-                      onClick={() => void deleteBroker(r.id)}
-                      disabled={deletingId === r.id}
-                      className="inline-flex h-11 items-center justify-center rounded-xl bg-[#dc2626] px-4 text-sm font-semibold text-white shadow-[0_6px_14px_-10px_rgba(220,38,38,0.55)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#b91c1c] disabled:cursor-not-allowed disabled:opacity-60"
-                      aria-label="Excluir corretor"
-                      title="Excluir"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-
-                  <div className="mt-5 grid grid-cols-2 gap-3">
-                    <div className="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70">
-                      <div className="text-xs font-semibold tracking-wide text-slate-600">Imóveis em mãos</div>
-                      <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
-                        {r.propertiesInHands}
-                      </div>
-                    </div>
-                    <div className="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70">
-                      <div className="flex items-center justify-between">
-                        <div className="text-xs font-semibold tracking-wide text-slate-600">Performance (Whats)</div>
-                        <MessageCircle className="h-4 w-4 text-emerald-600" />
-                      </div>
-                      <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
-                        {r.whatsClicks}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-5">
-                    <div className="text-xs font-semibold tracking-wide text-slate-600">Carteira</div>
-                    <div className="mt-3 flex flex-col gap-2">
-                      {r.assignedProperties.length > 0 ? (
-                        r.assignedProperties.slice(0, 18).map((p) => (
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="truncate text-base font-semibold text-slate-900">{r.full_name}</div>
                           <div
-                            key={p.id}
-                            className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white px-4 py-3 ring-1 ring-slate-200/70"
+                            className={
+                              "inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold ring-1 " +
+                              (r.isActive
+                                ? "bg-emerald-50 text-emerald-700 ring-emerald-200/70"
+                                : "bg-slate-50 text-slate-700 ring-slate-200/70")
+                            }
                           >
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span
-                                className={
-                                  "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 " +
-                                  purposeBadgeCls(p.purpose)
-                                }
-                              >
-                                {purposeLabel(p.purpose)}
-                              </span>
-                              <div className="text-sm font-semibold text-slate-900">{p.title}</div>
-                            </div>
-
-                            <div className="flex items-center gap-3 text-xs text-slate-500">
-                              <div>
-                                {p.data_direcionamento
-                                  ? new Date(p.data_direcionamento).toLocaleDateString("pt-BR")
-                                  : "Aguardando registro"}
-                              </div>
-                              {p.clicks > 0 ? (
-                                <div className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 font-semibold text-emerald-700 ring-1 ring-emerald-200/70">
-                                  <MessageCircle className="h-3.5 w-3.5" />
-                                  {p.clicks}
-                                </div>
-                              ) : null}
-                            </div>
+                            {r.isActive ? "Ativo" : "Inativo"}
                           </div>
-                        ))
-                      ) : (
-                        <div className="rounded-2xl bg-slate-50 px-5 py-5 text-sm text-slate-600 ring-1 ring-slate-200/70">
-                          Nenhum imóvel atribuído.
                         </div>
-                      )}
-                      {r.assignedProperties.length > 18 ? (
-                        <div className="text-xs font-semibold text-slate-500">
-                          +{r.assignedProperties.length - 18} imóveis não exibidos
-                        </div>
-                      ) : null}
+                        <div className="mt-1 truncate text-sm text-slate-600">{r.email}</div>
+                      </div>
                     </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                      <div className="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70">
+                        <div className="text-[11px] font-semibold tracking-wide text-slate-600">Imóveis em mãos</div>
+                        <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+                          {r.propertiesInHands}
+                        </div>
+                      </div>
+
+                      <div
+                        className={
+                          "rounded-xl px-4 py-3 ring-1 transition-all duration-300 " +
+                          (isHot
+                            ? "bg-emerald-600 text-white ring-emerald-500/40 shadow-[0_10px_20px_-14px_rgba(5,150,105,0.65)]"
+                            : "bg-slate-50 text-slate-900 ring-slate-200/70")
+                        }
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className={"text-[11px] font-semibold tracking-wide " + (isHot ? "text-emerald-50" : "text-slate-600")}
+                          >
+                            Cliques WhatsApp
+                          </div>
+                          <WhatsappIcon className={"h-4 w-4 " + (isHot ? "text-white" : "text-emerald-600")}
+                          />
+                        </div>
+                        <div className={"mt-2 text-2xl font-semibold tracking-tight " + (isHot ? "text-white" : "text-slate-900")}
+                        >
+                          {r.whatsClicks}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {showTags.length > 0 ? (
+                          showTags.map((p) => (
+                            <div
+                              key={p.id}
+                              className="inline-flex max-w-full items-center gap-2 rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-800 ring-1 ring-slate-200/70"
+                              title={p.title}
+                            >
+                              <span className={"h-2 w-2 rounded-full " + (normalizePurpose(p.purpose) === "locacao" ? "bg-emerald-500" : "bg-sky-500")} />
+                              <span className="max-w-[220px] truncate">{p.title}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600 ring-1 ring-slate-200/70">
+                            Nenhum imóvel atribuído.
+                          </div>
+                        )}
+                        {hiddenCount > 0 ? (
+                          <div className="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200/70">
+                            +{hiddenCount}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        {selectedBroker ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8">
+            <button
+              type="button"
+              onClick={() => setSelectedBrokerId(null)}
+              className="absolute inset-0 bg-slate-900/40"
+              aria-label="Fechar"
+            />
+            <div className="relative w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200/70">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">RELATÓRIO</div>
+                  <div className="mt-2 text-xl font-semibold tracking-tight text-slate-900">{selectedBroker.full_name}</div>
+                  <div className="mt-1 text-sm text-slate-600">{selectedBroker.email}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedBrokerId(null)}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-white text-slate-700 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
+                  aria-label="Fechar"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <div className="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70">
+                  <div className="text-[11px] font-semibold tracking-wide text-slate-600">Imóveis em mãos</div>
+                  <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+                    {selectedBroker.propertiesInHands}
                   </div>
                 </div>
-              );
-            })}
+                <div className="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70">
+                  <div className="flex items-center justify-between">
+                    <div className="text-[11px] font-semibold tracking-wide text-slate-600">Cliques WhatsApp</div>
+                    <WhatsappIcon className="h-4 w-4 text-emerald-600" />
+                  </div>
+                  <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{selectedBroker.whatsClicks}</div>
+                </div>
+              </div>
+
+              <div className="mt-5">
+                <div className="text-xs font-semibold tracking-wide text-slate-600">Imóveis</div>
+                <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+                  {selectedBroker.assignedProperties.length > 0 ? (
+                    selectedBroker.assignedProperties.slice(0, 24).map((p) => (
+                      <div
+                        key={p.id}
+                        className="flex items-center justify-between gap-3 rounded-xl bg-white px-4 py-3 ring-1 ring-slate-200/70"
+                      >
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold text-slate-900">{p.title}</div>
+                          <div className="mt-1 inline-flex items-center gap-2">
+                            <span
+                              className={
+                                "inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold ring-1 " +
+                                purposeBadgeCls(p.purpose)
+                              }
+                            >
+                              {purposeLabel(p.purpose)}
+                            </span>
+                            <div className="text-xs text-slate-500">
+                              {p.data_direcionamento
+                                ? new Date(p.data_direcionamento).toLocaleDateString("pt-BR")
+                                : "Aguardando registro"}
+                            </div>
+                          </div>
+                        </div>
+
+                        {p.clicks > 0 ? (
+                          <div className="shrink-0 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200/70">
+                            <MessageCircle className="h-3.5 w-3.5" />
+                            {p.clicks}
+                          </div>
+                        ) : (
+                          <div className="shrink-0 text-xs font-semibold text-slate-400">0</div>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl bg-slate-50 px-5 py-5 text-sm text-slate-600 ring-1 ring-slate-200/70">
+                      Nenhum imóvel atribuído.
+                    </div>
+                  )}
+                </div>
+                {selectedBroker.assignedProperties.length > 24 ? (
+                  <div className="mt-3 text-xs font-semibold text-slate-500">
+                    +{selectedBroker.assignedProperties.length - 24} imóveis não exibidos
+                  </div>
+                ) : null}
+              </div>
+            </div>
           </div>
-        )}
-      </section>
+        ) : null}
+      </div>
     </div>
   );
 }
