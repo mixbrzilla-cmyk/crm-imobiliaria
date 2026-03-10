@@ -39,6 +39,13 @@ type FactorsState = {
   standard: string;
 };
 
+type LegalDocsState = {
+  matricula_url: string;
+  iptu_url: string;
+  matricula_checked: boolean;
+  iptu_checked: boolean;
+};
+
 type AppraisalRow = {
   id: string;
   client_name: string | null;
@@ -80,7 +87,43 @@ type FormState = {
   paradigms: ParadigmRow[];
   factors: FactorsState;
   photos_urls: string[];
+  legal_docs: LegalDocsState;
 };
+
+function computeMcdmTolerance(args: {
+  samples: Array<{ area_m2: number | null; price: number | null }>;
+  tolerancePct?: number;
+}) {
+  const tolerance = args.tolerancePct != null ? args.tolerancePct : 0.2;
+  const valid = args.samples
+    .map((s) => {
+      const a = s.area_m2 ?? null;
+      const p = s.price ?? null;
+      if (!a || a <= 0) return null;
+      if (!p || p <= 0) return null;
+      return p / a;
+    })
+    .filter(Boolean) as number[];
+
+  if (valid.length !== 3) {
+    return {
+      ppm2_avg: null as number | null,
+      ppm2_min: null as number | null,
+      ppm2_max: null as number | null,
+      used: valid.length,
+    };
+  }
+
+  const avg = valid.reduce((acc, v) => acc + v, 0) / valid.length;
+  const min = avg * (1 - tolerance);
+  const max = avg * (1 + tolerance);
+  return {
+    ppm2_avg: Number.isFinite(avg) ? avg : null,
+    ppm2_min: Number.isFinite(min) ? min : null,
+    ppm2_max: Number.isFinite(max) ? max : null,
+    used: valid.length,
+  };
+}
 
 function parseOptionalNumber(value: string) {
   const trimmed = value.trim();
@@ -240,6 +283,11 @@ export default function AvaliacoesAdminPage() {
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
+  const [uploadingDocs, setUploadingDocs] = useState(false);
+  const [selectedMatricula, setSelectedMatricula] = useState<File | null>(null);
+  const [selectedIptu, setSelectedIptu] = useState<File | null>(null);
+  const [ptamText, setPtamText] = useState<string>("");
+
   const [brokers, setBrokers] = useState<Array<{ id: string; full_name: string; cnai: string | null }>>([]);
 
   const [form, setForm] = useState<FormState>({
@@ -266,6 +314,12 @@ export default function AvaliacoesAdminPage() {
       standard: "1.00",
     },
     photos_urls: [],
+    legal_docs: {
+      matricula_url: "",
+      iptu_url: "",
+      matricula_checked: false,
+      iptu_checked: false,
+    },
   });
 
   const selectedRow = useMemo(() => {
@@ -299,6 +353,22 @@ export default function AvaliacoesAdminPage() {
     };
     return computeFairMarketValue({ subjectAreaM2: subjectArea, paradigms, factors });
   }, [form.area_m2, form.factors, form.paradigms]);
+
+  const mcdmTolerance = useMemo(() => {
+    const firstThree = form.paradigms.slice(0, 3).map((p) => ({
+      area_m2: parseOptionalNumber(p.area_m2),
+      price: parseBRLInputToNumber(p.price),
+    }));
+    return computeMcdmTolerance({ samples: firstThree, tolerancePct: 0.2 });
+  }, [form.paradigms]);
+
+  const legalDocsOk = useMemo(() => {
+    const docs = form.legal_docs;
+    if (!docs) return false;
+    const hasUrls = Boolean(docs.matricula_url.trim()) && Boolean(docs.iptu_url.trim());
+    const checked = Boolean(docs.matricula_checked) && Boolean(docs.iptu_checked);
+    return hasUrls && checked;
+  }, [form.legal_docs]);
 
   useEffect(() => {
     setForm((s) => ({
@@ -365,6 +435,135 @@ export default function AvaliacoesAdminPage() {
     }
   }, [supabase]);
 
+  async function uploadLegalDoc(kind: "matricula" | "iptu") {
+    setErrorMessage(null);
+
+    if (!supabase) {
+      setErrorMessage(
+        "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+      );
+      return;
+    }
+
+    if (!selectedId) {
+      setErrorMessage("Salve a avaliação antes de enviar os documentos.");
+      return;
+    }
+
+    const file = kind === "matricula" ? selectedMatricula : selectedIptu;
+    if (!file) return;
+
+    setUploadingDocs(true);
+    try {
+      const bucket = (supabase as any).storage.from("appraisals");
+      const safeName = file.name.replace(/\s+/g, "-");
+      const path = `${selectedId}/docs/${kind}-${Date.now()}-${safeName}`;
+      const up = await bucket.upload(path, file, { upsert: false, contentType: file.type || undefined });
+      if (up?.error) {
+        setErrorMessage(up.error.message);
+        return;
+      }
+
+      const pub = bucket.getPublicUrl(path);
+      const url = pub?.data?.publicUrl ? String(pub.data.publicUrl) : "";
+      if (!url) {
+        setErrorMessage("Upload concluído, mas não foi possível obter a URL pública.");
+        return;
+      }
+
+      setForm((s) => {
+        const nextDocs = {
+          ...s.legal_docs,
+          ...(kind === "matricula" ? { matricula_url: url } : { iptu_url: url }),
+        };
+        return { ...s, legal_docs: nextDocs };
+      });
+
+      try {
+        const docsPayload: any = {
+          legal_docs_json: {
+            matricula_url:
+              kind === "matricula" ? url : form.legal_docs.matricula_url.trim() || null,
+            iptu_url: kind === "iptu" ? url : form.legal_docs.iptu_url.trim() || null,
+            matricula_checked: Boolean(form.legal_docs.matricula_checked),
+            iptu_checked: Boolean(form.legal_docs.iptu_checked),
+          },
+        };
+        const res = await (supabase as any)
+          .from("property_appraisals")
+          .update(docsPayload)
+          .eq("id", selectedId);
+        if (res?.error) {
+          setErrorMessage(res.error.message);
+        }
+      } catch {
+        setErrorMessage("Documento enviado, mas não foi possível vincular ao registro.");
+      }
+
+      if (kind === "matricula") setSelectedMatricula(null);
+      if (kind === "iptu") setSelectedIptu(null);
+    } catch {
+      setErrorMessage("Não foi possível enviar o documento agora.");
+    } finally {
+      setUploadingDocs(false);
+    }
+  }
+
+  function generatePtamSummary() {
+    const subjectArea = parseOptionalNumber(form.area_m2);
+    const avgPpm2 = mcdmTolerance.ppm2_avg;
+    const minPpm2 = mcdmTolerance.ppm2_min;
+    const maxPpm2 = mcdmTolerance.ppm2_max;
+    const suggested = parseBRLInputToNumber(form.suggested_price);
+    const computed = computedFairMarketValue;
+
+    const lines: string[] = [];
+    lines.push("PTAM — Parecer Técnico de Avaliação Mercadológica");
+    lines.push("");
+    lines.push(`Imóvel (avaliando): ${form.address.trim() || "-"}`);
+    lines.push(
+      `Bairro/Cidade: ${(form.neighborhood.trim() || "-") + " • " + (form.city.trim() || "-")}`,
+    );
+    lines.push(`Data da vistoria: ${form.inspection_date || "-"}`);
+    lines.push(`Área privativa: ${subjectArea != null ? `${subjectArea} m²` : "-"}`);
+    lines.push(`Conservação (norma): ${form.condition || "-"}`);
+    lines.push("");
+    lines.push("Método: MCDM (Método Comparativo Direto de Mercado) — NBR 14653");
+    lines.push("Amostras (3 imóveis vizinhos):");
+    form.paradigms.slice(0, 3).forEach((p, idx) => {
+      const a = parseOptionalNumber(p.area_m2);
+      const pr = parseBRLInputToNumber(p.price);
+      const ppm2 = a && pr ? pr / a : null;
+      lines.push(
+        `  ${idx + 1}. ${p.label || `Amostra ${idx + 1}`} — Área: ${a != null ? a : "-"} m² — Preço: ${pr != null ? formatCurrencyBRL(pr) : "-"} — R$/m²: ${ppm2 != null ? formatCurrencyBRL(ppm2) : "-"}`,
+      );
+    });
+    lines.push("");
+    lines.push(
+      `R$/m² médio: ${avgPpm2 != null ? formatCurrencyBRL(avgPpm2) : "-"} (tolerância ±20%)`,
+    );
+    lines.push(
+      `Intervalo NBR: ${minPpm2 != null ? formatCurrencyBRL(minPpm2) : "-"} a ${maxPpm2 != null ? formatCurrencyBRL(maxPpm2) : "-"}`,
+    );
+    lines.push("");
+    lines.push(`Valor sugerido (manual): ${suggested != null ? formatCurrencyBRL(suggested) : "-"}`);
+    lines.push(`Valor justo (calculado): ${computed != null ? formatCurrencyBRL(computed) : "-"}`);
+    lines.push("");
+    lines.push("Checklist jurídico (trava):");
+    lines.push(
+      `  Matrícula: ${form.legal_docs.matricula_url ? "ENVIADA" : "PENDENTE"} • Conferida: ${form.legal_docs.matricula_checked ? "SIM" : "NÃO"}`,
+    );
+    lines.push(
+      `  IPTU: ${form.legal_docs.iptu_url ? "ENVIADO" : "PENDENTE"} • Conferido: ${form.legal_docs.iptu_checked ? "SIM" : "NÃO"}`,
+    );
+    if (form.notes.trim()) {
+      lines.push("");
+      lines.push("Observações técnicas:");
+      lines.push(form.notes.trim());
+    }
+    setPtamText(lines.join("\n"));
+  }
+
   const loadBrokers = useCallback(async () => {
     if (!supabase) {
       setBrokers([]);
@@ -413,6 +612,9 @@ export default function AvaliacoesAdminPage() {
     setSelectedId(null);
     setActiveTab("basicos");
     setSelectedFiles([]);
+    setSelectedMatricula(null);
+    setSelectedIptu(null);
+    setPtamText("");
     setForm({
       client_name: "",
       address: "",
@@ -431,6 +633,12 @@ export default function AvaliacoesAdminPage() {
       paradigms: [{ id: crypto.randomUUID(), label: "Paradigma 1", area_m2: "", price: "", weight: "1" }],
       factors: { conservation: "1.00", location: "1.00", standard: "1.00" },
       photos_urls: [],
+      legal_docs: {
+        matricula_url: "",
+        iptu_url: "",
+        matricula_checked: false,
+        iptu_checked: false,
+      },
     });
   }
 
@@ -444,6 +652,7 @@ export default function AvaliacoesAdminPage() {
     setActiveTab("basicos");
     const paradigmsFromDb = Array.isArray((row as any)?.paradigms_json) ? (row as any).paradigms_json : null;
     const factorsFromDb = (row as any)?.factors_json ?? null;
+    const legalDocsFromDb = (row as any)?.legal_docs_json ?? null;
 
     setForm({
       client_name: row.client_name ?? "",
@@ -481,6 +690,13 @@ export default function AvaliacoesAdminPage() {
         standard: factorsFromDb?.standard != null ? String(factorsFromDb.standard) : "1.00",
       },
       photos_urls: Array.isArray((row as any)?.photos_urls) ? ((row as any).photos_urls as string[]) : [],
+      legal_docs: {
+        matricula_url:
+          legalDocsFromDb?.matricula_url != null ? String(legalDocsFromDb.matricula_url) : "",
+        iptu_url: legalDocsFromDb?.iptu_url != null ? String(legalDocsFromDb.iptu_url) : "",
+        matricula_checked: Boolean(legalDocsFromDb?.matricula_checked),
+        iptu_checked: Boolean(legalDocsFromDb?.iptu_checked),
+      },
     });
 
     setIsModalOpen(true);
@@ -499,6 +715,13 @@ export default function AvaliacoesAdminPage() {
 
     if (!form.address.trim()) {
       setErrorMessage("Endereço é obrigatório.");
+      return;
+    }
+
+    if (form.status === "entregue" && !legalDocsOk) {
+      setErrorMessage(
+        "Trava jurídica: para finalizar (Entregue/Laudo finalizado), envie Matrícula e IPTU e marque ambos como Conferidos.",
+      );
       return;
     }
 
@@ -531,6 +754,12 @@ export default function AvaliacoesAdminPage() {
         standard: parseOptionalFactor(form.factors.standard),
       },
       photos_urls: form.photos_urls.length ? form.photos_urls : null,
+      legal_docs_json: {
+        matricula_url: form.legal_docs.matricula_url.trim() || null,
+        iptu_url: form.legal_docs.iptu_url.trim() || null,
+        matricula_checked: Boolean(form.legal_docs.matricula_checked),
+        iptu_checked: Boolean(form.legal_docs.iptu_checked),
+      },
       notes: form.notes.trim() || null,
       video_call_link: form.video_call_link.trim() || null,
       published_property_id: selectedRow?.published_property_id ?? null,
@@ -553,6 +782,7 @@ export default function AvaliacoesAdminPage() {
         delete retry.fair_market_value;
         delete retry.paradigms_json;
         delete retry.factors_json;
+        delete retry.legal_docs_json;
         delete retry.evaluator_id;
         delete retry.inspection_date;
         delete retry.photos_urls;
@@ -1117,12 +1347,17 @@ export default function AvaliacoesAdminPage() {
 
                         <label className="flex flex-col gap-2">
                           <span className="text-xs font-semibold tracking-wide text-slate-600">Estado / conservação</span>
-                          <input
+                          <select
                             value={form.condition}
                             onChange={(e) => setForm((s) => ({ ...s, condition: e.target.value }))}
-                            className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 shadow-sm ring-1 ring-slate-200/70 outline-none transition-all focus:ring-2 focus:ring-[#2b6cff]/30"
-                            placeholder="Ex: ótimo / precisa reforma"
-                          />
+                            className="h-11 rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-slate-200/70 outline-none transition-all focus:ring-2 focus:ring-[#2b6cff]/30"
+                          >
+                            <option value="">Selecionar</option>
+                            <option value="Novo">Novo</option>
+                            <option value="Entre e Regular">Entre e Regular</option>
+                            <option value="Reparos Simples">Reparos Simples</option>
+                            <option value="Reparos Importantes">Reparos Importantes</option>
+                          </select>
                         </label>
                       </>
                     ) : null}
@@ -1157,6 +1392,45 @@ export default function AvaliacoesAdminPage() {
                               <Plus className="h-4 w-4" />
                               Adicionar
                             </button>
+                          </div>
+
+                          <div className="mt-4 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200/70">
+                            <div className="flex flex-col gap-1">
+                              <div className="text-sm font-semibold text-slate-900">Calculadora MCDM (NBR 14653)</div>
+                              <div className="text-xs text-slate-600">
+                                Insira <span className="font-semibold">3 amostras</span> (primeiros 3 paradigmas). O sistema calcula a média de R$/m² e aplica tolerância de 20%.
+                              </div>
+                            </div>
+
+                            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                              <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200/70">
+                                <div className="text-[11px] font-semibold tracking-[0.16em] text-slate-500">R$/m² MÉDIO</div>
+                                <div className="mt-2 text-lg font-semibold text-slate-900">
+                                  {mcdmTolerance.ppm2_avg != null ? formatCurrencyBRL(mcdmTolerance.ppm2_avg) : "-"}
+                                </div>
+                                <div className="mt-1 text-xs font-semibold text-slate-500">Base: 3 amostras válidas</div>
+                              </div>
+                              <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200/70">
+                                <div className="text-[11px] font-semibold tracking-[0.16em] text-slate-500">INTERVALO -20%</div>
+                                <div className="mt-2 text-lg font-semibold text-slate-900">
+                                  {mcdmTolerance.ppm2_min != null ? formatCurrencyBRL(mcdmTolerance.ppm2_min) : "-"}
+                                </div>
+                                <div className="mt-1 text-xs font-semibold text-slate-500">NBR 14653</div>
+                              </div>
+                              <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200/70">
+                                <div className="text-[11px] font-semibold tracking-[0.16em] text-slate-500">INTERVALO +20%</div>
+                                <div className="mt-2 text-lg font-semibold text-slate-900">
+                                  {mcdmTolerance.ppm2_max != null ? formatCurrencyBRL(mcdmTolerance.ppm2_max) : "-"}
+                                </div>
+                                <div className="mt-1 text-xs font-semibold text-slate-500">NBR 14653</div>
+                              </div>
+                            </div>
+
+                            {mcdmTolerance.used !== 3 ? (
+                              <div className="mt-3 rounded-2xl bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900 ring-1 ring-amber-200/70">
+                                Preencha área e preço dos <span className="font-bold">3 primeiros</span> paradigmas para liberar o cálculo normativo.
+                              </div>
+                            ) : null}
                           </div>
 
                           <div className="mt-4 grid gap-3">
@@ -1248,6 +1522,29 @@ export default function AvaliacoesAdminPage() {
                               </div>
                             ))}
                           </div>
+
+                          {ptamText ? (
+                            <div className="mt-4 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200/70">
+                              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                                <div>
+                                  <div className="text-sm font-semibold text-slate-900">Resumo PTAM (prévia)</div>
+                                  <div className="mt-1 text-xs text-slate-600">Copie e use no seu modelo oficial.</div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => void navigator.clipboard.writeText(ptamText)}
+                                  className="inline-flex h-10 items-center justify-center rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition-all hover:bg-slate-800"
+                                >
+                                  Copiar
+                                </button>
+                              </div>
+                              <textarea
+                                value={ptamText}
+                                readOnly
+                                className="mt-3 min-h-56 w-full rounded-xl bg-white px-4 py-3 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                              />
+                            </div>
+                          ) : null}
                         </div>
                       </>
                     ) : null}
@@ -1379,7 +1676,16 @@ export default function AvaliacoesAdminPage() {
                               <span className="text-xs font-semibold tracking-wide text-slate-600">Etapa</span>
                               <select
                                 value={form.status}
-                                onChange={(e) => setForm((s) => ({ ...s, status: e.target.value as AppraisalStatus }))}
+                                onChange={(e) => {
+                                  const next = e.target.value as AppraisalStatus;
+                                  if (next === "entregue" && !legalDocsOk) {
+                                    setErrorMessage(
+                                      "Trava jurídica: para finalizar (Entregue/Laudo finalizado), envie Matrícula e IPTU e marque ambos como Conferidos.",
+                                    );
+                                    return;
+                                  }
+                                  setForm((s) => ({ ...s, status: next }));
+                                }}
                                 className="h-11 rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-slate-200/70 outline-none transition-all focus:ring-2 focus:ring-[#2b6cff]/30"
                               >
                                 <option value="solicitada">Solicitada</option>
@@ -1424,6 +1730,15 @@ export default function AvaliacoesAdminPage() {
                                 Exportar PDF
                               </button>
                             ) : null}
+
+                            <button
+                              type="button"
+                              onClick={() => generatePtamSummary()}
+                              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
+                            >
+                              <FileDown className="h-4 w-4" />
+                              Gerar PTAM
+                            </button>
 
                             {selectedRow ? (
                               <button
