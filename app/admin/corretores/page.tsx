@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { MessageCircle, Trash2, X } from "lucide-react";
+import { MessageCircle, Plus, Trash2, X } from "lucide-react";
 
 import { getSupabaseClient } from "@/lib/supabaseClient";
 
@@ -91,6 +91,12 @@ export default function CorretoresAdminPage() {
   const [rows, setRows] = useState<BrokerRowView[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedBrokerId, setSelectedBrokerId] = useState<string | null>(null);
+
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createName, setCreateName] = useState("");
+  const [createEmail, setCreateEmail] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const selectedBroker = useMemo(() => {
     if (!selectedBrokerId) return null;
@@ -265,22 +271,76 @@ export default function CorretoresAdminPage() {
     }
   }
 
+  async function createBroker() {
+    setCreateError(null);
+
+    if (!supabase) {
+      setCreateError(
+        "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+      );
+      return;
+    }
+
+    const name = createName.trim();
+    const email = createEmail.trim();
+    if (!name) {
+      setCreateError("Nome é obrigatório.");
+      return;
+    }
+
+    setCreating(true);
+    try {
+      const payload: any = {
+        id: crypto.randomUUID(),
+        full_name: name,
+        email: email || null,
+        role: "broker",
+        status: "ativo",
+      };
+
+      const res = await (supabase as any).from("profiles").insert(payload);
+      if (res?.error) {
+        setCreateError(res.error.message);
+        return;
+      }
+
+      setIsCreateOpen(false);
+      setCreateName("");
+      setCreateEmail("");
+      await loadBaseData();
+    } catch {
+      setCreateError("Não foi possível cadastrar o corretor agora.");
+    } finally {
+      setCreating(false);
+    }
+  }
+
   return (
     <div className="min-h-screen w-full bg-slate-100 px-6 py-6">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
         <header className="flex items-end justify-between gap-4">
           <div className="flex flex-col gap-2">
             <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">GESTÃO DE CORRETORES</div>
-            <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Gestão de Corretores</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-800">Gestão de Equipe</h1>
           </div>
 
-          <button
-            type="button"
-            onClick={() => void loadBaseData()}
-            className="inline-flex h-11 items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50"
-          >
-            Recarregar
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setIsCreateOpen(true)}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#2b6cff] px-5 text-sm font-semibold text-white shadow-[0_10px_26px_-18px_rgba(43,108,255,0.85)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#255fe6]"
+            >
+              <Plus className="h-4 w-4" />
+              Novo Corretor
+            </button>
+            <button
+              type="button"
+              onClick={() => void loadBaseData()}
+              className="inline-flex h-11 items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50"
+            >
+              Recarregar
+            </button>
+          </div>
         </header>
 
       {errorMessage ? (
@@ -294,8 +354,28 @@ export default function CorretoresAdminPage() {
             Carregando...
           </div>
         ) : rows.length === 0 ? (
-          <div className="rounded-2xl bg-white px-6 py-6 text-sm text-slate-600 shadow-lg">
-            Nenhum corretor encontrado.
+          <div className="flex w-full items-center justify-center py-10">
+            <div className="w-full max-w-2xl rounded-2xl bg-white p-10 shadow-xl">
+              <div className="mx-auto flex max-w-md flex-col items-center text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+                  <UsersPlaceholderIcon className="h-8 w-8" />
+                </div>
+                <div className="mt-6 text-xl font-semibold tracking-tight text-slate-900">
+                  Pronto para começar?
+                </div>
+                <div className="mt-2 text-sm text-slate-600">
+                  Cadastre seu primeiro corretor e acompanhe a performance em tempo real.
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCreateOpen(true)}
+                  className="mt-6 inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#2b6cff] px-6 text-sm font-semibold text-white shadow-[0_10px_26px_-18px_rgba(43,108,255,0.85)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#255fe6]"
+                >
+                  <Plus className="h-4 w-4" />
+                  Novo Corretor
+                </button>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
@@ -508,7 +588,112 @@ export default function CorretoresAdminPage() {
             </div>
           </div>
         ) : null}
+
+        {isCreateOpen ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8">
+            <button
+              type="button"
+              onClick={() => {
+                if (creating) return;
+                setIsCreateOpen(false);
+                setCreateError(null);
+              }}
+              className="absolute inset-0 bg-slate-900/40"
+              aria-label="Fechar"
+            />
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="create-broker-title"
+              className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200/70"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">NOVO CORRETOR</div>
+                  <div id="create-broker-title" className="mt-2 text-xl font-semibold tracking-tight text-slate-900">
+                    Cadastro rápido
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (creating) return;
+                    setIsCreateOpen(false);
+                    setCreateError(null);
+                  }}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-white text-slate-700 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
+                  aria-label="Fechar"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {createError ? (
+                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {createError}
+                </div>
+              ) : null}
+
+              <div className="mt-5 grid gap-4">
+                <div>
+                  <div className="text-xs font-semibold text-slate-600">Nome</div>
+                  <input
+                    value={createName}
+                    onChange={(e) => setCreateName(e.target.value)}
+                    className="mt-2 h-12 w-full rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all focus:ring-2 focus:ring-[#2b6cff]/40"
+                    placeholder="Nome do corretor"
+                  />
+                </div>
+
+                <div>
+                  <div className="text-xs font-semibold text-slate-600">Email (opcional)</div>
+                  <input
+                    value={createEmail}
+                    onChange={(e) => setCreateEmail(e.target.value)}
+                    className="mt-2 h-12 w-full rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all focus:ring-2 focus:ring-[#2b6cff]/40"
+                    placeholder="email@exemplo.com"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (creating) return;
+                    setIsCreateOpen(false);
+                    setCreateError(null);
+                  }}
+                  className="inline-flex h-11 items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={creating}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void createBroker()}
+                  className="inline-flex h-11 items-center justify-center rounded-xl bg-[#2b6cff] px-5 text-sm font-semibold text-white shadow-[0_10px_26px_-18px_rgba(43,108,255,0.85)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#255fe6] disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={creating}
+                >
+                  {creating ? "Salvando..." : "Cadastrar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
+  );
+}
+
+function UsersPlaceholderIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className}>
+      <path
+        d="M16 11c1.66 0 3-1.57 3-3.5S17.66 4 16 4s-3 1.57-3 3.5S14.34 11 16 11Zm-8 0c1.66 0 3-1.57 3-3.5S9.66 4 8 4 5 5.57 5 7.5 6.34 11 8 11Zm0 2c-2.67 0-8 1.34-8 4v1h10.5v-1c0-1.52.83-2.84 2.07-3.82C11.39 13.09 9.35 13 8 13Zm8 0c-.32 0-.68.02-1.06.05 1.16.84 1.96 2 1.96 3.45v1H24v-1c0-2.66-5.33-4-8-4Z"
+        fill="currentColor"
+        opacity="0.9"
+      />
+    </svg>
   );
 }
