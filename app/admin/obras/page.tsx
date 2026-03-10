@@ -7,6 +7,8 @@ import {
   Boxes,
   Calendar,
   ClipboardList,
+  Gauge,
+  HardHat,
   Minus,
   Plus,
   RefreshCw,
@@ -70,6 +72,7 @@ type WorkerForm = {
 type EntryForm = {
   worker_id: string;
   entry_date: string;
+  sector: "fundacao" | "alvenaria" | "eletrica";
   entry_type: EntryType;
   hours: string;
   notes: string;
@@ -94,12 +97,34 @@ function entryTypeLabel(t: EntryType) {
   return "Falta";
 }
 
+function statusLabel(status: MaterialStatus) {
+  if (status === "cotado") return "Cotado";
+  if (status === "comprado") return "Comprado";
+  return "Entregue";
+}
+
+function sectorLabel(sector: EntryForm["sector"]) {
+  if (sector === "fundacao") return "Fundação";
+  if (sector === "alvenaria") return "Alvenaria";
+  return "Elétrica";
+}
+
+function sectorCls(sector: EntryForm["sector"]) {
+  if (sector === "fundacao") return "bg-sky-50 text-sky-800 ring-sky-200/70";
+  if (sector === "alvenaria") return "bg-amber-50 text-amber-900 ring-amber-200/70";
+  return "bg-violet-50 text-violet-800 ring-violet-200/70";
+}
+
 export default function ObrasAdminPage() {
   const supabase = useMemo(() => getSupabaseClient(), []);
 
   const [tab, setTab] = useState<"materiais" | "medicao">("materiais");
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const [isMaterialModalOpen, setIsMaterialModalOpen] = useState(false);
+  const [isWorkerModalOpen, setIsWorkerModalOpen] = useState(false);
+  const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
 
   const [materials, setMaterials] = useState<ObraMaterialRow[]>([]);
   const [isMaterialsLoading, setIsMaterialsLoading] = useState(false);
@@ -133,6 +158,7 @@ export default function ObrasAdminPage() {
     return {
       worker_id: "",
       entry_date: `${yyyy}-${mm}-${dd}`,
+      sector: "fundacao",
       entry_type: "diaria",
       hours: "",
       notes: "",
@@ -407,6 +433,39 @@ export default function ObrasAdminPage() {
     return materials.filter((m) => m.status !== "entregue").length;
   }, [materials]);
 
+  const globalProgress = useMemo(() => {
+    const total = Math.max(1, materials.length);
+    const delivered = materials.filter((m) => m.status === "entregue").length;
+    const pct = Math.round((delivered / total) * 100);
+    return { pct, delivered, total };
+  }, [materials]);
+
+  const sectorProgress = useMemo(() => {
+    const counts: Record<EntryForm["sector"], number> = {
+      fundacao: 0,
+      alvenaria: 0,
+      eletrica: 0,
+    };
+
+    for (const e of entries) {
+      const notes = String(e.notes ?? "").toLowerCase();
+      if (notes.includes("[fundação]") || notes.includes("[fundacao]")) counts.fundacao += 1;
+      else if (notes.includes("[alvenaria]")) counts.alvenaria += 1;
+      else if (notes.includes("[elétrica]") || notes.includes("[eletrica]")) counts.eletrica += 1;
+    }
+
+    const max = Math.max(1, counts.fundacao, counts.alvenaria, counts.eletrica);
+    const pct = (n: number) => Math.max(10, Math.round((n / max) * 100));
+    return {
+      counts,
+      widths: {
+        fundacao: pct(counts.fundacao),
+        alvenaria: pct(counts.alvenaria),
+        eletrica: pct(counts.eletrica),
+      },
+    };
+  }, [entries]);
+
   const workerById = useMemo(() => {
     const map = new Map<string, ObraWorkerRow>();
     for (const w of workers) map.set(w.id, w);
@@ -429,27 +488,56 @@ export default function ObrasAdminPage() {
         </div>
       ) : null}
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
-          <div className="text-sm font-medium text-slate-600">Gastos (Materiais)</div>
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+        <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100/40 p-6 shadow-md ring-1 ring-slate-200/70">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-sm font-semibold text-slate-700">Gastos</div>
+            <ClipboardList className="h-4 w-4 text-slate-400" />
+          </div>
           <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
             {formatCurrencyBRL(totalMaterials)}
           </div>
-          <div className="mt-2 text-xs text-slate-500">Somatório: unitário x quantidade</div>
+          <div className="mt-2 text-xs text-slate-500">Materiais (unitário x quantidade)</div>
         </div>
-        <div className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
-          <div className="text-sm font-medium text-slate-600">Pendências (Entrega)</div>
-          <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
-            {pendingDeliveries}
+
+        <div className="rounded-2xl bg-amber-50/70 p-6 shadow-md ring-1 ring-amber-200/70">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-sm font-semibold text-amber-900">Pendências</div>
+            <Boxes className="h-4 w-4 text-amber-700/70" />
           </div>
-          <div className="mt-2 text-xs text-slate-500">Itens ainda não entregues</div>
+          <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">{pendingDeliveries}</div>
+          <div className="mt-2 text-xs text-amber-900/70">Itens ainda não entregues</div>
         </div>
-        <div className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
-          <div className="text-sm font-medium text-slate-600">Equipe Ativa</div>
+
+        <div className="rounded-2xl bg-white p-6 shadow-md ring-1 ring-slate-200/70">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-sm font-semibold text-slate-700">Equipe Ativa</div>
+            <Users className="h-4 w-4 text-slate-400" />
+          </div>
           <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
             {workers.filter((w) => w.active).length}
           </div>
           <div className="mt-2 text-xs text-slate-500">Cadastros em obra</div>
+        </div>
+
+        <div className="rounded-2xl bg-white p-6 shadow-md ring-1 ring-slate-200/70">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-sm font-semibold text-slate-700">Status Global da Obra</div>
+            <Gauge className="h-4 w-4 text-slate-400" />
+          </div>
+          <div className="mt-3 flex items-end justify-between gap-3">
+            <div className="text-3xl font-semibold tracking-tight text-slate-900">{globalProgress.pct}%</div>
+            <div className="text-xs font-semibold text-slate-500">
+              {globalProgress.delivered}/{globalProgress.total} entregues
+            </div>
+          </div>
+          <div className="mt-3 h-2 w-full rounded-full bg-slate-100 ring-1 ring-slate-200/70">
+            <div
+              className="h-2 rounded-full bg-slate-900/70"
+              style={{ width: `${Math.max(6, Math.min(100, globalProgress.pct))}%` }}
+            />
+          </div>
+          <div className="mt-2 text-xs text-slate-500">Baseado na entrega dos insumos</div>
         </div>
       </section>
 
@@ -485,26 +573,286 @@ export default function ObrasAdminPage() {
       </section>
 
       {tab === "materiais" ? (
-        <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <div className="lg:col-span-4">
-            <div className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="text-sm font-semibold text-slate-900">Novo Insumo</div>
-                  <div className="mt-1 text-xs text-slate-500">Cadastro rápido (com total automático).</div>
+        <section className="w-full">
+          <div className="rounded-2xl bg-white p-6 shadow-md ring-1 ring-slate-200/70">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div className="text-sm font-semibold text-slate-900">Insumos</div>
+                <div className="mt-1 text-xs text-slate-500">Tabela de compras, entregas e custos.</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="text-xs text-slate-500">
+                  {isMaterialsLoading ? "Atualizando..." : `${materials.length} itens`}
                 </div>
                 <button
                   type="button"
                   onClick={() => void loadMaterials()}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50"
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-semibold text-slate-900 shadow-sm ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50"
                 >
                   <RefreshCw className="h-4 w-4" />
                   Atualizar
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setErrorMessage(null);
+                    setIsMaterialModalOpen(true);
+                  }}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#ff0000] px-4 text-xs font-semibold text-white shadow-sm transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#e60000]"
+                >
+                  <Plus className="h-4 w-4" />
+                  Adicionar Insumo
+                </button>
               </div>
+            </div>
 
-              <form onSubmit={addMaterial} className="mt-5 flex flex-col gap-4">
-                <label className="flex flex-col gap-2">
+            <div className="mt-5 overflow-x-auto rounded-2xl bg-white ring-1 ring-slate-200/70">
+              <table className="min-w-full border-separate border-spacing-0">
+                <thead>
+                  <tr className="bg-slate-50">
+                    <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Insumo</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Status</th>
+                    <th className="px-5 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">Unit.</th>
+                    <th className="px-5 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">Qtd.</th>
+                    <th className="px-5 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">Total</th>
+                    <th className="px-5 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {materials.length > 0 ? (
+                    materials.map((m, idx) => {
+                      const unit = m.unit_price ?? 0;
+                      const qty = m.quantity ?? 0;
+                      const total = unit * qty;
+                      return (
+                        <tr
+                          key={m.id}
+                          className={
+                            "border-t border-slate-100 " + (idx % 2 === 1 ? "bg-slate-50/50" : "bg-white")
+                          }
+                        >
+                          <td className="px-5 py-4">
+                            <div className="text-sm font-semibold text-slate-900">{m.name}</div>
+                            <div className="mt-1 text-xs text-slate-500">{m.vendor ?? "-"}</div>
+                          </td>
+                          <td className="px-5 py-4">
+                            <span
+                              className={
+                                "inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-semibold ring-1 " +
+                                materialStatusCls(m.status)
+                              }
+                            >
+                              {statusLabel(m.status)}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4 text-right text-sm text-slate-700">{formatCurrencyBRL(unit)}</td>
+                          <td className="px-5 py-4 text-right text-sm text-slate-700">{qty}</td>
+                          <td className="px-5 py-4 text-right text-sm font-semibold text-slate-900">{formatCurrencyBRL(total)}</td>
+                          <td className="px-5 py-4">
+                            <div className="flex justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => void updateMaterialStatus(m.id, "cotado")}
+                                className="inline-flex h-9 items-center justify-center rounded-xl bg-white px-3 text-xs font-semibold text-slate-700 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
+                              >
+                                Cotado
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void updateMaterialStatus(m.id, "comprado")}
+                                className="inline-flex h-9 items-center justify-center rounded-xl bg-[#001f3f] px-3 text-xs font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:bg-[#001a33]"
+                              >
+                                Comprado
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void updateMaterialStatus(m.id, "entregue")}
+                                className="inline-flex h-9 items-center justify-center rounded-xl bg-emerald-600 px-3 text-xs font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:bg-emerald-700"
+                              >
+                                Entregue
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td className="px-5 py-8 text-sm text-slate-600" colSpan={6}>
+                        Nenhum insumo cadastrado.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      ) : (
+        <section className="w-full">
+          <div className="rounded-2xl bg-white p-6 shadow-md ring-1 ring-slate-200/70">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div className="text-sm font-semibold text-slate-900">Modo Medição</div>
+                <div className="mt-1 text-xs text-slate-500">
+                  Setores + lançamentos recentes. Dica: o setor fica registrado no texto como [Fundação], [Alvenaria], [Elétrica].
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="text-xs text-slate-500">
+                  {isWorkersLoading ? "Atualizando..." : `${entries.length} lançamentos`}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void loadWorkersAndEntries()}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-semibold text-slate-900 shadow-sm ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Atualizar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setErrorMessage(null);
+                    setIsWorkerModalOpen(true);
+                  }}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-semibold text-slate-900 shadow-sm ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50"
+                >
+                  <HardHat className="h-4 w-4" />
+                  Adicionar Colaborador
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setErrorMessage(null);
+                    setIsEntryModalOpen(true);
+                  }}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#001f3f] px-4 text-xs font-semibold text-white shadow-sm transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#001a33]"
+                >
+                  <Plus className="h-4 w-4" />
+                  Lançar Medição
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
+              {(
+                [
+                  { key: "fundacao" as const, icon: <ClipboardList className="h-4 w-4" /> },
+                  { key: "alvenaria" as const, icon: <Boxes className="h-4 w-4" /> },
+                  { key: "eletrica" as const, icon: <Gauge className="h-4 w-4" /> },
+                ] as const
+              ).map((s) => (
+                <div key={s.key} className="rounded-2xl bg-slate-50 p-5 ring-1 ring-slate-200/70">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold text-slate-900">{sectorLabel(s.key)}</div>
+                    <div className="text-slate-400">{s.icon}</div>
+                  </div>
+                  <div className="mt-2 flex items-end justify-between gap-3">
+                    <span
+                      className={
+                        "inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-semibold ring-1 " +
+                        sectorCls(s.key)
+                      }
+                    >
+                      {sectorProgress.counts[s.key]} lanç.
+                    </span>
+                    <div className="text-xs font-semibold text-slate-500">Evolução</div>
+                  </div>
+                  <div className="mt-3 h-2 w-full rounded-full bg-white ring-1 ring-slate-200/70">
+                    <div
+                      className="h-2 rounded-full bg-slate-900/70"
+                      style={{ width: `${sectorProgress.widths[s.key]}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 overflow-x-auto rounded-2xl bg-white ring-1 ring-slate-200/70">
+              <table className="min-w-full border-separate border-spacing-0">
+                <thead>
+                  <tr className="bg-slate-50">
+                    <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Colaborador</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Data</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Tipo</th>
+                    <th className="px-5 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">Horas</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Observações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {entries.length > 0 ? (
+                    entries.map((e, idx) => {
+                      const worker = workerById.get(e.worker_id);
+                      return (
+                        <tr
+                          key={e.id}
+                          className={
+                            "border-t border-slate-100 " + (idx % 2 === 1 ? "bg-slate-50/50" : "bg-white")
+                          }
+                        >
+                          <td className="px-5 py-4">
+                            <div className="text-sm font-semibold text-slate-900">{worker?.full_name ?? "-"}</div>
+                            <div className="mt-1 text-xs text-slate-500">{worker?.role ?? "-"}</div>
+                          </td>
+                          <td className="px-5 py-4 text-sm text-slate-700">{e.entry_date}</td>
+                          <td className="px-5 py-4">
+                            <span className="inline-flex items-center justify-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200/70">
+                              {entryTypeLabel(e.entry_type)}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4 text-right text-sm text-slate-700">{e.hours ?? "-"}</td>
+                          <td className="px-5 py-4 text-sm text-slate-700">{e.notes ?? "-"}</td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td className="px-5 py-8 text-sm text-slate-600" colSpan={5}>
+                        Nenhuma medição lançada.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mt-4 rounded-2xl bg-slate-50 px-5 py-4 text-sm text-slate-700 ring-1 ring-slate-200/70">
+              <div className="flex items-center gap-2">
+                <ClipboardList className="h-4 w-4 text-slate-500" />
+                <span className="font-semibold text-slate-900">Regra:</span> Hora-homem salva as horas. Diária e Falta salvam sem horas.
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {isMaterialModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 p-4 sm:items-center">
+          <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-[0_20px_60px_-24px_rgba(15,23,42,0.65)] ring-1 ring-slate-200/70">
+            <div className="flex items-start justify-between gap-6 border-b border-slate-100 px-6 py-5">
+              <div>
+                <div className="text-sm font-semibold text-slate-900">Adicionar Insumo</div>
+                <div className="mt-1 text-xs text-slate-500">Cadastro rápido com total automático.</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMaterialModalOpen(false)}
+                className="inline-flex h-10 items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
+              >
+                Fechar
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                void addMaterial(e);
+                setIsMaterialModalOpen(false);
+              }}
+              className="px-6 py-6"
+            >
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <label className="flex flex-col gap-2 md:col-span-2">
                   <span className="text-xs font-semibold tracking-wide text-slate-600">Insumo</span>
                   <input
                     value={materialsForm.name}
@@ -515,7 +863,7 @@ export default function ObrasAdminPage() {
                   />
                 </label>
 
-                <label className="flex flex-col gap-2">
+                <label className="flex flex-col gap-2 md:col-span-2">
                   <span className="text-xs font-semibold tracking-wide text-slate-600">Fornecedor (opcional)</span>
                   <input
                     value={materialsForm.vendor}
@@ -525,31 +873,28 @@ export default function ObrasAdminPage() {
                   />
                 </label>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs font-semibold tracking-wide text-slate-600">Valor Unitário</span>
-                    <input
-                      value={materialsForm.unit_price}
-                      onChange={(e) =>
-                        setMaterialsForm((s) => ({ ...s, unit_price: formatBRLInput(e.target.value) }))
-                      }
-                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                      placeholder="R$ 0,00"
-                      inputMode="decimal"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs font-semibold tracking-wide text-slate-600">Quantidade</span>
-                    <input
-                      value={materialsForm.quantity}
-                      onChange={(e) => setMaterialsForm((s) => ({ ...s, quantity: e.target.value }))}
-                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                      placeholder="1"
-                    />
-                  </label>
-                </div>
+                <label className="flex flex-col gap-2">
+                  <span className="text-xs font-semibold tracking-wide text-slate-600">Valor Unitário</span>
+                  <input
+                    value={materialsForm.unit_price}
+                    onChange={(e) => setMaterialsForm((s) => ({ ...s, unit_price: formatBRLInput(e.target.value) }))}
+                    className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
+                    placeholder="R$ 0,00"
+                    inputMode="decimal"
+                  />
+                </label>
 
                 <label className="flex flex-col gap-2">
+                  <span className="text-xs font-semibold tracking-wide text-slate-600">Quantidade</span>
+                  <input
+                    value={materialsForm.quantity}
+                    onChange={(e) => setMaterialsForm((s) => ({ ...s, quantity: e.target.value }))}
+                    className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
+                    placeholder="1"
+                  />
+                </label>
+
+                <label className="flex flex-col gap-2 md:col-span-2">
                   <span className="text-xs font-semibold tracking-wide text-slate-600">Status</span>
                   <select
                     value={materialsForm.status}
@@ -561,148 +906,58 @@ export default function ObrasAdminPage() {
                     <option value="entregue">Entregue</option>
                   </select>
                 </label>
+              </div>
 
-                <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700 ring-1 ring-slate-200/70">
-                  <span className="font-semibold text-slate-900">Total:</span>{" "}
-                  {(() => {
-                    const unit = parseBRLInputToNumber(materialsForm.unit_price) ?? 0;
-                    const qty = parseNumber(materialsForm.quantity) ?? 0;
-                    return formatCurrencyBRL(unit * qty);
-                  })()}
-                </div>
+              <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700 ring-1 ring-slate-200/70">
+                <span className="font-semibold text-slate-900">Total:</span>{" "}
+                {(() => {
+                  const unit = parseBRLInputToNumber(materialsForm.unit_price) ?? 0;
+                  const qty = parseNumber(materialsForm.quantity) ?? 0;
+                  return formatCurrencyBRL(unit * qty);
+                })()}
+              </div>
 
+              <div className="mt-5 flex justify-end">
                 <button
                   type="submit"
                   disabled={isMaterialSaving}
-                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#ff0000] px-5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#ff0000] px-6 text-sm font-semibold text-white shadow-sm transition-all duration-300 hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <Plus className="h-4 w-4" />
-                  {isMaterialSaving ? "Salvando..." : "Adicionar"}
+                  <BadgeCheck className="h-4 w-4" />
+                  {isMaterialSaving ? "Salvando..." : "Salvar"}
                 </button>
-              </form>
-            </div>
+              </div>
+            </form>
           </div>
+        </div>
+      ) : null}
 
-          <div className="lg:col-span-8">
-            <div className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="text-sm font-semibold text-slate-900">Lista de Insumos</div>
-                  <div className="mt-1 text-xs text-slate-500">Valor unitário x quantidade (total por item).</div>
-                </div>
-                <div className="text-xs text-slate-500">
-                  {isMaterialsLoading ? "Atualizando..." : `${materials.length} itens`}
-                </div>
+      {isWorkerModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 p-4 sm:items-center">
+          <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-[0_20px_60px_-24px_rgba(15,23,42,0.65)] ring-1 ring-slate-200/70">
+            <div className="flex items-start justify-between gap-6 border-b border-slate-100 px-6 py-5">
+              <div>
+                <div className="text-sm font-semibold text-slate-900">Adicionar Colaborador</div>
+                <div className="mt-1 text-xs text-slate-500">Cadastro de pedreiros/reformadores.</div>
               </div>
-
-              <div className="mt-5 overflow-x-auto rounded-2xl bg-white ring-1 ring-slate-200/70">
-                <table className="min-w-full border-separate border-spacing-0">
-                  <thead>
-                    <tr className="bg-slate-50">
-                      <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">
-                        Insumo
-                      </th>
-                      <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">
-                        Status
-                      </th>
-                      <th className="px-5 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">
-                        Unit.
-                      </th>
-                      <th className="px-5 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">
-                        Qtd.
-                      </th>
-                      <th className="px-5 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">
-                        Total
-                      </th>
-                      <th className="px-5 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">
-                        Ações
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {materials.length > 0 ? (
-                      materials.map((m) => {
-                        const unit = m.unit_price ?? 0;
-                        const qty = m.quantity ?? 0;
-                        const total = unit * qty;
-                        return (
-                          <tr key={m.id} className="border-t border-slate-100">
-                            <td className="px-5 py-4">
-                              <div className="text-sm font-semibold text-slate-900">{m.name}</div>
-                              <div className="mt-1 text-xs text-slate-500">{m.vendor ?? "-"}</div>
-                            </td>
-                            <td className="px-5 py-4">
-                              <span
-                                className={
-                                  "inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-semibold ring-1 " +
-                                  materialStatusCls(m.status)
-                                }
-                              >
-                                {m.status}
-                              </span>
-                            </td>
-                            <td className="px-5 py-4 text-right text-sm text-slate-700">
-                              {formatCurrencyBRL(unit)}
-                            </td>
-                            <td className="px-5 py-4 text-right text-sm text-slate-700">{qty}</td>
-                            <td className="px-5 py-4 text-right text-sm font-semibold text-slate-900">
-                              {formatCurrencyBRL(total)}
-                            </td>
-                            <td className="px-5 py-4">
-                              <div className="flex justify-end gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => void updateMaterialStatus(m.id, "cotado")}
-                                  className="inline-flex h-9 items-center justify-center rounded-xl bg-white px-3 text-xs font-semibold text-slate-700 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
-                                >
-                                  Cotado
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => void updateMaterialStatus(m.id, "comprado")}
-                                  className="inline-flex h-9 items-center justify-center rounded-xl bg-[#001f3f] px-3 text-xs font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:bg-[#001a33]"
-                                >
-                                  Comprado
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => void updateMaterialStatus(m.id, "entregue")}
-                                  className="inline-flex h-9 items-center justify-center rounded-xl bg-emerald-600 px-3 text-xs font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:bg-emerald-700"
-                                >
-                                  Entregue
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td className="px-5 py-8 text-sm text-slate-600" colSpan={6}>
-                          Nenhum insumo cadastrado.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              <button
+                type="button"
+                onClick={() => setIsWorkerModalOpen(false)}
+                className="inline-flex h-10 items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
+              >
+                Fechar
+              </button>
             </div>
-          </div>
-        </section>
-      ) : (
-        <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <div className="lg:col-span-4">
-            <div className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="text-sm font-semibold text-slate-900">Equipe</div>
-                  <div className="mt-1 text-xs text-slate-500">Cadastro de pedreiros/reformadores.</div>
-                </div>
-                <Users className="h-4 w-4 text-slate-400" />
-              </div>
 
-              <form onSubmit={addWorker} className="mt-5 flex flex-col gap-4">
-                <label className="flex flex-col gap-2">
+            <form
+              onSubmit={(e) => {
+                void addWorker(e);
+                setIsWorkerModalOpen(false);
+              }}
+              className="px-6 py-6"
+            >
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <label className="flex flex-col gap-2 md:col-span-2">
                   <span className="text-xs font-semibold tracking-wide text-slate-600">Nome</span>
                   <input
                     value={workerForm.full_name}
@@ -713,7 +968,7 @@ export default function ObrasAdminPage() {
                   />
                 </label>
 
-                <label className="flex flex-col gap-2">
+                <label className="flex flex-col gap-2 md:col-span-2">
                   <span className="text-xs font-semibold tracking-wide text-slate-600">Função</span>
                   <select
                     value={workerForm.role}
@@ -726,62 +981,87 @@ export default function ObrasAdminPage() {
                   </select>
                 </label>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs font-semibold tracking-wide text-slate-600">Diária</span>
-                    <input
-                      value={workerForm.daily_rate}
-                      onChange={(e) =>
-                        setWorkerForm((s) => ({ ...s, daily_rate: formatBRLInput(e.target.value) }))
-                      }
-                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                      placeholder="R$ 0,00"
-                      inputMode="decimal"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs font-semibold tracking-wide text-slate-600">Hora</span>
-                    <input
-                      value={workerForm.hourly_rate}
-                      onChange={(e) =>
-                        setWorkerForm((s) => ({ ...s, hourly_rate: formatBRLInput(e.target.value) }))
-                      }
-                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                      placeholder="R$ 0,00"
-                      inputMode="decimal"
-                    />
-                  </label>
-                </div>
+                <label className="flex flex-col gap-2">
+                  <span className="text-xs font-semibold tracking-wide text-slate-600">Diária</span>
+                  <input
+                    value={workerForm.daily_rate}
+                    onChange={(e) => setWorkerForm((s) => ({ ...s, daily_rate: formatBRLInput(e.target.value) }))}
+                    className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
+                    placeholder="R$ 0,00"
+                    inputMode="decimal"
+                  />
+                </label>
 
+                <label className="flex flex-col gap-2">
+                  <span className="text-xs font-semibold tracking-wide text-slate-600">Hora</span>
+                  <input
+                    value={workerForm.hourly_rate}
+                    onChange={(e) => setWorkerForm((s) => ({ ...s, hourly_rate: formatBRLInput(e.target.value) }))}
+                    className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
+                    placeholder="R$ 0,00"
+                    inputMode="decimal"
+                  />
+                </label>
+              </div>
+
+              <div className="mt-5 flex justify-end">
                 <button
                   type="submit"
                   disabled={isWorkerSaving}
-                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#ff0000] px-5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#ff0000] px-6 text-sm font-semibold text-white shadow-sm transition-all duration-300 hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <Plus className="h-4 w-4" />
-                  {isWorkerSaving ? "Salvando..." : "Adicionar"}
-                </button>
-              </form>
-            </div>
-
-            <div className="mt-6 rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="text-sm font-semibold text-slate-900">Lançar Medição</div>
-                  <div className="mt-1 text-xs text-slate-500">Hora-homem, diária ou falta.</div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void loadWorkersAndEntries()}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Atualizar
+                  <BadgeCheck className="h-4 w-4" />
+                  {isWorkerSaving ? "Salvando..." : "Salvar"}
                 </button>
               </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
 
-              <form onSubmit={addEntry} className="mt-5 flex flex-col gap-4">
-                <label className="flex flex-col gap-2">
+      {isEntryModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 p-4 sm:items-center">
+          <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-[0_20px_60px_-24px_rgba(15,23,42,0.65)] ring-1 ring-slate-200/70">
+            <div className="flex items-start justify-between gap-6 border-b border-slate-100 px-6 py-5">
+              <div>
+                <div className="text-sm font-semibold text-slate-900">Lançar Medição</div>
+                <div className="mt-1 text-xs text-slate-500">Hora-homem, diária ou falta.</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEntryModalOpen(false)}
+                className="inline-flex h-10 items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
+              >
+                Fechar
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const prefix = `[${sectorLabel(entryForm.sector)}] `;
+                const nextNotes = String(entryForm.notes ?? "").trim();
+                setEntryForm((s) => ({ ...s, notes: prefix + nextNotes }));
+                void addEntry(e);
+                setIsEntryModalOpen(false);
+              }}
+              className="px-6 py-6"
+            >
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <label className="flex flex-col gap-2 md:col-span-2">
+                  <span className="text-xs font-semibold tracking-wide text-slate-600">Setor</span>
+                  <select
+                    value={entryForm.sector}
+                    onChange={(e) => setEntryForm((s) => ({ ...s, sector: e.target.value as EntryForm["sector"] }))}
+                    className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
+                  >
+                    <option value="fundacao">Fundação</option>
+                    <option value="alvenaria">Alvenaria</option>
+                    <option value="eletrica">Elétrica</option>
+                  </select>
+                </label>
+
+                <label className="flex flex-col gap-2 md:col-span-2">
                   <span className="text-xs font-semibold tracking-wide text-slate-600">Colaborador</span>
                   <select
                     value={entryForm.worker_id}
@@ -801,42 +1081,41 @@ export default function ObrasAdminPage() {
                   </select>
                 </label>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs font-semibold tracking-wide text-slate-600">Data</span>
-                    <div className="relative">
-                      <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <input
-                        type="date"
-                        value={entryForm.entry_date}
-                        onChange={(e) => setEntryForm((s) => ({ ...s, entry_date: e.target.value }))}
-                        className="h-11 w-full rounded-xl bg-white pl-10 pr-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                        required
-                      />
-                    </div>
-                  </label>
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs font-semibold tracking-wide text-slate-600">Tipo</span>
-                    <select
-                      value={entryForm.entry_type}
-                      onChange={(e) =>
-                        setEntryForm((s) => ({
-                          ...s,
-                          entry_type: e.target.value as EntryType,
-                          hours: e.target.value === "hora_homem" ? s.hours : "",
-                        }))
-                      }
-                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                    >
-                      <option value="hora_homem">Hora-Homem</option>
-                      <option value="diaria">Diária</option>
-                      <option value="falta">Falta</option>
-                    </select>
-                  </label>
-                </div>
+                <label className="flex flex-col gap-2">
+                  <span className="text-xs font-semibold tracking-wide text-slate-600">Data</span>
+                  <div className="relative">
+                    <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="date"
+                      value={entryForm.entry_date}
+                      onChange={(e) => setEntryForm((s) => ({ ...s, entry_date: e.target.value }))}
+                      className="h-11 w-full rounded-xl bg-white pl-10 pr-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
+                      required
+                    />
+                  </div>
+                </label>
+
+                <label className="flex flex-col gap-2">
+                  <span className="text-xs font-semibold tracking-wide text-slate-600">Tipo</span>
+                  <select
+                    value={entryForm.entry_type}
+                    onChange={(e) =>
+                      setEntryForm((s) => ({
+                        ...s,
+                        entry_type: e.target.value as EntryType,
+                        hours: e.target.value === "hora_homem" ? s.hours : "",
+                      }))
+                    }
+                    className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
+                  >
+                    <option value="hora_homem">Hora-Homem</option>
+                    <option value="diaria">Diária</option>
+                    <option value="falta">Falta</option>
+                  </select>
+                </label>
 
                 {entryForm.entry_type === "hora_homem" ? (
-                  <label className="flex flex-col gap-2">
+                  <label className="flex flex-col gap-2 md:col-span-2">
                     <span className="text-xs font-semibold tracking-wide text-slate-600">Horas</span>
                     <div className="flex gap-2">
                       <button
@@ -874,7 +1153,7 @@ export default function ObrasAdminPage() {
                   </label>
                 ) : null}
 
-                <label className="flex flex-col gap-2">
+                <label className="flex flex-col gap-2 md:col-span-2">
                   <span className="text-xs font-semibold tracking-wide text-slate-600">Observações (opcional)</span>
                   <input
                     value={entryForm.notes}
@@ -883,100 +1162,22 @@ export default function ObrasAdminPage() {
                     placeholder="Ex: 2 horas extras"
                   />
                 </label>
+              </div>
 
+              <div className="mt-5 flex justify-end">
                 <button
                   type="submit"
                   disabled={isEntrySaving || workers.length === 0}
-                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#001f3f] px-5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#001a33] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#001f3f] px-6 text-sm font-semibold text-white shadow-sm transition-all duration-300 hover:bg-[#001a33] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <BadgeCheck className="h-4 w-4" />
                   {isEntrySaving ? "Salvando..." : "Registrar"}
                 </button>
-              </form>
-            </div>
+              </div>
+            </form>
           </div>
-
-          <div className="lg:col-span-8">
-            <div className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="text-sm font-semibold text-slate-900">Medições Recentes</div>
-                  <div className="mt-1 text-xs text-slate-500">Últimos lançamentos (por data).</div>
-                </div>
-                <div className="text-xs text-slate-500">
-                  {isWorkersLoading ? "Atualizando..." : `${entries.length} lançamentos`}
-                </div>
-              </div>
-
-              <div className="mt-5 overflow-x-auto rounded-2xl bg-white ring-1 ring-slate-200/70">
-                <table className="min-w-full border-separate border-spacing-0">
-                  <thead>
-                    <tr className="bg-slate-50">
-                      <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">
-                        Colaborador
-                      </th>
-                      <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">
-                        Data
-                      </th>
-                      <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">
-                        Tipo
-                      </th>
-                      <th className="px-5 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">
-                        Horas
-                      </th>
-                      <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">
-                        Observações
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {entries.length > 0 ? (
-                      entries.map((ev) => {
-                        const worker = workerById.get(ev.worker_id);
-                        return (
-                          <tr key={ev.id} className="border-t border-slate-100">
-                            <td className="px-5 py-4">
-                              <div className="text-sm font-semibold text-slate-900">
-                                {worker?.full_name ?? ev.worker_id}
-                              </div>
-                              <div className="mt-1 text-xs text-slate-500">{worker?.role ?? "-"}</div>
-                            </td>
-                            <td className="px-5 py-4 text-sm text-slate-700">{ev.entry_date}</td>
-                            <td className="px-5 py-4">
-                              <span className="inline-flex items-center justify-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200/70">
-                                {entryTypeLabel(ev.entry_type)}
-                              </span>
-                            </td>
-                            <td className="px-5 py-4 text-right text-sm text-slate-700">
-                              {typeof ev.hours === "number" ? ev.hours : "-"}
-                            </td>
-                            <td className="px-5 py-4 text-sm text-slate-700">{ev.notes ?? "-"}</td>
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td className="px-5 py-8 text-sm text-slate-600" colSpan={5}>
-                          Nenhuma medição lançada.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="mt-4 rounded-2xl bg-slate-50 px-5 py-4 text-sm text-slate-700 ring-1 ring-slate-200/70">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <ClipboardList className="h-4 w-4 text-slate-500" />
-                    <span className="font-semibold text-slate-900">Regra:</span> Hora-homem salva as horas. Diária e Falta salvam sem horas.
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
+        </div>
+      ) : null}
     </div>
   );
 }
