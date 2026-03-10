@@ -5,7 +5,6 @@ import {
   Building2,
   ClipboardList,
   Gavel,
-  Radar,
   Home,
   LayoutDashboard,
   Layers,
@@ -93,13 +92,6 @@ export default function AdminLayout({
           >
             <ClipboardList className="h-4 w-4 text-slate-200/80 transition-all duration-300 group-hover:text-white" />
             Leads/Atendimento
-          </Link>
-          <Link
-            href="/admin/gps"
-            className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-100/90 transition-all duration-300 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff0000]/40"
-          >
-            <Radar className="h-4 w-4 text-slate-200/80 transition-all duration-300 group-hover:text-white" />
-            GPS de Captação
           </Link>
           <Link
             href="/admin/obras"
