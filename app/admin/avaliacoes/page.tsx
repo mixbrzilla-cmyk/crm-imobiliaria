@@ -1138,7 +1138,7 @@ export default function AvaliacoesAdminPage() {
             <div
               role="dialog"
               aria-modal="true"
-              className="relative w-full max-w-6xl overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-200/70"
+              className="relative flex w-full max-w-5xl max-h-[90vh] flex-col overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-200/70"
             >
               <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
                 <div>
@@ -1167,6 +1167,8 @@ export default function AvaliacoesAdminPage() {
                   </button>
                 </div>
               </div>
+
+              <div className="flex-1 overflow-y-auto">
 
               {complianceWarning ? (
                 <div className="px-6 pt-5">
@@ -1218,7 +1220,7 @@ export default function AvaliacoesAdminPage() {
                 </div>
 
                 <div className="md:col-span-9">
-                  <form onSubmit={saveAppraisal} className="flex flex-col gap-4">
+                  <form id="appraisal-form" onSubmit={saveAppraisal} className="flex flex-col gap-4">
                     {activeTab === "basicos" ? (
                       <>
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -1759,18 +1761,36 @@ export default function AvaliacoesAdminPage() {
                         </div>
                       </>
                     ) : null}
-
-                    <div className="pt-2">
-                      <button
-                        type="submit"
-                        disabled={isSaving || uploadingPhotos}
-                        className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#2b6cff] px-6 text-sm font-semibold text-white shadow-[0_10px_26px_-18px_rgba(43,108,255,0.85)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#255fe6] disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        <Plus className="h-4 w-4" />
-                        {isSaving ? "Salvando..." : selectedId ? "Salvar alterações" : "Criar avaliação"}
-                      </button>
-                    </div>
                   </form>
+                </div>
+              </div>
+
+              </div>
+
+              <div className="border-t border-slate-100 bg-white px-6 py-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isSaving || uploadingPhotos) return;
+                      setIsModalOpen(false);
+                      resetForm();
+                    }}
+                    disabled={isSaving || uploadingPhotos}
+                    className="inline-flex h-11 items-center justify-center rounded-xl bg-slate-100 px-6 text-sm font-semibold text-slate-800 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-200/60 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Cancelar
+                  </button>
+
+                  <button
+                    type="submit"
+                    form="appraisal-form"
+                    disabled={isSaving || uploadingPhotos}
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#2b6cff] px-6 text-sm font-semibold text-white shadow-[0_10px_26px_-18px_rgba(43,108,255,0.85)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#255fe6] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Plus className="h-4 w-4" />
+                    {isSaving ? "Salvando..." : selectedId ? "Salvar alterações" : "Criar avaliação"}
+                  </button>
                 </div>
               </div>
             </div>
