@@ -31,6 +31,7 @@ type DirecionamentoRow = {
   city: string | null;
   corretor_id: string | null;
   data_direcionamento: string | null;
+  created_at?: string | null;
 };
 
 type DirecionamentoViewRow = {
@@ -43,10 +44,12 @@ type DirecionamentoViewRow = {
 
 type TopProperty = {
   id: string;
+  title: string | null;
   property_type: string;
   purpose: string;
   price: number | null;
-  address: string | null;
+  neighborhood: string | null;
+  city: string | null;
 };
 
 type ObraMaterialRow = {
@@ -222,6 +225,8 @@ export default function AdminDashboardClient() {
         .eq("role", "broker")
         .order("full_name", { ascending: true });
 
+      let brokerRows: Profile[] = [];
+
       const [
         profilesRes,
         leadsRes,
@@ -229,7 +234,6 @@ export default function AdminDashboardClient() {
         vgvRes,
         obraMaterialsRes,
         whatsRes,
-        avulsosIdsRes,
         devIdsRes,
         inventarioIdsRes,
         direcionamentosRes,
@@ -242,14 +246,11 @@ export default function AdminDashboardClient() {
             .gte("created_at", startOfWeek.toISOString())
             .order("created_at", { ascending: true }),
           supabase
-            .from("standalone_properties")
-            .select("id, property_type, purpose, price, address")
+            .from("properties")
+            .select("id, title, property_type, purpose, price, neighborhood, city")
             .order("price", { ascending: false })
             .limit(5),
-          supabase
-            .from("standalone_properties")
-            .select("price")
-            .not("price", "is", null),
+          supabase.from("properties").select("price").not("price", "is", null),
           (supabase as any)
             .from("obra_materials")
             .select("id, status, unit_price, quantity")
@@ -265,18 +266,16 @@ export default function AdminDashboardClient() {
             .order("sent_at", { ascending: false })
             .limit(500),
 
-          // unificação: Avulsos + Empreendimentos + Inventário (properties), sempre via corretor_id
-          supabase.from("standalone_properties").select("id, corretor_id"),
+          // unificação: Empreendimentos + Inventário (properties), sempre via corretor_id
           (supabase as any).from("developments").select("id, corretor_id"),
           supabase.from("properties").select("id, corretor_id"),
 
           // Relatório de direcionamento (posse)
           supabase
             .from("properties")
-            .select("id, title, neighborhood, city, corretor_id, data_direcionamento")
+            .select("id, title, neighborhood, city, corretor_id, data_direcionamento, created_at")
             .not("corretor_id", "is", null)
-            .not("data_direcionamento", "is", null)
-            .order("data_direcionamento", { ascending: false })
+            .order("data_direcionamento", { ascending: false, nullsFirst: false })
             .limit(50),
         ]);
 
@@ -289,6 +288,7 @@ export default function AdminDashboardClient() {
           setActiveCount(0);
         } else {
           const allRows = (fallback.data ?? []) as Profile[];
+          brokerRows = allRows;
           const pending = allRows.filter((r) => r.status === "pendente").length;
           const active = allRows.filter((r) => r.status === "ativo").length;
           setRows(allRows);
@@ -302,6 +302,7 @@ export default function AdminDashboardClient() {
           // handled above with fallback query
         } else {
           const allRows = (profilesRes.value.data ?? []) as Profile[];
+          brokerRows = allRows;
           const pending = allRows.filter((r) => r.status === "pendente").length;
           const active = allRows.filter((r) => r.status === "ativo").length;
           setRows(allRows);
@@ -310,13 +311,15 @@ export default function AdminDashboardClient() {
         }
       }
 
+      const profilesById = new Map<string, Profile>();
+      for (const p of brokerRows) profilesById.set(p.id, p);
+
       const brokerCountMap = new Map<string, number>();
       let totalCount = 0;
       let assignedCount = 0;
       let unassignedCount = 0;
 
-      const inventorySources: Array<{ res: typeof avulsosIdsRes; label: string }> = [
-        { res: avulsosIdsRes, label: "standalone_properties" },
+      const inventorySources: Array<{ res: typeof devIdsRes; label: string }> = [
         { res: devIdsRes, label: "developments" },
         { res: inventarioIdsRes, label: "properties" },
       ];
@@ -347,27 +350,37 @@ export default function AdminDashboardClient() {
       setAssignedImoveisCount(assignedCount);
       setUnassignedImoveisCount(unassignedCount);
 
-      const profilesById = new Map<string, Profile>();
-      if (profilesRes.status === "fulfilled" && !profilesRes.value.error) {
-        const allRows = (profilesRes.value.data ?? []) as Profile[];
-        for (const p of allRows) profilesById.set(p.id, p);
-      }
-
       if (direcionamentosRes.status === "fulfilled") {
         if (direcionamentosRes.value.error) {
           console.log("[Dashboard] Erro ao carregar direcionamentos:", direcionamentosRes.value.error);
           setDirecionamentos([]);
         } else {
           const data = (direcionamentosRes.value.data ?? []) as DirecionamentoRow[];
+          const brokerIds = Array.from(
+            new Set(data.map((r) => (r.corretor_id ?? "").trim()).filter(Boolean)),
+          );
+
+          const profilesById = new Map<string, { id: string; full_name: string | null }>();
+          if (brokerIds.length > 0) {
+            const profRes = await supabase
+              .from("profiles")
+              .select("id, full_name")
+              .in("id", brokerIds);
+            if (!profRes.error) {
+              const profRows = (profRes.data ?? []) as Array<{ id: string; full_name: string | null }>;
+              for (const p of profRows) profilesById.set(p.id, p);
+            }
+          }
+
           const nowTs = Date.now();
           const view = data
-            .filter((r) => Boolean(r.corretor_id) && Boolean(r.data_direcionamento))
+            .filter((r) => Boolean(r.corretor_id))
             .map((r) => {
               const brokerId = r.corretor_id ?? "";
               const brokerName = (profilesById.get(brokerId)?.full_name ?? "").trim() || brokerId;
               const loc = [r.neighborhood, r.city].filter(Boolean).join(" • ");
               const propertyLabel = (r.title ?? "").trim() || loc || r.id;
-              const directedAt = r.data_direcionamento ?? "";
+              const directedAt = r.data_direcionamento ?? r.created_at ?? "";
               const directedTs = directedAt ? new Date(directedAt).getTime() : NaN;
               const daysSince = Number.isFinite(directedTs)
                 ? Math.max(0, Math.floor((nowTs - directedTs) / (24 * 60 * 60 * 1000)))
@@ -609,7 +622,7 @@ export default function AdminDashboardClient() {
           <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
             {totalImoveisCount}
           </div>
-          <div className="mt-2 text-xs text-slate-500">Avulsos + Empreendimentos + Inventário</div>
+          <div className="mt-2 text-xs text-slate-500">Inventário + Empreendimentos</div>
         </div>
 
         <div className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
@@ -708,7 +721,7 @@ export default function AdminDashboardClient() {
           <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
             {formatCurrencyBRL(vgvValue)}
           </div>
-          <div className="mt-2 text-xs text-slate-500">Somatório dos preços de imóveis avulsos</div>
+          <div className="mt-2 text-xs text-slate-500">Somatório dos preços do inventário</div>
         </div>
       </section>
 
@@ -807,7 +820,7 @@ export default function AdminDashboardClient() {
 
         <div className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
           <div className="text-sm font-semibold text-slate-900">Imóveis Top</div>
-          <div className="mt-1 text-xs text-slate-500">Top 5 por preço (avulsos)</div>
+          <div className="mt-1 text-xs text-slate-500">Top 5 por preço (inventário)</div>
 
           <div className="mt-4 flex flex-col gap-3">
             {topProperties.length > 0 ? (
@@ -817,9 +830,11 @@ export default function AdminDashboardClient() {
                   className="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70"
                 >
                   <div className="text-sm font-semibold text-slate-900">
-                    {p.property_type} • {p.purpose}
+                    {(p.title ?? "").trim() || `${p.property_type} • ${p.purpose}`}
                   </div>
-                  <div className="mt-1 text-xs text-slate-500">{p.address ?? "-"}</div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    {(p.neighborhood ?? "-") + (p.city ? ` • ${p.city}` : "")}
+                  </div>
                   <div className="mt-2 text-sm font-semibold text-slate-900">
                     {typeof p.price === "number" ? formatCurrencyBRL(p.price) : "-"}
                   </div>
