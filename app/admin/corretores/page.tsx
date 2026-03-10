@@ -12,6 +12,8 @@ type BrokerProfile = {
   id: string;
   full_name: string | null;
   email: string | null;
+  whatsapp?: string | null;
+  creci?: string | null;
   status: string | null;
   role?: string | null;
 };
@@ -20,6 +22,8 @@ type BrokerRowView = {
   id: string;
   full_name: string;
   email: string;
+  whatsapp: string;
+  creci: string;
   statusLabel: string;
   isActive: boolean;
   propertiesInHands: number;
@@ -95,6 +99,8 @@ export default function CorretoresAdminPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createName, setCreateName] = useState("");
   const [createEmail, setCreateEmail] = useState("");
+  const [createWhatsapp, setCreateWhatsapp] = useState("");
+  const [createCreci, setCreateCreci] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -118,7 +124,7 @@ export default function CorretoresAdminPage() {
 
     const brokersRes = await supabase
       .from("profiles")
-      .select("id, full_name, email, status, role")
+      .select("id, full_name, email, whatsapp, creci, status, role")
       .eq("role", "broker")
       .order("full_name", { ascending: true });
 
@@ -202,6 +208,8 @@ export default function CorretoresAdminPage() {
     const view: BrokerRowView[] = brokerRows.map((b) => {
       const name = (b.full_name ?? "").trim() || "-";
       const email = (b.email ?? "").trim() || "-";
+      const whatsapp = (b.whatsapp ?? "").trim() || "-";
+      const creci = (b.creci ?? "").trim() || "-";
       const status = statusBadge(b.status ?? null);
       const assignedProperties = propsByBroker.get(b.id) ?? [];
       const inHands = assignedProperties.length;
@@ -210,6 +218,8 @@ export default function CorretoresAdminPage() {
         id: b.id,
         full_name: name,
         email,
+        whatsapp,
+        creci,
         statusLabel: status.label,
         isActive: status.active,
         propertiesInHands: inHands,
@@ -283,8 +293,21 @@ export default function CorretoresAdminPage() {
 
     const name = createName.trim();
     const email = createEmail.trim();
+    const whatsappRaw = createWhatsapp.trim();
+    const whatsapp = whatsappRaw.replace(/\D+/g, "");
+    const creci = createCreci.trim();
     if (!name) {
       setCreateError("Nome é obrigatório.");
+      return;
+    }
+
+    if (!whatsapp) {
+      setCreateError("WhatsApp é obrigatório.");
+      return;
+    }
+
+    if (!creci) {
+      setCreateError("CRECI é obrigatório.");
       return;
     }
 
@@ -294,6 +317,8 @@ export default function CorretoresAdminPage() {
         id: crypto.randomUUID(),
         full_name: name,
         email: email || null,
+        whatsapp,
+        creci,
         role: "broker",
         status: "ativo",
       };
@@ -307,6 +332,8 @@ export default function CorretoresAdminPage() {
       setIsCreateOpen(false);
       setCreateName("");
       setCreateEmail("");
+      setCreateWhatsapp("");
+      setCreateCreci("");
       await loadBaseData();
     } catch {
       setCreateError("Não foi possível cadastrar o corretor agora.");
@@ -383,6 +410,7 @@ export default function CorretoresAdminPage() {
                 const showTags = r.assignedProperties.slice(0, 6);
                 const hiddenCount = Math.max(0, r.assignedProperties.length - showTags.length);
                 const hasClicks = r.whatsClicks > 0;
+                const creciLabel = r.creci !== "-" ? `CRECI: ${r.creci}` : "CRECI: -";
 
                 return (
                   <div
@@ -404,6 +432,7 @@ export default function CorretoresAdminPage() {
 
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-base font-semibold text-slate-900">{r.full_name}</div>
+                        <div className="mt-1 truncate text-xs font-semibold text-slate-500">{creciLabel}</div>
                       </div>
 
                       <div className="flex items-center gap-2">
@@ -597,6 +626,10 @@ export default function CorretoresAdminPage() {
                 if (creating) return;
                 setIsCreateOpen(false);
                 setCreateError(null);
+                setCreateName("");
+                setCreateEmail("");
+                setCreateWhatsapp("");
+                setCreateCreci("");
               }}
               className="absolute inset-0 bg-slate-900/40"
               aria-label="Fechar"
@@ -620,6 +653,10 @@ export default function CorretoresAdminPage() {
                     if (creating) return;
                     setIsCreateOpen(false);
                     setCreateError(null);
+                    setCreateName("");
+                    setCreateEmail("");
+                    setCreateWhatsapp("");
+                    setCreateCreci("");
                   }}
                   className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-white text-slate-700 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
                   aria-label="Fechar"
@@ -646,6 +683,28 @@ export default function CorretoresAdminPage() {
                 </div>
 
                 <div>
+                  <div className="text-xs font-semibold text-slate-600">WhatsApp</div>
+                  <input
+                    value={createWhatsapp}
+                    onChange={(e) => setCreateWhatsapp(e.target.value.replace(/\D+/g, ""))}
+                    inputMode="numeric"
+                    className="mt-2 h-12 w-full rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all focus:ring-2 focus:ring-[#2b6cff]/40"
+                    placeholder="Ex: 94991234567"
+                  />
+                  <div className="mt-2 text-[11px] font-semibold text-slate-500">Use apenas números (DDD + número).</div>
+                </div>
+
+                <div>
+                  <div className="text-xs font-semibold text-slate-600">CRECI</div>
+                  <input
+                    value={createCreci}
+                    onChange={(e) => setCreateCreci(e.target.value)}
+                    className="mt-2 h-12 w-full rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all focus:ring-2 focus:ring-[#2b6cff]/40"
+                    placeholder="Ex: 12345-F"
+                  />
+                </div>
+
+                <div>
                   <div className="text-xs font-semibold text-slate-600">Email (opcional)</div>
                   <input
                     value={createEmail}
@@ -663,6 +722,10 @@ export default function CorretoresAdminPage() {
                     if (creating) return;
                     setIsCreateOpen(false);
                     setCreateError(null);
+                    setCreateName("");
+                    setCreateEmail("");
+                    setCreateWhatsapp("");
+                    setCreateCreci("");
                   }}
                   className="inline-flex h-11 items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                   disabled={creating}
