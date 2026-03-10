@@ -264,7 +264,7 @@ export default function CorretoresAdminPage() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-slate-50 px-6 py-6">
+    <div className="min-h-screen w-full bg-slate-100 px-6 py-6">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
         <header className="flex items-end justify-between gap-4">
           <div className="flex flex-col gap-2">
@@ -287,7 +287,7 @@ export default function CorretoresAdminPage() {
         </div>
       ) : null}
 
-        <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200/70">
+        <section className="rounded-2xl bg-white p-6 shadow-lg ring-1 ring-slate-200/70">
 
           {isLoading ? (
             <div className="rounded-2xl bg-slate-50 px-5 py-6 text-sm text-slate-600 ring-1 ring-slate-200/70">
@@ -298,16 +298,16 @@ export default function CorretoresAdminPage() {
               Nenhum corretor encontrado.
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
               {rows.map((r) => {
                 const showTags = r.assignedProperties.slice(0, 6);
                 const hiddenCount = Math.max(0, r.assignedProperties.length - showTags.length);
-                const isHot = r.whatsClicks >= 50;
+                const hasClicks = r.whatsClicks > 0;
 
                 return (
                   <div
                     key={r.id}
-                    className="group relative rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[2px] hover:shadow-md"
+                    className="group relative rounded-2xl border-t-4 border-blue-600 bg-white p-6 shadow-lg ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[2px]"
                   >
                     <div className="absolute right-4 top-4 flex items-center gap-2">
                       <button
@@ -329,7 +329,7 @@ export default function CorretoresAdminPage() {
                       </button>
                     </div>
 
-                    <div className="flex items-start gap-4 pr-28">
+                    <div className="flex items-start justify-between gap-4 pr-28">
                       <div className="relative">
                         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">
                           {initialsFromName(r.full_name)}
@@ -360,7 +360,7 @@ export default function CorretoresAdminPage() {
                       </div>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="mt-5 flex items-center justify-between gap-4">
                       <div className="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70">
                         <div className="text-[11px] font-semibold tracking-wide text-slate-600">Imóveis em mãos</div>
                         <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
@@ -370,23 +370,19 @@ export default function CorretoresAdminPage() {
 
                       <div
                         className={
-                          "rounded-xl px-4 py-3 ring-1 transition-all duration-300 " +
-                          (isHot
-                            ? "bg-emerald-600 text-white ring-emerald-500/40 shadow-[0_10px_20px_-14px_rgba(5,150,105,0.65)]"
-                            : "bg-slate-50 text-slate-900 ring-slate-200/70")
+                          "flex h-20 w-20 flex-col items-center justify-center rounded-full ring-1 transition-all duration-300 " +
+                          (hasClicks
+                            ? "bg-emerald-600 text-white ring-emerald-500/40 shadow-[0_14px_28px_-18px_rgba(5,150,105,0.85)]"
+                            : "bg-slate-50 text-slate-600 ring-slate-200/70")
                         }
+                        title={hasClicks ? `${r.whatsClicks} cliques` : "0 cliques"}
                       >
-                        <div className="flex items-center justify-between">
-                          <div className={"text-[11px] font-semibold tracking-wide " + (isHot ? "text-emerald-50" : "text-slate-600")}
-                          >
-                            Cliques WhatsApp
-                          </div>
-                          <WhatsappIcon className={"h-4 w-4 " + (isHot ? "text-white" : "text-emerald-600")}
-                          />
-                        </div>
-                        <div className={"mt-2 text-2xl font-semibold tracking-tight " + (isHot ? "text-white" : "text-slate-900")}
-                        >
+                        <WhatsappIcon className={"h-5 w-5 " + (hasClicks ? "text-white" : "text-slate-400")} />
+                        <div className={"mt-1 text-lg font-semibold leading-none " + (hasClicks ? "text-white" : "text-slate-700")}>
                           {r.whatsClicks}
+                        </div>
+                        <div className={"mt-0.5 text-[10px] font-semibold " + (hasClicks ? "text-emerald-50" : "text-slate-400")}>
+                          cliques
                         </div>
                       </div>
                     </div>
@@ -397,10 +393,10 @@ export default function CorretoresAdminPage() {
                           showTags.map((p) => (
                             <div
                               key={p.id}
-                              className="inline-flex max-w-full items-center gap-2 rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-800 ring-1 ring-slate-200/70"
+                              className="inline-flex max-w-full items-center gap-2 rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-200/70"
                               title={p.title}
                             >
-                              <span className={"h-2 w-2 rounded-full " + (normalizePurpose(p.purpose) === "locacao" ? "bg-emerald-500" : "bg-sky-500")} />
+                              <span className={"h-2 w-2 rounded-full " + (normalizePurpose(p.purpose) === "locacao" ? "bg-emerald-500" : "bg-blue-600")} />
                               <span className="max-w-[220px] truncate">{p.title}</span>
                             </div>
                           ))
@@ -431,11 +427,18 @@ export default function CorretoresAdminPage() {
               className="absolute inset-0 bg-slate-900/40"
               aria-label="Fechar"
             />
-            <div className="relative w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200/70">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="broker-report-title"
+              className="relative w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200/70"
+            >
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">RELATÓRIO</div>
-                  <div className="mt-2 text-xl font-semibold tracking-tight text-slate-900">{selectedBroker.full_name}</div>
+                  <div id="broker-report-title" className="mt-2 text-xl font-semibold tracking-tight text-slate-900">
+                    {selectedBroker.full_name}
+                  </div>
                   <div className="mt-1 text-sm text-slate-600">{selectedBroker.email}</div>
                 </div>
                 <button
@@ -458,9 +461,11 @@ export default function CorretoresAdminPage() {
                 <div className="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70">
                   <div className="flex items-center justify-between">
                     <div className="text-[11px] font-semibold tracking-wide text-slate-600">Cliques WhatsApp</div>
-                    <WhatsappIcon className="h-4 w-4 text-emerald-600" />
+                    <WhatsappIcon className={"h-4 w-4 " + (selectedBroker.whatsClicks > 0 ? "text-emerald-600" : "text-slate-400")} />
                   </div>
-                  <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{selectedBroker.whatsClicks}</div>
+                  <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+                    {selectedBroker.whatsClicks} {selectedBroker.whatsClicks === 1 ? "clique" : "cliques"}
+                  </div>
                 </div>
               </div>
 
