@@ -80,6 +80,19 @@ type ObraMaterialRow = {
   quantity: number | null;
 };
 
+type ObraWorkerRow = {
+  id: string;
+  daily_rate: number | null;
+  hourly_rate: number | null;
+};
+
+type ObraWorkerEntryRow = {
+  id: string;
+  worker_id: string;
+  entry_type: string | null;
+  hours: number | null;
+};
+
 type LegalCaseRow = {
   id: string;
   due_diligence_json?: any;
@@ -267,6 +280,7 @@ export default function AdminDashboardClient() {
 
   const [obraMaterialsTotal, setObraMaterialsTotal] = useState<number>(0);
   const [obraPendingDeliveries, setObraPendingDeliveries] = useState<number>(0);
+  const [obraLaborTotal, setObraLaborTotal] = useState<number>(0);
 
   const [leadsTodayCount, setLeadsTodayCount] = useState<number>(0);
   const [leadsWeekCount, setLeadsWeekCount] = useState<number>(0);
@@ -352,6 +366,9 @@ export default function AdminDashboardClient() {
       setLegalRiskCounts({ verde: 0, amarelo: 0, vermelho: 0 });
       setPtamMonthCount(0);
       setPtamMonthAvgValue(0);
+      setObraMaterialsTotal(0);
+      setObraPendingDeliveries(0);
+      setObraLaborTotal(0);
       return;
     }
 
@@ -444,6 +461,8 @@ export default function AdminDashboardClient() {
         lastOwnerPropRes,
         lastOwnerDevRes,
         obraMaterialsRes,
+        obraWorkersRes,
+        obraWorkerEntriesRes,
         whatsRes,
         devIdsRes,
         inventarioIdsRes,
@@ -514,6 +533,16 @@ export default function AdminDashboardClient() {
             .from("obra_materials")
             .select("id, status, unit_price, quantity")
             .order("created_at", { ascending: false }),
+
+          (supabase as any)
+            .from("obra_workers")
+            .select("id, daily_rate, hourly_rate")
+            .limit(500),
+
+          (supabase as any)
+            .from("obra_worker_entries")
+            .select("id, worker_id, entry_type, hours")
+            .limit(2000),
 
           // WhatsApp activity today (schema optional)
           supabase
@@ -876,13 +905,57 @@ export default function AdminDashboardClient() {
 
       const gross = propsGross + devGross;
       const commission = 0.05 * (propsAssignedGross + devAssignedGross);
-      const net = gross - commission;
+
+      let materialsExpense = 0;
+      let pendingDeliveries = 0;
+      if (obraMaterialsRes.status === "fulfilled") {
+        if (obraMaterialsRes.value.error) {
+          materialsExpense = 0;
+          pendingDeliveries = 0;
+        } else {
+          const mats = (obraMaterialsRes.value.data ?? []) as ObraMaterialRow[];
+          materialsExpense = mats.reduce((acc, m) => acc + (m.unit_price ?? 0) * (m.quantity ?? 0), 0);
+          pendingDeliveries = mats.filter((m) => (m.status ?? "") !== "entregue").length;
+        }
+      }
+
+      let laborExpense = 0;
+      try {
+        const workers =
+          obraWorkersRes.status === "fulfilled" && !obraWorkersRes.value.error
+            ? ((obraWorkersRes.value.data ?? []) as ObraWorkerRow[])
+            : ([] as ObraWorkerRow[]);
+        const entries =
+          obraWorkerEntriesRes.status === "fulfilled" && !obraWorkerEntriesRes.value.error
+            ? ((obraWorkerEntriesRes.value.data ?? []) as ObraWorkerEntryRow[])
+            : ([] as ObraWorkerEntryRow[]);
+
+        const workerById = new Map<string, ObraWorkerRow>();
+        for (const w of workers) workerById.set(w.id, w);
+
+        laborExpense = entries.reduce((acc, e) => {
+          const w = workerById.get(String(e.worker_id ?? ""));
+          if (!w) return acc;
+          const type = String(e.entry_type ?? "").toLowerCase();
+          if (type === "diaria") return acc + (w.daily_rate ?? 0);
+          if (type === "hora_homem") return acc + (w.hourly_rate ?? 0) * (e.hours ?? 0);
+          return acc;
+        }, 0);
+      } catch {
+        laborExpense = 0;
+      }
+
+      const net = gross - commission - materialsExpense - laborExpense;
 
       setGrossPropertiesValue(propsGross);
       setGrossDevelopmentsValue(devGross);
       setGrossInventoryValue(gross);
       setCommissionValue(commission);
       setNetProfitValue(net);
+
+      setObraMaterialsTotal(materialsExpense);
+      setObraPendingDeliveries(pendingDeliveries);
+      setObraLaborTotal(laborExpense);
 
       try {
         const propRow: any =
@@ -901,18 +974,7 @@ export default function AdminDashboardClient() {
         setLastOwnerContactAt(null);
       }
 
-      if (obraMaterialsRes.status === "fulfilled") {
-        if (obraMaterialsRes.value.error) {
-          setObraMaterialsTotal(0);
-          setObraPendingDeliveries(0);
-        } else {
-          const mats = (obraMaterialsRes.value.data ?? []) as ObraMaterialRow[];
-          const total = mats.reduce((acc, m) => acc + (m.unit_price ?? 0) * (m.quantity ?? 0), 0);
-          const pending = mats.filter((m) => (m.status ?? "") !== "entregue").length;
-          setObraMaterialsTotal(total);
-          setObraPendingDeliveries(pending);
-        }
-      }
+      // obra_materials/obra_workers/obra_worker_entries are handled above for net profit breakdown
 
       if (whatsRes.status === "fulfilled") {
         if (whatsRes.value.error) {
@@ -985,6 +1047,7 @@ export default function AdminDashboardClient() {
       setVgvValue(0);
       setObraMaterialsTotal(0);
       setObraPendingDeliveries(0);
+      setObraLaborTotal(0);
       setTrafficBySource({
         meta: 0,
         google: 0,
@@ -1105,6 +1168,9 @@ export default function AdminDashboardClient() {
               </div>
               <div className="mt-2 text-xs text-emerald-700">
                 Total {formatCurrencyBRL(grossInventoryValue)} • Comissão (5%) {formatCurrencyBRL(commissionValue)}
+              </div>
+              <div className="mt-2 text-[11px] font-semibold text-emerald-800/80">
+                Gastos: Materiais {formatCurrencyBRL(obraMaterialsTotal)} • Medição {formatCurrencyBRL(obraLaborTotal)}
               </div>
               <div className="mt-2 text-[11px] font-semibold text-emerald-800/80">
                 Inventário: {formatCurrencyBRL(grossPropertiesValue)} • Empreendimentos: {formatCurrencyBRL(grossDevelopmentsValue)}
@@ -1369,6 +1435,14 @@ export default function AdminDashboardClient() {
         </div>
 
         <div className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
+          <div className="text-sm font-medium text-slate-600">Obra: gastos (medição)</div>
+          <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
+            {formatCurrencyBRL(obraLaborTotal)}
+          </div>
+          <div className="mt-2 text-xs text-slate-500">Diárias + hora-homem (workers x entries)</div>
+        </div>
+
+        <div className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70 sm:col-span-2">
           <div className="text-sm font-medium text-slate-600">Obra: pendências de entrega</div>
           <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
             {obraPendingDeliveries}

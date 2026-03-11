@@ -27,10 +27,11 @@ type ObraMaterialRow = {
   status: MaterialStatus;
   unit_price: number | null;
   quantity: number | null;
+  unit?: string | null;
   created_at?: string;
 };
 
-type WorkerRole = "pedreiro" | "reformador" | "outro";
+type WorkerRole = "pedreiro" | "reformador" | "pintor" | "outro";
 
 type ObraWorkerRow = {
   id: string;
@@ -60,6 +61,7 @@ type MaterialsForm = {
   status: MaterialStatus;
   unit_price: string;
   quantity: string;
+  unit: "un" | "m2" | "l";
 };
 
 type WorkerForm = {
@@ -135,6 +137,7 @@ export default function ObrasAdminPage() {
     status: "cotado",
     unit_price: "",
     quantity: "",
+    unit: "un",
   });
 
   const [workers, setWorkers] = useState<ObraWorkerRow[]>([]);
@@ -179,10 +182,23 @@ export default function ObrasAdminPage() {
     setIsMaterialsLoading(true);
 
     try {
-      const res = await (supabase as any)
+      let res = await (supabase as any)
         .from("obra_materials")
-        .select("id, name, vendor, status, unit_price, quantity, created_at")
+        .select("id, name, vendor, status, unit_price, quantity, unit, created_at")
         .order("created_at", { ascending: false });
+
+      if (res.error) {
+        const msg = String((res.error as any)?.message ?? "");
+        const isColumnNotFound = /column\s+\"?unit\"?\s+does\s+not\s+exist|column\s+unit\s+not\s+found/i.test(msg);
+        const code = (res.error as any)?.code;
+        const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
+        if (isColumnNotFound || isSchemaMismatch) {
+          res = await (supabase as any)
+            .from("obra_materials")
+            .select("id, name, vendor, status, unit_price, quantity, created_at")
+            .order("created_at", { ascending: false });
+        }
+      }
 
       if (res.error) {
         setErrorMessage(res.error.message);
@@ -281,7 +297,7 @@ export default function ObrasAdminPage() {
     setIsMaterialSaving(true);
 
     try {
-      const payload = {
+      const payloadBase = {
         id: crypto.randomUUID(),
         name: materialsForm.name.trim(),
         vendor: materialsForm.vendor.trim() || null,
@@ -290,9 +306,28 @@ export default function ObrasAdminPage() {
         quantity: qty,
       };
 
-      const { error } = await (supabase as any).from("obra_materials").insert(payload);
-      if (error) {
-        setErrorMessage(error.message);
+      const payloadAttempts: Array<any> = [
+        { ...payloadBase, unit: materialsForm.unit },
+        payloadBase,
+      ];
+
+      let lastError: any = null;
+      for (const payload of payloadAttempts) {
+        const { error } = await (supabase as any).from("obra_materials").insert(payload);
+        if (!error) {
+          lastError = null;
+          break;
+        }
+        lastError = error;
+        const msg = String((error as any)?.message ?? "");
+        const isColumnNotFound = /column\s+\"?unit\"?\s+does\s+not\s+exist|column\s+unit\s+not\s+found/i.test(msg);
+        const code = (error as any)?.code;
+        const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
+        if (!isColumnNotFound && !isSchemaMismatch) break;
+      }
+
+      if (lastError) {
+        setErrorMessage(lastError.message);
         return;
       }
 
@@ -302,6 +337,7 @@ export default function ObrasAdminPage() {
         status: "cotado",
         unit_price: "",
         quantity: "",
+        unit: "un",
       });
 
       await loadMaterials();
@@ -310,6 +346,19 @@ export default function ObrasAdminPage() {
     } finally {
       setIsMaterialSaving(false);
     }
+  }
+
+  function unitLabel(unit: string | null | undefined) {
+    const u = String(unit ?? "").toLowerCase();
+    if (u === "m2") return "m²";
+    if (u === "l") return "L";
+    return "un";
+  }
+
+  function unitOptionLabel(unit: MaterialsForm["unit"]) {
+    if (unit === "m2") return "m²";
+    if (unit === "l") return "Litros";
+    return "Unidades";
   }
 
   async function updateMaterialStatus(id: string, status: MaterialStatus) {
@@ -475,8 +524,8 @@ export default function ObrasAdminPage() {
   return (
     <div className="flex w-full flex-col gap-8">
       <header className="flex flex-col gap-2">
-        <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">OBRAS & ENGENHARIA</div>
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Controle de Obra</h1>
+        <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">GASTOS DA IMOBILIÁRIA</div>
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Controle de Gastos</h1>
         <p className="text-sm leading-relaxed text-slate-600">
           Materiais, medição de equipe e pendências. Operação leve, sem Auth, com render estável.
         </p>
@@ -646,7 +695,9 @@ export default function ObrasAdminPage() {
                             </span>
                           </td>
                           <td className="px-5 py-4 text-right text-sm text-slate-700">{formatCurrencyBRL(unit)}</td>
-                          <td className="px-5 py-4 text-right text-sm text-slate-700">{qty}</td>
+                          <td className="px-5 py-4 text-right text-sm text-slate-700">
+                            {m.quantity != null ? `${qty} ${unitLabel(m.unit ?? null)}` : "-"}
+                          </td>
                           <td className="px-5 py-4 text-right text-sm font-semibold text-slate-900">{formatCurrencyBRL(total)}</td>
                           <td className="px-5 py-4">
                             <div className="flex justify-end gap-2">
@@ -886,12 +937,25 @@ export default function ObrasAdminPage() {
 
                 <label className="flex flex-col gap-2">
                   <span className="text-xs font-semibold tracking-wide text-slate-600">Quantidade</span>
-                  <input
-                    value={materialsForm.quantity}
-                    onChange={(e) => setMaterialsForm((s) => ({ ...s, quantity: e.target.value }))}
-                    className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                    placeholder="1"
-                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      value={materialsForm.quantity}
+                      onChange={(e) => setMaterialsForm((s) => ({ ...s, quantity: e.target.value }))}
+                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
+                      placeholder="1"
+                    />
+                    <select
+                      value={materialsForm.unit}
+                      onChange={(e) => setMaterialsForm((s) => ({ ...s, unit: e.target.value as MaterialsForm["unit"] }))}
+                      className="h-11 rounded-xl bg-white px-3 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
+                      title="Unidade"
+                      aria-label="Unidade"
+                    >
+                      <option value="un">{unitOptionLabel("un")}</option>
+                      <option value="m2">{unitOptionLabel("m2")}</option>
+                      <option value="l">{unitOptionLabel("l")}</option>
+                    </select>
+                  </div>
                 </label>
 
                 <label className="flex flex-col gap-2 md:col-span-2">
@@ -977,6 +1041,7 @@ export default function ObrasAdminPage() {
                   >
                     <option value="pedreiro">Pedreiro</option>
                     <option value="reformador">Reformador</option>
+                    <option value="pintor">Pintor</option>
                     <option value="outro">Outro</option>
                   </select>
                 </label>
