@@ -935,7 +935,7 @@ export default function AvaliacoesAdminPage() {
 
       const updateRes = await (supabase as any)
         .from("property_appraisals")
-        .update({ status: "publicado", published_property_id: propertyId })
+        .update({ published_property_id: propertyId })
         .eq("id", appraisal.id);
 
       if (updateRes.error) {
