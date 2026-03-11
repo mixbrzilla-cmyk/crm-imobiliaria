@@ -634,33 +634,69 @@ export default function AdminDashboardClient() {
           })(),
 
           // Relatório de direcionamento (posse)
-          (() => {
-            const q = supabase
-              .from("properties")
-              .select(`id, title, neighborhood, city, ${propertiesBrokerColumn}, data_direcionamento, updated_at, created_at`)
-              .not(propertiesBrokerColumn, "is", null)
-              .order("data_direcionamento", { ascending: false, nullsFirst: false })
-              .limit(50);
-            return propertiesHasDeletedAt ? q.is("deleted_at", null) : q;
+          // Relatório de direcionamento (posse)
+          // (busca completa; tenta assigned_broker_id e faz fallback para broker_id/corretor_id conforme schema)
+          (async () => {
+            const columns: Array<"assigned_broker_id" | "broker_id" | "corretor_id"> = [
+              "assigned_broker_id",
+              "broker_id",
+              "corretor_id",
+            ];
+
+            for (const col of columns) {
+              const base = (supabase as any)
+                .from("properties")
+                .select(`id, title, neighborhood, city, ${col}, data_direcionamento, updated_at, created_at`)
+                .not(col, "is", null);
+
+              const q = propertiesHasDeletedAt ? base.is("deleted_at", null) : base;
+              const res = await q.order("data_direcionamento", { ascending: false, nullsFirst: false }).limit(5000);
+              const msg = String(res?.error?.message ?? "");
+              const code = (res?.error as any)?.code;
+              const isAssignColMissing = new RegExp(
+                `column\\s+\\"?${col}\\"?\\s+does\\s+not\\s+exist|${col}\\s+not\\s+found`,
+                "i",
+              ).test(msg);
+              const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
+              if (res?.error && (isAssignColMissing || isSchemaMismatch)) continue;
+              return { res, col };
+            }
+
+            return { res: { data: [], error: null }, col: "corretor_id" as const };
           })(),
 
           // Relatório de direcionamento (posse) - developments
-          (() => {
-            const base = (supabase as any)
-              .from("developments")
-              .select("*")
-              .not(developmentsBrokerColumn, "is", null)
-              .limit(50);
+          (async () => {
+            const columns: Array<"assigned_broker_id" | "broker_id" | "corretor_id"> = [
+              "assigned_broker_id",
+              "broker_id",
+              "corretor_id",
+            ];
 
-            return (async () => {
+            for (const col of columns) {
+              const base = (supabase as any)
+                .from("developments")
+                .select(`id, name, title, neighborhood, bairro, localidade, city, cidade, ${col}, data_direcionamento, updated_at, created_at`)
+                .not(col, "is", null);
+
               const q = developmentsHasDeletedAt ? base.is("deleted_at", null) : base;
-
-              let res = await q.order("created_at", { ascending: false });
+              let res = await q.order("updated_at", { ascending: false }).limit(5000);
               if (res?.error) {
-                res = await q.order("id", { ascending: false });
+                res = await q.order("created_at", { ascending: false }).limit(5000);
               }
-              return res;
-            })();
+
+              const msg = String(res?.error?.message ?? "");
+              const code = (res?.error as any)?.code;
+              const isAssignColMissing = new RegExp(
+                `column\\s+\\"?${col}\\"?\\s+does\\s+not\\s+exist|${col}\\s+not\\s+found`,
+                "i",
+              ).test(msg);
+              const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
+              if (res?.error && (isAssignColMissing || isSchemaMismatch)) continue;
+              return { res, col };
+            }
+
+            return { res: { data: [], error: null }, col: "corretor_id" as const };
           })(),
 
           // Jurídico (status do escritório)
@@ -752,17 +788,21 @@ export default function AdminDashboardClient() {
       setAssignedImoveisCount(assignedCount);
       setUnassignedImoveisCount(unassignedCount);
 
-      const unionRows: DirecionamentoUnionRow[] = [];
+      const unionMap = new Map<string, DirecionamentoUnionRow>();
 
       if (direcionamentosRes.status === "fulfilled") {
-        if (direcionamentosRes.value.error) {
-          console.log("[Dashboard] Erro ao carregar direcionamentos properties:", direcionamentosRes.value.error);
+        const payload: any = direcionamentosRes.value;
+        if (payload?.res?.error) {
+          console.log("[Dashboard] Erro ao carregar direcionamentos properties:", payload.res.error);
         } else {
-          const data = (direcionamentosRes.value.data ?? []) as Array<any>;
+          const col = (payload?.col ?? propertiesBrokerColumn) as string;
+          const data = (payload?.res?.data ?? []) as Array<any>;
           for (const r of data) {
-            const corretor_id = (r as any)?.[propertiesBrokerColumn] ?? null;
-            unionRows.push({
-              id: String(r?.id ?? crypto.randomUUID()),
+            const corretor_id = (r as any)?.[col] ?? null;
+            const id = String(r?.id ?? "");
+            if (!id) continue;
+            unionMap.set(`properties:${id}`, {
+              id,
               title: (r?.title ?? null) as string | null,
               neighborhood: (r?.neighborhood ?? null) as string | null,
               city: (r?.city ?? null) as string | null,
@@ -777,19 +817,23 @@ export default function AdminDashboardClient() {
       }
 
       if (direcionamentosDevsRes.status === "fulfilled") {
-        if (direcionamentosDevsRes.value.error) {
-          console.log("[Dashboard] Erro ao carregar direcionamentos developments:", direcionamentosDevsRes.value.error);
+        const payload: any = direcionamentosDevsRes.value;
+        if (payload?.res?.error) {
+          console.log("[Dashboard] Erro ao carregar direcionamentos developments:", payload.res.error);
         } else {
-          const data = (direcionamentosDevsRes.value.data ?? []) as Array<any>;
+          const col = (payload?.col ?? developmentsBrokerColumn) as string;
+          const data = (payload?.res?.data ?? []) as Array<any>;
           for (const r of data) {
-            const corretor_id = (r as any)?.[developmentsBrokerColumn] ?? null;
-            unionRows.push({
-              id: String(r?.id ?? crypto.randomUUID()),
+            const corretor_id = (r as any)?.[col] ?? null;
+            const id = String(r?.id ?? "");
+            if (!id) continue;
+            unionMap.set(`developments:${id}`, {
+              id,
               title: (String(r?.name ?? r?.title ?? "").trim() || null) as string | null,
               neighborhood: (r?.localidade ?? r?.bairro ?? r?.neighborhood ?? null) as string | null,
               city: (r?.city ?? r?.cidade ?? null) as string | null,
               corretor_id: corretor_id ? String(corretor_id) : null,
-              data_direcionamento: null,
+              data_direcionamento: (r?.data_direcionamento ?? null) as string | null,
               updated_at: (r?.updated_at ?? null) as string | null,
               created_at: (r?.created_at ?? null) as string | null,
               source: "developments",
@@ -797,6 +841,8 @@ export default function AdminDashboardClient() {
           }
         }
       }
+
+      const unionRows = Array.from(unionMap.values());
 
       if (unionRows.length > 0) {
         const brokerIds = Array.from(
@@ -814,12 +860,6 @@ export default function AdminDashboardClient() {
 
         const view = unionRows
           .filter((r) => Boolean(r.corretor_id))
-          .sort((a, b) => {
-            const aKey = a.data_direcionamento ?? a.updated_at ?? a.created_at ?? "";
-            const bKey = b.data_direcionamento ?? b.updated_at ?? b.created_at ?? "";
-            return bKey.localeCompare(aKey);
-          })
-          .slice(0, 50)
           .map((r) => {
             const brokerId = r.corretor_id ?? "";
             const brokerName = (profilesById.get(brokerId)?.full_name ?? "").trim() || brokerId;
@@ -834,6 +874,12 @@ export default function AdminDashboardClient() {
               directedAtIso: directedAt,
               directedTs,
             };
+          })
+          .sort((a, b) => {
+            const aElapsed = a.directedAtIso ? nowTick - a.directedTs : -1;
+            const bElapsed = b.directedAtIso ? nowTick - b.directedTs : -1;
+            if (aElapsed === bElapsed) return 0;
+            return bElapsed - aElapsed;
           });
 
         setDirecionamentos(view);
@@ -1420,7 +1466,7 @@ export default function AdminDashboardClient() {
           </div>
         </div>
 
-        <div className="mt-5 overflow-x-auto">
+        <div className="mt-5 max-h-[520px] overflow-auto rounded-xl ring-1 ring-slate-200/70">
           <table className="min-w-full border-separate border-spacing-0">
             <thead>
               <tr className="bg-slate-50">
