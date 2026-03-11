@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -72,9 +73,17 @@ export default function LoginPage() {
     <div className="min-h-screen bg-white px-6 py-12">
       <div className="mx-auto flex w-full max-w-md flex-col gap-8">
         <header className="flex flex-col gap-2">
-          <h1 className="text-3xl font-semibold tracking-tight text-[#1e3a8a]">
-            Entrar
-          </h1>
+          <div className="flex items-center justify-center">
+            <Image
+              src="/imobiliaria-moderna-logo.png"
+              alt="Imobiliária Moderna"
+              width={240}
+              height={80}
+              priority
+              className="h-14 w-auto"
+            />
+          </div>
+          <h1 className="text-3xl font-semibold tracking-tight text-[color:var(--imob-navy)]">Entrar</h1>
           <p className="text-sm text-zinc-600">
             Acesse o CRM com seu e-mail e senha.
           </p>
@@ -82,9 +91,9 @@ export default function LoginPage() {
 
         <form onSubmit={onSubmit} className="flex flex-col gap-5">
           <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-[#1e3a8a]">E-mail</span>
+            <span className="text-sm font-medium text-[color:var(--imob-navy)]">E-mail</span>
             <input
-              className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-zinc-900 outline-none focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/20"
+              className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-zinc-900 outline-none focus:border-[color:var(--imob-navy)] focus:ring-2 focus:ring-[color:var(--imob-navy)]/20"
               value={form.email}
               onChange={(e) => setForm((s) => ({ ...s, email: e.target.value }))}
               name="email"
@@ -95,9 +104,9 @@ export default function LoginPage() {
           </label>
 
           <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-[#1e3a8a]">Senha</span>
+            <span className="text-sm font-medium text-[color:var(--imob-navy)]">Senha</span>
             <input
-              className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-zinc-900 outline-none focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/20"
+              className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-zinc-900 outline-none focus:border-[color:var(--imob-navy)] focus:ring-2 focus:ring-[color:var(--imob-navy)]/20"
               value={form.password}
               onChange={(e) => setForm((s) => ({ ...s, password: e.target.value }))}
               name="password"
@@ -116,14 +125,14 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="inline-flex h-12 items-center justify-center rounded-lg bg-[#1e3a8a] px-5 text-base font-semibold text-white transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-12 items-center justify-center rounded-lg bg-[color:var(--imob-navy)] px-5 text-base font-semibold text-white transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSubmitting ? "Entrando..." : "Entrar"}
           </button>
 
           <div className="text-sm text-zinc-600">
             Não tem conta?{" "}
-            <Link className="font-semibold text-[#dc2626] hover:underline" href="/cadastro">
+            <Link className="font-semibold text-[color:var(--imob-red)] hover:underline" href="/cadastro">
               Solicitar acesso
             </Link>
           </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
@@ -66,7 +67,17 @@ export default function CorretorHomePage() {
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
-        <div className="text-sm font-semibold text-[color:var(--imob-navy)]">Portal do Corretor</div>
+        <div className="flex items-center gap-3">
+          <Image
+            src="/imobiliaria-moderna-logo.png"
+            alt="Imobiliária Moderna"
+            width={160}
+            height={44}
+            priority
+            className="h-9 w-auto"
+          />
+          <div className="text-sm font-semibold text-[color:var(--imob-navy)]">Portal do Corretor</div>
+        </div>
         <div className="text-xs text-zinc-500">{profile?.full_name ?? ""}</div>
       </header>
 

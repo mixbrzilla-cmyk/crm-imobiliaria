@@ -41,6 +41,7 @@ type DirecionamentoRow = {
   city: string | null;
   corretor_id: string | null;
   data_direcionamento: string | null;
+  updated_at?: string | null;
   created_at?: string | null;
 };
 
@@ -51,6 +52,7 @@ type DirecionamentoUnionRow = {
   city: string | null;
   corretor_id: string | null;
   data_direcionamento: string | null;
+  updated_at?: string | null;
   created_at?: string | null;
   source: "properties" | "developments";
 };
@@ -60,7 +62,7 @@ type DirecionamentoViewRow = {
   brokerName: string;
   propertyLabel: string;
   directedAtIso: string;
-  daysSince: number;
+  directedTs: number;
 };
 
 type TopProperty = {
@@ -228,6 +230,25 @@ function formatDaysSinceLabel(days: number) {
   return `Há ${days} dias`;
 }
 
+function formatElapsedLabel(ms: number) {
+  if (!Number.isFinite(ms) || ms < 0) return "-";
+  const mins = Math.floor(ms / (60 * 1000));
+  if (mins <= 0) return "Agora";
+  if (mins < 60) return `Há ${mins} min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `Há ${hours} hora${hours === 1 ? "" : "s"}`;
+  const days = Math.floor(hours / 24);
+  return formatDaysSinceLabel(days);
+}
+
+function timeToneClass(ms: number) {
+  if (!Number.isFinite(ms) || ms < 0) return "text-slate-700";
+  const hours = ms / (60 * 60 * 1000);
+  if (hours >= 96) return "text-red-700";
+  if (hours >= 48) return "text-amber-700";
+  return "text-emerald-700";
+}
+
 function normalizeLeadSource(input: string | null): LeadSource {
   const value = (input ?? "").trim().toLowerCase();
   if (!value) return "outros";
@@ -349,6 +370,13 @@ export default function AdminDashboardClient() {
   const [ptamMonthAvgValue, setPtamMonthAvgValue] = useState<number>(0);
 
   const [direcionamentos, setDirecionamentos] = useState<DirecionamentoViewRow[]>([]);
+
+  const [nowTick, setNowTick] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTick(Date.now()), 60 * 1000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const [whatsActivityLines, setWhatsActivityLines] = useState<WhatsActivityLine[]>([]);
 
@@ -609,7 +637,7 @@ export default function AdminDashboardClient() {
           (() => {
             const q = supabase
               .from("properties")
-              .select(`id, title, neighborhood, city, ${propertiesBrokerColumn}, data_direcionamento, created_at`)
+              .select(`id, title, neighborhood, city, ${propertiesBrokerColumn}, data_direcionamento, updated_at, created_at`)
               .not(propertiesBrokerColumn, "is", null)
               .order("data_direcionamento", { ascending: false, nullsFirst: false })
               .limit(50);
@@ -740,6 +768,7 @@ export default function AdminDashboardClient() {
               city: (r?.city ?? null) as string | null,
               corretor_id: corretor_id ? String(corretor_id) : null,
               data_direcionamento: (r?.data_direcionamento ?? null) as string | null,
+              updated_at: (r?.updated_at ?? null) as string | null,
               created_at: (r?.created_at ?? null) as string | null,
               source: "properties",
             });
@@ -761,6 +790,7 @@ export default function AdminDashboardClient() {
               city: (r?.city ?? r?.cidade ?? null) as string | null,
               corretor_id: corretor_id ? String(corretor_id) : null,
               data_direcionamento: null,
+              updated_at: (r?.updated_at ?? null) as string | null,
               created_at: (r?.created_at ?? null) as string | null,
               source: "developments",
             });
@@ -782,12 +812,11 @@ export default function AdminDashboardClient() {
           }
         }
 
-        const nowTs = Date.now();
         const view = unionRows
           .filter((r) => Boolean(r.corretor_id))
           .sort((a, b) => {
-            const aKey = a.data_direcionamento ?? a.created_at ?? "";
-            const bKey = b.data_direcionamento ?? b.created_at ?? "";
+            const aKey = a.data_direcionamento ?? a.updated_at ?? a.created_at ?? "";
+            const bKey = b.data_direcionamento ?? b.updated_at ?? b.created_at ?? "";
             return bKey.localeCompare(aKey);
           })
           .slice(0, 50)
@@ -796,17 +825,14 @@ export default function AdminDashboardClient() {
             const brokerName = (profilesById.get(brokerId)?.full_name ?? "").trim() || brokerId;
             const loc = [r.neighborhood, r.city].filter(Boolean).join(" • ");
             const propertyLabel = (r.title ?? "").trim() || loc || r.id;
-            const directedAt = r.data_direcionamento ?? r.created_at ?? "";
+            const directedAt = r.data_direcionamento ?? r.updated_at ?? r.created_at ?? "";
             const directedTs = directedAt ? new Date(directedAt).getTime() : NaN;
-            const daysSince = Number.isFinite(directedTs)
-              ? Math.max(0, Math.floor((nowTs - directedTs) / (24 * 60 * 60 * 1000)))
-              : -1;
             return {
               id: r.id,
               brokerName,
               propertyLabel,
               directedAtIso: directedAt,
-              daysSince,
+              directedTs,
             };
           });
 
@@ -1426,8 +1452,13 @@ export default function AdminDashboardClient() {
                         ? new Date(r.directedAtIso).toLocaleDateString("pt-BR")
                         : "Aguardando registro"}
                     </td>
-                    <td className="px-4 py-3 text-sm font-semibold text-slate-900">
-                      {r.directedAtIso ? formatDaysSinceLabel(r.daysSince) : "-"}
+                    <td
+                      className={
+                        "px-4 py-3 text-sm font-semibold " +
+                        (r.directedAtIso ? timeToneClass(nowTick - r.directedTs) : "text-slate-900")
+                      }
+                    >
+                      {r.directedAtIso ? formatElapsedLabel(nowTick - r.directedTs) : "-"}
                     </td>
                   </tr>
                 ))
