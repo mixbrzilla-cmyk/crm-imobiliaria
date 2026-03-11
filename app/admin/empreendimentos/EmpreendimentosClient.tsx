@@ -503,9 +503,25 @@ export default function EmpreendimentosClient() {
 
     try {
       const query = (supabase as any).from("developments");
-      const res = selectedId
+      let res = selectedId
         ? await query.update(detailsPayload).eq("id", selectedId)
         : await query.insert(detailsPayload);
+
+      if (res.error) {
+        const code = (res.error as any)?.code;
+        if (code === "PGRST204" || code === "PGRST301") {
+          console.log("[Empreendimentos] Retry save with basePayload due to schema mismatch", {
+            code,
+            message: res.error.message,
+            details: (res.error as any)?.details,
+            hint: (res.error as any)?.hint,
+          });
+
+          res = selectedId
+            ? await query.update(basePayload).eq("id", selectedId)
+            : await query.insert(basePayload);
+        }
+      }
 
       if (res.error) throw res.error;
 
@@ -515,8 +531,15 @@ export default function EmpreendimentosClient() {
       await load();
       return;
     } catch (e) {
-      console.log("DEBUG SUPABASE:", e);
-      setErrorMessage("Não foi possível salvar o empreendimento agora.");
+      const errAny = e as any;
+      console.log("DEBUG SUPABASE:", errAny);
+      console.log("[Empreendimentos] save error", {
+        code: errAny?.code,
+        message: errAny?.message,
+        details: errAny?.details,
+        hint: errAny?.hint,
+      });
+      setErrorMessage(errAny?.message ? String(errAny.message) : "Não foi possível salvar o empreendimento agora.");
       setIsSaving(false);
     }
   }
