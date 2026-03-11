@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { MessageCircle, Plus, Trash2, X } from "lucide-react";
+import { CheckCircle2, MessageCircle, Plus, Trash2, X, XCircle } from "lucide-react";
 
 import { getSupabaseClient } from "@/lib/supabaseClient";
 
@@ -62,6 +62,19 @@ function statusBadge(status: string | null) {
   };
 }
 
+function approvalBadge(status: string | null) {
+  const s = (status ?? "").toLowerCase().trim();
+  const isActive = s === "ativo";
+  const isPending = !s || s === "pendente" || s === "aguardando";
+  if (isActive) {
+    return { label: "Ativo", cls: "bg-emerald-50 text-emerald-700 ring-emerald-200/70" };
+  }
+  if (isPending) {
+    return { label: "Pendente", cls: "bg-amber-50 text-amber-800 ring-amber-200/70" };
+  }
+  return { label: status ?? "-", cls: "bg-slate-100 text-slate-700 ring-slate-200/70" };
+}
+
 function initialsFromName(name: string) {
   const parts = (name ?? "")
     .trim()
@@ -95,6 +108,7 @@ export default function CorretoresAdminPage() {
   const [rows, setRows] = useState<BrokerRowView[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedBrokerId, setSelectedBrokerId] = useState<string | null>(null);
+  const [updatingApprovalId, setUpdatingApprovalId] = useState<string | null>(null);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createName, setCreateName] = useState("");
@@ -108,6 +122,30 @@ export default function CorretoresAdminPage() {
     if (!selectedBrokerId) return null;
     return rows.find((r) => r.id === selectedBrokerId) ?? null;
   }, [rows, selectedBrokerId]);
+
+  async function setBrokerApproval(brokerId: string, nextStatus: "ativo" | "recusado") {
+    setErrorMessage(null);
+    if (!supabase) {
+      setErrorMessage(
+        "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+      );
+      return;
+    }
+
+    setUpdatingApprovalId(brokerId);
+    try {
+      const { error } = await supabase.from("profiles").update({ status: nextStatus }).eq("id", brokerId);
+      if (error) {
+        setErrorMessage(error.message);
+        return;
+      }
+      await loadBaseData();
+    } catch {
+      setErrorMessage("Não foi possível atualizar o status do corretor agora.");
+    } finally {
+      setUpdatingApprovalId(null);
+    }
+  }
 
   const loadBaseData = useCallback(async () => {
     setIsLoading(true);
@@ -411,6 +449,9 @@ export default function CorretoresAdminPage() {
                 const hiddenCount = Math.max(0, r.assignedProperties.length - showTags.length);
                 const hasClicks = r.whatsClicks > 0;
                 const creciLabel = r.creci !== "-" ? `CRECI: ${r.creci}` : "CRECI: -";
+                const statusInfo = approvalBadge(r.statusLabel);
+                const canApprove = !r.isActive;
+                const isUpdatingApproval = updatingApprovalId === r.id;
 
                 return (
                   <div
@@ -433,6 +474,16 @@ export default function CorretoresAdminPage() {
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-base font-semibold text-slate-900">{r.full_name}</div>
                         <div className="mt-1 truncate text-xs font-semibold text-slate-500">{creciLabel}</div>
+                        <div className="mt-2">
+                          <span
+                            className={
+                              "inline-flex items-center justify-center rounded-full px-3 py-1 text-[11px] font-semibold ring-1 " +
+                              statusInfo.cls
+                            }
+                          >
+                            {statusInfo.label}
+                          </span>
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-2">
@@ -457,6 +508,29 @@ export default function CorretoresAdminPage() {
                         </button>
                       </div>
                     </div>
+
+                    {canApprove ? (
+                      <div className="mt-4 grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void setBrokerApproval(r.id, "ativo")}
+                          disabled={isUpdatingApproval}
+                          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm transition-all duration-300 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <CheckCircle2 className="h-4 w-4" />
+                          {isUpdatingApproval ? "Aprovando..." : "Aprovar"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void setBrokerApproval(r.id, "recusado")}
+                          disabled={isUpdatingApproval}
+                          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 text-sm font-semibold text-white shadow-sm transition-all duration-300 hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <XCircle className="h-4 w-4" />
+                          {isUpdatingApproval ? "Recusando..." : "Recusar"}
+                        </button>
+                      </div>
+                    ) : null}
 
                     <div className="mt-5 flex items-center justify-between gap-4">
                       <div className="inline-flex items-center gap-2 rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70">

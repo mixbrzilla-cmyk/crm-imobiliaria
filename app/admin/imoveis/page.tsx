@@ -136,6 +136,8 @@ type BrokerProfile = {
 export default function InventarioImoveisPage() {
   const supabase = useMemo(() => getSupabaseClient(), []);
 
+  const [propertiesBrokerColumn, setPropertiesBrokerColumn] = useState<"corretor_id" | "broker_id">("corretor_id");
+
   const [activeTab, setActiveTab] = useState<TabKey>("basicos");
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -195,10 +197,11 @@ export default function InventarioImoveisPage() {
     }
 
     try {
+      const brokerCol = propertiesBrokerColumn;
       const { data, error } = await supabase
         .from("properties")
         .select(
-          "id, title, property_type, purpose, price, is_premium, corretor_id, data_direcionamento, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description, created_at",
+          `id, title, property_type, purpose, price, is_premium, ${brokerCol}, data_direcionamento, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description, created_at`,
         )
         .order("created_at", { ascending: false });
 
@@ -208,13 +211,14 @@ export default function InventarioImoveisPage() {
         return;
       }
 
-      setRows((data ?? []) as PropertyRow[]);
+      setRows((data ?? []) as any);
     } catch {
       try {
+        const brokerCol = propertiesBrokerColumn;
         const { data, error } = await supabase
           .from("properties")
           .select(
-            "id, title, property_type, purpose, price, is_premium, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description, created_at",
+            `id, title, property_type, purpose, price, is_premium, ${brokerCol}, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description, created_at`,
           )
           .order("created_at", { ascending: false });
         if (error) {
@@ -222,7 +226,7 @@ export default function InventarioImoveisPage() {
           setErrorMessage(error.message);
           return;
         }
-        setRows((data ?? []) as PropertyRow[]);
+        setRows((data ?? []) as any);
       } catch {
         setRows([]);
         setErrorMessage("Não foi possível carregar o inventário agora.");
@@ -277,6 +281,25 @@ export default function InventarioImoveisPage() {
     void loadBrokers();
   }, []);
 
+  useEffect(() => {
+    if (!supabase) return;
+
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const test = await (supabase as any).from("properties").select("id, broker_id").limit(1);
+        if (!test.error) {
+          setPropertiesBrokerColumn("broker_id");
+        } else {
+          setPropertiesBrokerColumn("corretor_id");
+        }
+      } catch {
+        setPropertiesBrokerColumn("corretor_id");
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [supabase]);
+
   async function updateCorretorInline(rowId: string, brokerId: string) {
     setErrorMessage(null);
 
@@ -290,13 +313,13 @@ export default function InventarioImoveisPage() {
     const nextBrokerId = brokerId || null;
     const nowIso = nextBrokerId ? new Date().toISOString() : null;
 
-    const payload = { corretor_id: nextBrokerId, data_direcionamento: nowIso };
+    const payload = { [propertiesBrokerColumn]: nextBrokerId, data_direcionamento: nowIso } as any;
     console.log("[Inventário] Salvando corretor/data_direcionamento", { rowId, payload });
 
     setUpdatingFieldByRowId((c) => ({ ...c, [rowId]: "corretor" }));
     setRows((current) =>
-      current.map((r) =>
-        r.id === rowId ? { ...r, corretor_id: nextBrokerId, data_direcionamento: nowIso } : r,
+      current.map((r: any) =>
+        r.id === rowId ? { ...r, [propertiesBrokerColumn]: nextBrokerId, data_direcionamento: nowIso } : r,
       ),
     );
 
@@ -469,7 +492,7 @@ export default function InventarioImoveisPage() {
       property_type: form.property_type.trim() ? form.property_type.trim() : null,
       purpose: form.purpose,
       price: parseBRLInputToNumber(form.price),
-      corretor_id: form.corretor_id.trim() ? form.corretor_id.trim() : null,
+      [propertiesBrokerColumn]: form.corretor_id.trim() ? form.corretor_id.trim() : null,
       is_premium: form.is_premium,
       neighborhood: form.neighborhood.trim() ? form.neighborhood.trim() : null,
       city: form.city.trim() ? form.city.trim() : null,
@@ -482,7 +505,7 @@ export default function InventarioImoveisPage() {
       tour_url: form.tour_url.trim() ? form.tour_url.trim() : null,
       status: form.status,
       description: form.description.trim() ? form.description.trim() : null,
-    };
+    } as any;
 
     try {
       const query = (supabase as any).from("properties");
@@ -499,7 +522,7 @@ export default function InventarioImoveisPage() {
     } catch {
       try {
         const retryPayload: any = { ...payload };
-        delete retryPayload.corretor_id;
+        delete retryPayload[propertiesBrokerColumn];
         const query = (supabase as any).from("properties");
         const { error } = selectedId
           ? await query.update(retryPayload).eq("id", selectedId)
@@ -997,6 +1020,28 @@ export default function InventarioImoveisPage() {
                           className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 shadow-sm ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#2b6cff]/30"
                           placeholder="Ex: Moinhos de Vento"
                         />
+                      </label>
+
+                      <label className="flex flex-col gap-2">
+                        <span className="text-xs font-semibold tracking-wide text-slate-600">Corretor</span>
+                        <select
+                          value={form.corretor_id}
+                          onChange={(e) => setForm((s) => ({ ...s, corretor_id: e.target.value }))}
+                          className="h-11 rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#2b6cff]/30"
+                        >
+                          <option value="">Sem corretor</option>
+                          {brokers.length === 0 ? (
+                            <option value="" disabled>
+                              Nenhum corretor ativo encontrado
+                            </option>
+                          ) : (
+                            brokers.map((b) => (
+                              <option key={b.id} value={b.id}>
+                                {b.full_name ?? b.id}
+                              </option>
+                            ))
+                          )}
+                        </select>
                       </label>
                     </>
                   ) : null}
