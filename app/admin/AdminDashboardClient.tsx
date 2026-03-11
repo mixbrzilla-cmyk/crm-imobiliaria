@@ -121,6 +121,8 @@ type AppraisalAggRow = {
 
 type LeadStageBucket = "entrada" | "atendimento" | "visita" | "contrato";
 
+type LeadFunnel5Stage = "recebido" | "contato" | "visita" | "proposta" | "fechado";
+
 type WhatsActivityLine = {
   brokerName: string;
   leadLabel: string;
@@ -134,6 +136,39 @@ function formatCurrencyBRL(value: number) {
     currency: "BRL",
     maximumFractionDigits: 0,
   });
+}
+
+function LeadsFunnel5({ counts }: { counts: Record<LeadFunnel5Stage, number> }) {
+  const items: Array<{ key: LeadFunnel5Stage; label: string; cls: string }> = [
+    { key: "recebido", label: "Lead Recebido", cls: "bg-sky-50 text-sky-800 ring-sky-200/70" },
+    { key: "contato", label: "Contato", cls: "bg-amber-50 text-amber-900 ring-amber-200/70" },
+    { key: "visita", label: "Visita", cls: "bg-violet-50 text-violet-800 ring-violet-200/70" },
+    { key: "proposta", label: "Proposta", cls: "bg-indigo-50 text-indigo-800 ring-indigo-200/70" },
+    { key: "fechado", label: "Fechado", cls: "bg-emerald-50 text-emerald-800 ring-emerald-200/70" },
+  ];
+
+  const max = Math.max(1, ...items.map((i) => counts[i.key] ?? 0));
+  return (
+    <div className="mt-4 flex flex-col gap-2">
+      {items.map((i) => {
+        const value = counts[i.key] ?? 0;
+        const width = Math.max(12, Math.round((value / max) * 100));
+        return (
+          <div key={i.key} className="flex items-center gap-3">
+            <div className={"w-32 rounded-full px-3 py-1 text-xs font-semibold ring-1 " + i.cls}>
+              {i.label}
+            </div>
+            <div className="flex-1">
+              <div className="h-3 w-full rounded-full bg-slate-100 ring-1 ring-slate-200/70">
+                <div className="h-3 rounded-full bg-slate-900/70" style={{ width: `${width}%` }} />
+              </div>
+            </div>
+            <div className="w-10 text-right text-xs font-semibold text-slate-900">{value}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function safeObject(value: any) {
@@ -167,6 +202,17 @@ function bucketFromLeadStage(stage: string | null | undefined): LeadStageBucket 
   if (s === "contrato" || s === "vendido") return "contrato";
   if (s === "atendimento" || s === "proposta") return "atendimento";
   return "entrada";
+}
+
+function bucketFromLeadStage5(stage: string | null | undefined): LeadFunnel5Stage {
+  const s = String(stage ?? "").trim().toLowerCase();
+  if (!s) return "recebido";
+  if (s === "visita") return "visita";
+  if (s === "proposta" || s === "contrato") return "proposta";
+  if (s === "vendido") return "fechado";
+  if (s === "qualificado" || s === "atendimento") return "contato";
+  if (s === "recebido") return "recebido";
+  return "recebido";
 }
 
 function purposeBadge(purpose: string) {
@@ -342,6 +388,14 @@ export default function AdminDashboardClient() {
     contrato: 0,
   });
 
+  const [leadFunnel5, setLeadFunnel5] = useState<Record<LeadFunnel5Stage, number>>({
+    recebido: 0,
+    contato: 0,
+    visita: 0,
+    proposta: 0,
+    fechado: 0,
+  });
+
   const [legalRiskCounts, setLegalRiskCounts] = useState<{ verde: number; amarelo: number; vermelho: number }>({
     verde: 0,
     amarelo: 0,
@@ -403,6 +457,7 @@ export default function AdminDashboardClient() {
       setDirecionamentos([]);
       setDirecionamentosError(null);
       setLeadFunnel({ entrada: 0, atendimento: 0, visita: 0, contrato: 0 });
+      setLeadFunnel5({ recebido: 0, contato: 0, visita: 0, proposta: 0, fechado: 0 });
       setLegalRiskCounts({ verde: 0, amarelo: 0, vermelho: 0 });
       setPtamMonthCount(0);
       setPtamMonthAvgValue(0);
@@ -869,6 +924,7 @@ export default function AdminDashboardClient() {
             outros: 0,
           });
           setLeadFunnel({ entrada: 0, atendimento: 0, visita: 0, contrato: 0 });
+          setLeadFunnel5({ recebido: 0, contato: 0, visita: 0, proposta: 0, fechado: 0 });
         } else {
           const leads = (leadsRes.value.data ?? []) as LeadRow[];
           const bySource: Record<LeadSource, number> = {
@@ -887,6 +943,14 @@ export default function AdminDashboardClient() {
             contrato: 0,
           };
 
+          const funnel5: Record<LeadFunnel5Stage, number> = {
+            recebido: 0,
+            contato: 0,
+            visita: 0,
+            proposta: 0,
+            fechado: 0,
+          };
+
           let todayCount = 0;
           for (const lead of leads) {
             const createdAt = lead.created_at ? new Date(lead.created_at) : null;
@@ -897,11 +961,14 @@ export default function AdminDashboardClient() {
               );
               if (daysSince >= 0 && daysSince < 7) leadsDailyBuckets[daysSince] += 1;
             }
-            const normalized = normalizeLeadSource(lead.source);
-            bySource[normalized] += 1;
+            const s = normalizeLeadSource(lead.source ?? null);
+            bySource[s] += 1;
 
-            const bucket = bucketFromLeadStage(lead.stage ?? null);
+            const bucket = bucketFromLeadStage(lead.stage);
             funnel[bucket] += 1;
+
+            const bucket5 = bucketFromLeadStage5(lead.stage);
+            funnel5[bucket5] += 1;
           }
 
           setLeadsTodayCount(todayCount);
@@ -909,6 +976,7 @@ export default function AdminDashboardClient() {
           setLeadsWeekTrend(leadsDailyBuckets);
           setTrafficBySource(bySource);
           setLeadFunnel(funnel);
+          setLeadFunnel5(funnel5);
         }
       }
 
@@ -1194,6 +1262,7 @@ export default function AdminDashboardClient() {
       setWhatsActivityLines([]);
       setDirecionamentos([]);
       setLeadFunnel({ entrada: 0, atendimento: 0, visita: 0, contrato: 0 });
+      setLeadFunnel5({ recebido: 0, contato: 0, visita: 0, proposta: 0, fechado: 0 });
       setLegalRiskCounts({ verde: 0, amarelo: 0, vermelho: 0 });
       setPtamMonthCount(0);
       setPtamMonthAvgValue(0);
@@ -1512,11 +1581,11 @@ export default function AdminDashboardClient() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="text-sm font-medium text-slate-600">Funil de Leads</div>
-              <div className="mt-1 text-xs text-slate-500">Entrada → Atendimento → Visita → Contrato</div>
+              <div className="mt-1 text-xs text-slate-500">Lead Recebido → Contato → Visita → Proposta → Fechado</div>
             </div>
             <Users className="h-6 w-6 text-sky-700" />
           </div>
-          <LeadsFunnel counts={leadFunnel} />
+          <LeadsFunnel5 counts={leadFunnel5} />
         </div>
 
         <div className="rounded-2xl bg-gradient-to-br from-emerald-50 via-white to-emerald-50 p-6 shadow-sm ring-1 ring-emerald-200/70 border-l-4 border-l-emerald-500">

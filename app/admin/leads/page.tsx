@@ -41,6 +41,28 @@ type LeadRow = {
   created_at?: string;
 };
 
+type CustomerPreferencesRow = {
+  lead_id: string;
+  tipo_imovel: string | null;
+  valor_max: number | null;
+  quartos: number | null;
+  bairro: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+type PropertySuggestionRow = {
+  id: string;
+  title: string | null;
+  property_type: string | null;
+  purpose: string | null;
+  price: number | null;
+  neighborhood: string | null;
+  city: string | null;
+  bedrooms: number | null;
+  status: string | null;
+};
+
 type LeadEventRow = {
   id: string;
   lead_id: string;
@@ -174,6 +196,15 @@ export default function LeadsAdminPage() {
   const [selectedLead, setSelectedLead] = useState<LeadRow | null>(null);
   const [leadHistory, setLeadHistory] = useState<LeadEventRow[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+
+  const [preferences, setPreferences] = useState<CustomerPreferencesRow | null>(null);
+  const [preferencesError, setPreferencesError] = useState<string | null>(null);
+  const [isPreferencesLoading, setIsPreferencesLoading] = useState(false);
+  const [isPreferencesSaving, setIsPreferencesSaving] = useState(false);
+
+  const [suggestions, setSuggestions] = useState<PropertySuggestionRow[]>([]);
+  const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
+  const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(false);
 
   const [dispatchBrokerId, setDispatchBrokerId] = useState<string>("");
   const [isDispatching, setIsDispatching] = useState(false);
@@ -578,6 +609,14 @@ export default function LeadsAdminPage() {
     setLeadHistory([]);
     setErrorMessage(null);
 
+    setPreferences(null);
+    setPreferencesError(null);
+    setIsPreferencesLoading(false);
+
+    setSuggestions([]);
+    setSuggestionsError(null);
+    setIsSuggestionsLoading(false);
+
     if (!supabase) return;
 
     setIsHistoryLoading(true);
@@ -600,12 +639,138 @@ export default function LeadsAdminPage() {
       setLeadHistory([]);
       setIsHistoryLoading(false);
     }
+
+    void loadPreferences(lead.id);
+  }
+
+  async function loadPreferences(leadId: string) {
+    if (!supabase) return;
+
+    setIsPreferencesLoading(true);
+    setPreferencesError(null);
+
+    try {
+      const { data, error } = await (supabase as any)
+        .from("customer_preferences")
+        .select("lead_id, tipo_imovel, valor_max, quartos, bairro, created_at, updated_at")
+        .eq("lead_id", leadId)
+        .maybeSingle();
+
+      if (error) {
+        setPreferences(null);
+        setPreferencesError(error.message);
+        setIsPreferencesLoading(false);
+        return;
+      }
+
+      const row = (data ?? null) as CustomerPreferencesRow | null;
+      setPreferences(
+        row ?? {
+          lead_id: leadId,
+          tipo_imovel: null,
+          valor_max: null,
+          quartos: null,
+          bairro: null,
+        },
+      );
+      setIsPreferencesLoading(false);
+      void loadSuggestions(leadId, row);
+    } catch (e: any) {
+      setPreferences(null);
+      setPreferencesError(e?.message ?? "Falha ao carregar preferências.");
+      setIsPreferencesLoading(false);
+    }
+  }
+
+  async function savePreferences() {
+    if (!supabase || !selectedLead || !preferences) return;
+
+    setIsPreferencesSaving(true);
+    setPreferencesError(null);
+
+    const payload = {
+      lead_id: selectedLead.id,
+      tipo_imovel: preferences.tipo_imovel?.trim() ? preferences.tipo_imovel.trim() : null,
+      valor_max: typeof preferences.valor_max === "number" && Number.isFinite(preferences.valor_max) ? preferences.valor_max : null,
+      quartos: typeof preferences.quartos === "number" && Number.isFinite(preferences.quartos) ? preferences.quartos : null,
+      bairro: preferences.bairro?.trim() ? preferences.bairro.trim() : null,
+      updated_at: new Date().toISOString(),
+    };
+
+    try {
+      const { error } = await (supabase as any)
+        .from("customer_preferences")
+        .upsert(payload, { onConflict: "lead_id" });
+
+      if (error) {
+        setPreferencesError(error.message);
+        setIsPreferencesSaving(false);
+        return;
+      }
+
+      setIsPreferencesSaving(false);
+      void loadSuggestions(selectedLead.id, payload as any);
+    } catch (e: any) {
+      setPreferencesError(e?.message ?? "Não foi possível salvar as preferências.");
+      setIsPreferencesSaving(false);
+    }
+  }
+
+  async function loadSuggestions(leadId: string, prefs: CustomerPreferencesRow | null | undefined) {
+    if (!supabase) return;
+
+    setIsSuggestionsLoading(true);
+    setSuggestionsError(null);
+    setSuggestions([]);
+
+    try {
+      let q = (supabase as any)
+        .from("properties")
+        .select("id, title, property_type, purpose, price, neighborhood, city, bedrooms, status")
+        .eq("status", "disponivel")
+        .order("created_at", { ascending: false })
+        .limit(24);
+
+      const tipo = String(prefs?.tipo_imovel ?? "").trim();
+      const bairro = String(prefs?.bairro ?? "").trim();
+      const quartos = typeof prefs?.quartos === "number" ? prefs!.quartos : null;
+      const valorMax = typeof prefs?.valor_max === "number" ? prefs!.valor_max : null;
+
+      if (tipo) q = q.ilike("property_type", `%${tipo}%`);
+      if (bairro) q = q.ilike("neighborhood", `%${bairro}%`);
+      if (quartos != null) q = q.gte("bedrooms", quartos);
+      if (valorMax != null) q = q.lte("price", valorMax);
+
+      const { data, error } = await q;
+      if (error) {
+        setSuggestions([]);
+        setSuggestionsError(error.message);
+        setIsSuggestionsLoading(false);
+        return;
+      }
+
+      setSuggestions((data ?? []) as PropertySuggestionRow[]);
+      setIsSuggestionsLoading(false);
+    } catch (e: any) {
+      setSuggestions([]);
+      setSuggestionsError(e?.message ?? "Não foi possível carregar sugestões.");
+      setIsSuggestionsLoading(false);
+    }
   }
 
   function closeLeadModal() {
     setSelectedLead(null);
     setLeadHistory([]);
     setIsHistoryLoading(false);
+
+    setPreferences(null);
+    setPreferencesError(null);
+    setIsPreferencesLoading(false);
+    setIsPreferencesSaving(false);
+
+    setSuggestions([]);
+    setSuggestionsError(null);
+    setIsSuggestionsLoading(false);
   }
 
   return (
@@ -878,6 +1043,173 @@ export default function LeadsAdminPage() {
                   <span className="font-semibold text-slate-900">Interesse:</span> {selectedLead.interest}
                 </div>
               ) : null}
+
+              <div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-slate-200/70">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">MATCHING</div>
+                    <div className="mt-1 text-sm font-semibold text-[#001f3f]">Preferências do Cliente</div>
+                    <div className="mt-1 text-xs text-slate-500">Base para sugerir imóveis automaticamente.</div>
+                  </div>
+                </div>
+
+                {preferencesError ? (
+                  <div className="mt-3 rounded-xl bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900 ring-1 ring-amber-200/70">
+                    {preferencesError}
+                  </div>
+                ) : null}
+
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <label className="flex flex-col gap-2">
+                    <span className="text-xs font-semibold tracking-wide text-slate-600">Tipo do imóvel</span>
+                    <input
+                      value={preferences?.tipo_imovel ?? ""}
+                      onChange={(e) =>
+                        setPreferences((s) =>
+                          s
+                            ? {
+                                ...s,
+                                tipo_imovel: e.target.value,
+                              }
+                            : s,
+                        )
+                      }
+                      disabled={isPreferencesLoading}
+                      className="h-11 w-full rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15 disabled:opacity-60"
+                      placeholder="Ex: Apartamento"
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-2">
+                    <span className="text-xs font-semibold tracking-wide text-slate-600">Bairro</span>
+                    <input
+                      value={preferences?.bairro ?? ""}
+                      onChange={(e) =>
+                        setPreferences((s) =>
+                          s
+                            ? {
+                                ...s,
+                                bairro: e.target.value,
+                              }
+                            : s,
+                        )
+                      }
+                      disabled={isPreferencesLoading}
+                      className="h-11 w-full rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15 disabled:opacity-60"
+                      placeholder="Ex: Centro"
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-2">
+                    <span className="text-xs font-semibold tracking-wide text-slate-600">Quartos (mín.)</span>
+                    <input
+                      value={preferences?.quartos != null ? String(preferences.quartos) : ""}
+                      onChange={(e) => {
+                        const raw = e.target.value.trim();
+                        const n = raw ? Number(raw) : null;
+                        setPreferences((s) =>
+                          s
+                            ? {
+                                ...s,
+                                quartos: n != null && Number.isFinite(n) ? Math.max(0, Math.trunc(n)) : null,
+                              }
+                            : s,
+                        );
+                      }}
+                      disabled={isPreferencesLoading}
+                      inputMode="numeric"
+                      className="h-11 w-full rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15 disabled:opacity-60"
+                      placeholder="Ex: 2"
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-2">
+                    <span className="text-xs font-semibold tracking-wide text-slate-600">Valor máximo</span>
+                    <input
+                      value={preferences?.valor_max != null ? String(preferences.valor_max) : ""}
+                      onChange={(e) => {
+                        const raw = e.target.value.trim();
+                        const n = raw ? Number(raw.replace(/\./g, "").replace(",", ".")) : null;
+                        setPreferences((s) =>
+                          s
+                            ? {
+                                ...s,
+                                valor_max: n != null && Number.isFinite(n) ? Math.max(0, n) : null,
+                              }
+                            : s,
+                        );
+                      }}
+                      disabled={isPreferencesLoading}
+                      inputMode="decimal"
+                      className="h-11 w-full rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15 disabled:opacity-60"
+                      placeholder="Ex: 450000"
+                    />
+                  </label>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => void savePreferences()}
+                    disabled={isPreferencesSaving || isPreferencesLoading || !preferences}
+                    className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-[#001f3f] px-5 text-sm font-semibold text-white shadow-[0_6px_14px_-10px_rgba(15,23,42,0.45)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#001a33] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isPreferencesSaving ? "Salvando..." : "Salvar preferências"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!selectedLead) return;
+                      void loadSuggestions(selectedLead.id, preferences);
+                    }}
+                    disabled={isSuggestionsLoading || isPreferencesLoading}
+                    className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isSuggestionsLoading ? "Buscando..." : "Atualizar sugestões"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-2xl bg-white ring-1 ring-slate-200/70">
+                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                  <div className="text-sm font-semibold text-slate-900">Imóveis sugeridos para este perfil</div>
+                  <div className="text-xs text-slate-500">
+                    {isSuggestionsLoading ? "Atualizando..." : `${suggestions.length} sugestão(ões)`}
+                  </div>
+                </div>
+                <div className="max-h-64 overflow-auto px-4 py-3">
+                  {suggestionsError ? (
+                    <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200/70">
+                      {suggestionsError}
+                    </div>
+                  ) : suggestions.length > 0 ? (
+                    <div className="flex flex-col gap-2">
+                      {suggestions.slice(0, 10).map((p) => (
+                        <div
+                          key={p.id}
+                          className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-700 ring-1 ring-slate-200/70"
+                        >
+                          <div className="text-xs font-semibold tracking-wide text-slate-600">
+                            {p.property_type ?? "Imóvel"}
+                            {p.neighborhood ? ` • ${p.neighborhood}` : ""}
+                            {p.city ? ` • ${p.city}` : ""}
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-slate-900">{p.title ?? "-"}</div>
+                          <div className="mt-1 text-[11px] text-slate-600">
+                            {typeof p.price === "number" ? formatCurrencyBRL(p.price) : "Preço: -"}
+                            {typeof p.bedrooms === "number" ? ` • ${p.bedrooms} qtos` : ""}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl bg-slate-50 px-4 py-6 text-sm text-slate-600 ring-1 ring-slate-200/70">
+                      Nenhuma sugestão no momento. Preencha as preferências e tente novamente.
+                    </div>
+                  )}
+                </div>
+              </div>
 
               <div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-slate-200/70">
                 <div className="flex items-start justify-between gap-4">

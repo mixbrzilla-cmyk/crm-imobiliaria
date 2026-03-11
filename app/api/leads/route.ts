@@ -8,6 +8,10 @@ function sanitizePhone(input: string) {
   return input.replace(/[^0-9+]/g, "").trim();
 }
 
+function normalizeCpf(input: string) {
+  return String(input ?? "").replace(/\D+/g, "").trim();
+}
+
 function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
@@ -40,6 +44,20 @@ export async function POST(req: Request) {
   const mensagem = (body?.mensagem ?? body?.message ?? "").toString().trim() || null;
   const slug_imovel = (body?.slug_imovel ?? body?.slug ?? body?.property_slug ?? "").toString().trim() || null;
 
+  const cpf = normalizeCpf(body?.cpf ?? body?.document ?? "") || null;
+  const address = (body?.address ?? body?.endereco ?? "").toString().trim() || null;
+  const rawIntent = (body?.intent ?? body?.intencao ?? "").toString().trim().toLowerCase();
+  const intent = rawIntent === "comprar" || rawIntent === "alugar" ? rawIntent : null;
+
+  const prefs = body?.preferences ?? body?.customer_preferences ?? null;
+  const tipo_imovel = (prefs?.tipo_imovel ?? body?.tipo_imovel ?? "").toString().trim() || null;
+  const bairro = (prefs?.bairro ?? body?.bairro ?? "").toString().trim() || null;
+  const quartosRaw = prefs?.quartos ?? body?.quartos ?? null;
+  const valorMaxRaw = prefs?.valor_max ?? body?.valor_max ?? body?.valorMax ?? null;
+  const quartos = typeof quartosRaw === "number" ? Math.trunc(quartosRaw) : quartosRaw ? Math.trunc(Number(quartosRaw)) : null;
+  const valor_max =
+    typeof valorMaxRaw === "number" ? valorMaxRaw : valorMaxRaw ? Number(String(valorMaxRaw).replace(/\./g, "").replace(",", ".")) : null;
+
   if (!nome || !telefone) {
     return NextResponse.json(
       { ok: false, error: "nome e telefone são obrigatórios" },
@@ -59,6 +77,9 @@ export async function POST(req: Request) {
     source: "elementor" as const,
     assigned_broker_profile_id: null,
     created_at: new Date().toISOString(),
+    cpf,
+    address,
+    intent,
   };
 
   try {
@@ -74,6 +95,31 @@ export async function POST(req: Request) {
         },
         { status: 400, headers: corsHeaders() },
       );
+    }
+
+    try {
+      const maybePrefs = {
+        lead_id: payload.id,
+        tipo_imovel,
+        valor_max: typeof valor_max === "number" && Number.isFinite(valor_max) ? valor_max : null,
+        quartos: typeof quartos === "number" && Number.isFinite(quartos) ? quartos : null,
+        bairro,
+        updated_at: new Date().toISOString(),
+      };
+
+      const hasAny =
+        Boolean(maybePrefs.tipo_imovel) ||
+        Boolean(maybePrefs.bairro) ||
+        typeof maybePrefs.quartos === "number" ||
+        typeof maybePrefs.valor_max === "number";
+
+      if (hasAny) {
+        await (supabase as any)
+          .from("customer_preferences")
+          .upsert(maybePrefs, { onConflict: "lead_id" });
+      }
+    } catch {
+      // ignore
     }
 
     return NextResponse.json({ ok: true }, { status: 200, headers: corsHeaders() });
