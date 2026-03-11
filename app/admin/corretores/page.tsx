@@ -547,81 +547,82 @@ export default function CorretoresAdminPage() {
     } finally {
       setCreating(false);
     }
+
   }
 
   return (
-    <div className="min-h-screen w-full bg-slate-100 px-6 py-6">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-        <header className="flex items-end justify-between gap-4">
-          <div className="flex flex-col gap-2">
-            <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">GESTÃO DE CORRETORES</div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-800">Gestão de Equipe</h1>
-          </div>
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-3 rounded-3xl bg-white px-6 py-6 shadow-[0_25px_60px_-50px_rgba(15,23,42,0.55)] ring-1 ring-slate-200/70">
+        <div>
+          <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">GESTÃO DE CORRETORES</div>
+          <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Gerenciar Corretores</div>
+          <div className="mt-1 text-sm text-slate-600">Cadastre, aprove e controle o time.</div>
+        </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setIsCreateOpen(true)}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#2b6cff] px-5 text-sm font-semibold text-white shadow-[0_10px_26px_-18px_rgba(43,108,255,0.85)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#255fe6]"
-            >
-              <Plus className="h-4 w-4" />
-              Novo Corretor
-            </button>
-            <button
-              type="button"
-              onClick={() => void loadBaseData()}
-              className="inline-flex h-11 items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50"
-            >
-              Recarregar
-            </button>
-          </div>
-        </header>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsCreateOpen(true)}
+            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#2b6cff] px-5 text-sm font-semibold text-white shadow-[0_10px_26px_-18px_rgba(43,108,255,0.85)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#255fe6] sm:w-auto"
+          >
+            <Plus className="h-4 w-4" />
+            Novo Corretor
+          </button>
+          <button
+            type="button"
+            onClick={() => void loadBaseData()}
+            className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50 sm:w-auto"
+          >
+            Recarregar
+          </button>
+        </div>
+      </div>
 
       {errorMessage ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-2xl bg-red-50 px-5 py-4 text-sm text-red-700 ring-1 ring-red-200/70">
           {errorMessage}
         </div>
       ) : null}
 
-        {isLoading ? (
-          <div className="rounded-2xl bg-white px-6 py-6 text-sm text-slate-600 shadow-lg">
-            Carregando...
-          </div>
-        ) : rows.length === 0 ? (
-          <div className="flex w-full items-center justify-center py-10">
-            <div className="w-full max-w-2xl rounded-2xl bg-white p-10 shadow-xl">
-              <div className="mx-auto flex max-w-md flex-col items-center text-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
-                  <UsersPlaceholderIcon className="h-8 w-8" />
-                </div>
-                <div className="mt-6 text-xl font-semibold tracking-tight text-slate-900">
-                  Pronto para começar?
-                </div>
-                <div className="mt-2 text-sm text-slate-600">
-                  Cadastre seu primeiro corretor e acompanhe a performance em tempo real.
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsCreateOpen(true)}
-                  className="mt-6 inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#2b6cff] px-6 text-sm font-semibold text-white shadow-[0_10px_26px_-18px_rgba(43,108,255,0.85)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#255fe6]"
-                >
-                  <Plus className="h-4 w-4" />
-                  Novo Corretor
-                </button>
+      {isLoading ? (
+        <div className="rounded-2xl bg-white px-6 py-6 text-sm text-slate-600 shadow-lg">
+          Carregando...
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="flex w-full items-center justify-center py-10">
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-10 shadow-xl">
+            <div className="mx-auto flex max-w-md flex-col items-center text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+                <UsersPlaceholderIcon className="h-8 w-8" />
               </div>
+              <div className="mt-6 text-xl font-semibold tracking-tight text-slate-900">
+                Pronto para começar?
+              </div>
+              <div className="mt-2 text-sm text-slate-600">
+                Cadastre seu primeiro corretor e acompanhe a performance em tempo real.
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreateOpen(true)}
+                className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#2b6cff] px-6 text-sm font-semibold text-white shadow-[0_10px_26px_-18px_rgba(43,108,255,0.85)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#255fe6] sm:w-auto"
+              >
+                <Plus className="h-4 w-4" />
+                Novo Corretor
+              </button>
             </div>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
-              {rows.map((r) => {
-                const showTags = r.assignedProperties.slice(0, 6);
-                const hasClicks = r.whatsClicks > 0;
-                const creciLabel = r.creci !== "-" ? `CRECI: ${r.creci}` : "CRECI: -";
-                const statusInfo = approvalBadge(r.statusLabel);
-                const canApprove = !r.isActive;
-                const isUpdatingApproval = updatingApprovalId === r.id;
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
+          {rows.map((r) => {
+            const showTags = r.assignedProperties.slice(0, 6);
+            const hasClicks = r.whatsClicks > 0;
+            const creciLabel = r.creci !== "-" ? `CRECI: ${r.creci}` : "CRECI: -";
+            const statusInfo = approvalBadge(r.statusLabel);
+            const canApprove = !r.isActive;
+            const isUpdatingApproval = updatingApprovalId === r.id;
 
-                const managedItems = (
+            const managedItems = (
                   [
                     ...r.assignedProperties.map((p) => ({
                       kind: "property" as const,
@@ -652,14 +653,14 @@ export default function CorretoresAdminPage() {
                   ]
                 ).slice(0, 6);
 
-                const managedTotal = r.assignedProperties.length + r.assignedDevelopments.length;
-                const hiddenCount = Math.max(0, managedTotal - managedItems.length);
+            const managedTotal = r.assignedProperties.length + r.assignedDevelopments.length;
+            const hiddenCount = Math.max(0, managedTotal - managedItems.length);
 
-                return (
-                  <div
-                    key={r.id}
-                    className="group relative rounded-2xl bg-white p-6 shadow-xl transition-all duration-300 hover:-translate-y-[2px]"
-                  >
+            return (
+              <div
+                key={r.id}
+                className="group relative rounded-2xl bg-white p-6 shadow-xl transition-all duration-300 hover:-translate-y-[2px]"
+              >
                     <div className="flex items-start justify-between gap-4">
                       <div className="relative">
                         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">
@@ -863,10 +864,10 @@ export default function CorretoresAdminPage() {
                       </div>
                     </div>
                   </div>
-                );
-              })}
-          </div>
-        )}
+            );
+          })}
+        </div>
+      )}
 
         {selectedBroker ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8">
@@ -1098,7 +1099,6 @@ export default function CorretoresAdminPage() {
             </div>
           </div>
         ) : null}
-      </div>
     </div>
   );
 }
