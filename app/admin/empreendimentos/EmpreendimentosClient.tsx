@@ -816,53 +816,51 @@ export default function EmpreendimentosClient() {
                     ) : null}
                   </div>
 
-                  <div className="mt-5 grid grid-cols-2 gap-2">
+                  <div className="mt-5 flex flex-wrap items-center gap-2">
                     <button
                       type="button"
                       onClick={() => editRow(r)}
-                      className="inline-flex h-11 items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
+                      className="inline-flex h-9 items-center justify-center rounded-xl bg-white px-3 text-xs font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
                     >
                       Editar
                     </button>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!ownerWhatsapp) return;
-                          const url = `/admin/whatsapp?phone=${encodeURIComponent(ownerWhatsapp)}`;
-                          window.location.href = url;
-                        }}
-                        disabled={!ownerWhatsapp}
-                        className="inline-flex h-11 items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                        title="Iniciar conversa com o proprietário"
-                      >
-                        WhatsApp
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedId(r.id);
-                          setDispatchSelectionById((c) => ({ ...c, [r.id]: r.broker_id ?? r.corretor_id ?? "" }));
-                          setIsModalOpen(true);
-                          setModalStep(0);
-                        }}
-                        className="inline-flex h-11 items-center justify-center rounded-xl bg-[#001f3f] px-4 text-sm font-semibold text-white shadow-[0_6px_14px_-10px_rgba(15,23,42,0.45)] transition-all duration-300 hover:bg-[#001a33]"
-                      >
-                        Abrir
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void deleteDevelopment(r.id)}
-                        className="inline-flex h-11 items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-rose-700 ring-1 ring-rose-200/70 transition-all duration-300 hover:bg-rose-50"
-                        title="Excluir"
-                        aria-label="Excluir"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!ownerWhatsapp) return;
+                        const url = `/admin/whatsapp?phone=${encodeURIComponent(ownerWhatsapp)}`;
+                        window.location.href = url;
+                      }}
+                      disabled={!ownerWhatsapp}
+                      className="inline-flex h-9 items-center justify-center rounded-xl bg-white px-3 text-xs font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      title="Iniciar conversa com o proprietário"
+                    >
+                      WhatsApp
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedId(r.id);
+                        setDispatchSelectionById((c) => ({ ...c, [r.id]: r.broker_id ?? r.corretor_id ?? "" }));
+                        setIsModalOpen(true);
+                        setModalStep(0);
+                      }}
+                      className="inline-flex h-9 items-center justify-center rounded-xl bg-[#001f3f] px-3 text-xs font-semibold text-white shadow-[0_6px_14px_-10px_rgba(15,23,42,0.45)] transition-all duration-300 hover:bg-[#001a33]"
+                    >
+                      Abrir
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void deleteDevelopment(r.id)}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-rose-600 text-white shadow-sm transition-all duration-300 hover:bg-rose-700"
+                      title="Excluir"
+                      aria-label="Excluir"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
 
-                  <div className="mt-4 rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-200/70">
+                  <div className="mt-3 rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-200/70">
                     <div className="text-[10px] font-semibold tracking-wide text-slate-500">
                       Último contato com proprietário
                     </div>

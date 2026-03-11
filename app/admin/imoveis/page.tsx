@@ -17,6 +17,7 @@ import {
   Search,
   SlidersHorizontal,
   Tag,
+  Trash2,
   X,
 } from "lucide-react";
 
@@ -822,7 +823,7 @@ export default function InventarioImoveisPage() {
 
                     <div className="mt-4 flex items-end justify-between gap-4">
                       <div className="text-lg font-semibold tracking-tight text-emerald-600">{price}</div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center justify-end gap-2">
                         <button
                           type="button"
                           onClick={() => {
@@ -831,7 +832,7 @@ export default function InventarioImoveisPage() {
                             window.location.href = url;
                           }}
                           disabled={!ownerWhatsapp}
-                          className="inline-flex h-10 items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="inline-flex h-9 items-center justify-center rounded-xl bg-white px-3 text-xs font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                           title="Iniciar conversa com o proprietário"
                         >
                           WhatsApp
@@ -839,7 +840,7 @@ export default function InventarioImoveisPage() {
                         <button
                           type="button"
                           onClick={() => editRow(r)}
-                          className="inline-flex h-10 items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
+                          className="inline-flex h-9 items-center justify-center rounded-xl bg-white px-3 text-xs font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
                         >
                           Editar
                         </button>
@@ -847,14 +848,20 @@ export default function InventarioImoveisPage() {
                           type="button"
                           onClick={() => void removeRow(r.id)}
                           disabled={isDeletingId === r.id}
-                          className="inline-flex h-10 items-center justify-center rounded-xl bg-rose-600 px-4 text-sm font-semibold text-white shadow-sm transition-all duration-300 hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-rose-600 text-white shadow-sm transition-all duration-300 hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          title={isDeletingId === r.id ? "Excluindo..." : "Excluir"}
+                          aria-label={isDeletingId === r.id ? "Excluindo" : "Excluir"}
                         >
-                          {isDeletingId === r.id ? "Excluindo..." : "Excluir"}
+                          {isDeletingId === r.id ? (
+                            <span className="text-[11px] font-extrabold">...</span>
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
                         </button>
                       </div>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
                       <div className="rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-200/70">
                         <div className="text-[10px] font-semibold tracking-wide text-slate-500">Corretor</div>
                         <select
@@ -887,13 +894,13 @@ export default function InventarioImoveisPage() {
                           </span>
                         </label>
                       </div>
-                    </div>
 
-                    <div className="mt-4 rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-200/70">
-                      <div className="text-[10px] font-semibold tracking-wide text-slate-500">
-                        Último contato com proprietário
+                      <div className="rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-200/70">
+                        <div className="text-[10px] font-semibold tracking-wide text-slate-500">
+                          Último contato com proprietário
+                        </div>
+                        <div className="mt-1 text-xs font-semibold text-slate-700">{formatTimeBR(ownerLast)}</div>
                       </div>
-                      <div className="mt-1 text-xs font-semibold text-slate-700">{formatTimeBR(ownerLast)}</div>
                     </div>
                   </div>
                 </div>
