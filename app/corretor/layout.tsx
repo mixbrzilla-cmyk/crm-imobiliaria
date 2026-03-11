@@ -145,11 +145,16 @@ export default function CorretorLayout({ children }: { children: React.ReactNode
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      <div className="border-b border-zinc-200 bg-white">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-col">
-            <div className="text-sm font-semibold text-[#1e3a8a]">Portal do Corretor</div>
-            <div className="text-xs text-zinc-500">{profile?.full_name ?? "Corretor"}</div>
+      <div className="border-b border-zinc-200 bg-gradient-to-b from-white to-zinc-50/40">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#001f3f] text-sm font-extrabold tracking-tight text-white shadow-sm ring-1 ring-[#001f3f]/20">
+              IM
+            </div>
+            <div className="flex flex-col">
+              <div className="text-sm font-extrabold tracking-tight text-[#001f3f]">Imobiliária Moderna</div>
+              <div className="text-xs font-medium text-zinc-500">{profile?.full_name ?? "Corretor"}</div>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -160,10 +165,10 @@ export default function CorretorLayout({ children }: { children: React.ReactNode
                   key={item.href}
                   href={item.href}
                   className={
-                    "inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold transition-colors " +
+                    "inline-flex h-10 items-center justify-center rounded-xl px-4 text-sm font-semibold transition-all duration-300 " +
                     (active
-                      ? "bg-[#1e3a8a] text-white"
-                      : "border border-zinc-200 bg-white text-[#1e3a8a] hover:bg-zinc-50")
+                      ? "bg-[#001f3f] text-white shadow-sm"
+                      : "border border-zinc-200 bg-white/70 text-[#001f3f] hover:bg-white")
                   }
                 >
                   {item.label}
@@ -182,7 +187,7 @@ export default function CorretorLayout({ children }: { children: React.ReactNode
                 }
                 void supabase.auth.signOut().finally(() => router.replace("/login"));
               }}
-              className="inline-flex h-10 items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 hover:bg-zinc-50"
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-200 bg-white/70 px-4 text-sm font-semibold text-zinc-700 transition-all duration-300 hover:bg-white"
             >
               Sair
             </button>

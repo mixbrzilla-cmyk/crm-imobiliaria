@@ -37,6 +37,24 @@ function pickOwnerWhatsapp(row: any) {
   return normalizeWhatsapp(String(row?.owner_whatsapp ?? row?.proprietario_whatsapp ?? row?.owner_phone ?? ""));
 }
 
+function formatCurrencyBRL(value: any) {
+  const n = typeof value === "number" ? value : value != null ? Number(value) : NaN;
+  if (!Number.isFinite(n)) return "-";
+  return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function pickBeds(row: any) {
+  const v = row?.bedrooms ?? row?.quartos ?? null;
+  const n = typeof v === "number" ? v : v != null ? Number(v) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+
+function pickBaths(row: any) {
+  const v = row?.bathrooms ?? row?.banheiros ?? null;
+  const n = typeof v === "number" ? v : v != null ? Number(v) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+
 export default function CorretorEnviadosPage() {
   const supabase = useMemo(() => getSupabaseClient(), []);
 
@@ -217,60 +235,99 @@ export default function CorretorEnviadosPage() {
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{errorMessage}</div>
       ) : null}
 
-      <div className="rounded-xl border border-zinc-200 bg-white">
-        <div className="flex items-center justify-between gap-4 border-b border-zinc-200 px-5 py-3">
-          <div className="text-sm font-semibold text-zinc-900">Lista</div>
+      <div className="rounded-2xl border border-zinc-200 bg-white">
+        <div className="flex items-center justify-between gap-4 border-b border-zinc-200 px-5 py-4">
+          <div>
+            <div className="text-sm font-semibold text-zinc-900">Seus atendimentos</div>
+            <div className="mt-0.5 text-xs text-zinc-500">Cards prontos para você abrir conversa e fechar venda.</div>
+          </div>
           <button
             type="button"
             onClick={() => void load()}
-            className="inline-flex h-10 items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 text-sm font-semibold text-[#1e3a8a] hover:bg-zinc-50"
+            className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-[#001f3f] transition-all duration-300 hover:bg-zinc-50"
           >
             Atualizar
           </button>
         </div>
 
         {isLoading ? (
-          <div className="p-5 text-sm text-zinc-600">Carregando...</div>
+          <div className="p-6 text-sm text-zinc-600">Carregando...</div>
         ) : rows.length === 0 ? (
-          <div className="p-5 text-sm text-zinc-600">Nenhum imóvel enviado para você ainda.</div>
+          <div className="p-10">
+            <div className="mx-auto flex max-w-xl flex-col items-center gap-3 rounded-2xl bg-zinc-50 p-8 text-center ring-1 ring-zinc-200">
+              <div className="grid h-14 w-14 place-items-center rounded-2xl bg-white text-3xl shadow-sm ring-1 ring-zinc-200">
+                🏡
+              </div>
+              <div className="text-base font-semibold text-zinc-900">Pronto para sua próxima venda?</div>
+              <div className="text-sm text-zinc-600">Seus imóveis aparecerão aqui!</div>
+            </div>
+          </div>
         ) : (
-          <div className="divide-y divide-zinc-200">
+          <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
             {rows.map((r) => {
               const title = pickTitle(r.source, r.data);
               const loc = pickLocation(r.source, r.data);
               const whatsapp = pickOwnerWhatsapp(r.data);
               const phoneParam = whatsapp ? encodeURIComponent(whatsapp) : "";
+              const priceLabel = formatCurrencyBRL(r.data?.price ?? r.data?.valor ?? null);
+              const beds = pickBeds(r.data);
+              const baths = pickBaths(r.data);
 
               return (
-                <div key={`${r.source}:${r.id}`} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-zinc-900">{title}</div>
-                    <div className="mt-1 text-xs text-zinc-600">
-                      {r.source === "properties" ? "Imóvel" : "Empreendimento"}
-                      {loc ? ` • ${loc}` : ""}
+                <div
+                  key={`${r.source}:${r.id}`}
+                  className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-[1px] hover:shadow-md"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-base font-semibold text-zinc-900">{title}</div>
+                      <div className="mt-1 truncate text-sm font-medium text-zinc-600">{loc || "Localização não informada"}</div>
                     </div>
-
-                    <div className="mt-2 grid grid-cols-1 gap-1 text-xs text-zinc-700 sm:grid-cols-2">
-                      {r.data?.price != null ? <div>Preço: {String(r.data.price)}</div> : null}
-                      {r.data?.bedrooms != null ? <div>Quartos: {String(r.data.bedrooms)}</div> : null}
-                      {r.data?.bathrooms != null ? <div>Banheiros: {String(r.data.bathrooms)}</div> : null}
-                      {r.data?.area != null ? <div>Área: {String(r.data.area)}</div> : null}
-                      {r.data?.address ? <div className="sm:col-span-2">Endereço: {String(r.data.address)}</div> : null}
-                      {whatsapp ? <div className="sm:col-span-2">WhatsApp do proprietário: {whatsapp}</div> : null}
+                    <div className="shrink-0 rounded-full bg-[#dc2626]/10 px-3 py-1 text-xs font-semibold text-[#dc2626]">
+                      {r.source === "properties" ? "Imóvel" : "Empreendimento"}
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="mt-4 flex items-end justify-between gap-4">
+                    <div className="text-sm text-zinc-600">Preço</div>
+                    <div className="text-lg font-extrabold tracking-tight text-emerald-700">{priceLabel}</div>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-zinc-700">
+                    {beds != null ? (
+                      <div className="inline-flex items-center gap-2 rounded-full bg-zinc-50 px-3 py-1 ring-1 ring-zinc-200">
+                        <span aria-hidden="true">🛏️</span>
+                        <span className="font-semibold">{beds}</span>
+                      </div>
+                    ) : null}
+                    {baths != null ? (
+                      <div className="inline-flex items-center gap-2 rounded-full bg-zinc-50 px-3 py-1 ring-1 ring-zinc-200">
+                        <span aria-hidden="true">🚿</span>
+                        <span className="font-semibold">{baths}</span>
+                      </div>
+                    ) : null}
+                    {r.data?.area != null ? (
+                      <div className="inline-flex items-center gap-2 rounded-full bg-zinc-50 px-3 py-1 text-xs font-semibold text-zinc-700 ring-1 ring-zinc-200">
+                        {String(r.data.area)} m²
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+                    <div className="text-xs font-medium text-zinc-500">
+                      {whatsapp ? `WhatsApp do proprietário: ${whatsapp}` : "WhatsApp não informado"}
+                    </div>
                     <Link
                       href={whatsapp ? `/corretor/whatsapp?phone=${phoneParam}` : "/corretor/whatsapp"}
                       className={
-                        "inline-flex h-10 items-center justify-center rounded-lg border px-4 text-sm font-semibold " +
+                        "inline-flex h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold shadow-sm transition-all duration-300 " +
                         (whatsapp
-                          ? "border-zinc-200 bg-white text-[#1e3a8a] hover:bg-zinc-50"
-                          : "border-zinc-100 bg-zinc-50 text-zinc-400")
+                          ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                          : "bg-zinc-100 text-zinc-400")
                       }
                       aria-disabled={!whatsapp}
                     >
+                      <span aria-hidden="true">💬</span>
                       WhatsApp
                     </Link>
                   </div>
