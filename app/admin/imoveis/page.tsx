@@ -480,12 +480,17 @@ export default function InventarioImoveisPage() {
     };
 
     try {
-      const query = (supabase as any).from("properties");
-      const { error } = selectedId
-        ? await query.update(payload).eq("id", selectedId)
-        : await query.insert(payload);
+      const res = await fetch("/api/properties", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: selectedId ? "update" : "insert", id: selectedId, payload }),
+      });
 
-      if (error) throw error;
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        const msg = String(json?.error ?? "Erro ao salvar.");
+        throw new Error(msg);
+      }
 
       setIsSaving(false);
       resetForm();
@@ -495,13 +500,15 @@ export default function InventarioImoveisPage() {
       try {
         const retryPayload: any = { ...payload };
         delete retryPayload.corretor_id;
-        const query = (supabase as any).from("properties");
-        const { error } = selectedId
-          ? await query.update(retryPayload).eq("id", selectedId)
-          : await query.insert(retryPayload);
+        const res = await fetch("/api/properties", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action: selectedId ? "update" : "insert", id: selectedId, payload: retryPayload }),
+        });
 
-        if (error) {
-          setErrorMessage(error.message);
+        const json = await res.json().catch(() => null);
+        if (!res.ok) {
+          setErrorMessage(String(json?.error ?? "Erro ao salvar."));
           setIsSaving(false);
           return;
         }
