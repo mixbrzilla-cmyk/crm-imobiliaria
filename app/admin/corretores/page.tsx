@@ -231,7 +231,7 @@ export default function CorretoresAdminPage() {
 
     const brokersRes = await supabase
       .from("profiles")
-      .select("id, full_name, email, whatsapp, creci, cnai, status, role")
+      .select("id, full_name, email, whatsapp, creci, status, role")
       .eq("role", "broker")
       .order("full_name", { ascending: true });
 
@@ -521,11 +521,6 @@ export default function CorretoresAdminPage() {
       return;
     }
 
-    if (!cnai) {
-      setCreateError("CNAI é obrigatório.");
-      return;
-    }
-
     setCreating(true);
     try {
       const payload: any = {
@@ -534,7 +529,6 @@ export default function CorretoresAdminPage() {
         email: email || null,
         whatsapp,
         creci,
-        cnai,
         role: "broker",
         status: "ativo",
       };
@@ -543,6 +537,17 @@ export default function CorretoresAdminPage() {
       if (res?.error) {
         setCreateError(res.error.message);
         return;
+      }
+
+      if (cnai) {
+        try {
+          const up = await (supabase as any).from("profiles").update({ cnai }).eq("id", payload.id);
+          if (up?.error) {
+            // ignore (coluna pode não existir ainda)
+          }
+        } catch {
+          // ignore (coluna pode não existir ainda)
+        }
       }
 
       setIsCreateOpen(false);
