@@ -5,6 +5,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   BadgeCheck,
   Camera,
+  CarFront,
+  Cuboid,
+  Ruler,
   FileText,
   Home,
   Layers,
@@ -238,6 +241,7 @@ export default function InventarioImoveisPage() {
         .from("profiles")
         .select("id, full_name, status, status_aprovacao, role")
         .eq("role", "broker")
+        .eq("status", "ativo")
         .order("full_name", { ascending: true });
 
       if (res.error) {
@@ -245,6 +249,7 @@ export default function InventarioImoveisPage() {
           .from("profiles")
           .select("id, full_name, status, role")
           .eq("role", "broker")
+          .eq("status", "ativo")
           .order("full_name", { ascending: true });
       }
 
@@ -695,15 +700,26 @@ export default function InventarioImoveisPage() {
             {filteredRows.map((r) => {
               const photo = (r.photos_urls ?? [])[0] ?? null;
               const title = r.title ?? r.property_type ?? "Imóvel";
-              const local = (r.neighborhood ?? "-") + (r.city ? ` • ${r.city}` : "");
+              const neighborhood = r.neighborhood ?? "-";
+              const city = r.city ?? "";
+              const local = city ? `${neighborhood} • ${city}` : neighborhood;
               const price = typeof r.price === "number" ? formatCurrencyBRL(r.price) : "-";
+              const area = typeof r.area_m2 === "number" ? `${Math.round(r.area_m2)}m²` : "-";
+              const bedrooms = typeof r.bedrooms === "number" ? r.bedrooms : null;
+              const suites = typeof r.suites === "number" ? r.suites : null;
+              const parking = typeof r.parking_spots === "number" ? r.parking_spots : null;
+              const roomsLine =
+                bedrooms != null || suites != null
+                  ? `${bedrooms ?? 0} qtos | ${suites ?? 0} suíte${(suites ?? 0) === 1 ? "" : "s"}`
+                  : "-";
+              const parkingLine = parking != null ? `${parking} vaga${parking === 1 ? "" : "s"}` : "-";
 
               return (
                 <div
                   key={r.id}
                   className="group overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[2px] hover:shadow-md"
                 >
-                  <div className="relative h-40 w-full bg-slate-100">
+                  <div className="relative h-44 w-full bg-slate-100">
                     {photo ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={photo} alt="" className="h-full w-full object-cover" />
@@ -713,24 +729,46 @@ export default function InventarioImoveisPage() {
                       </div>
                     )}
 
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/55 via-slate-950/10 to-transparent" />
+
                     <div className="absolute left-4 top-4 flex flex-wrap items-center gap-2">
                       <span
                         className={
-                          "inline-flex items-center justify-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 " +
-                          purposeBadgeCls(r.purpose)
+                          "inline-flex items-center justify-center gap-1.5 rounded-full bg-white/55 px-3 py-1 text-xs font-semibold text-slate-900 ring-1 ring-white/70 backdrop-blur "
                         }
                       >
+                        <Tag className="h-3.5 w-3.5" />
                         {purposeLabel((r.purpose ?? "venda") as PropertyPurpose)}
                       </span>
-                      <Badge status={(r.status ?? "disponivel") as PropertyStatus} />
+                      <span className="inline-flex items-center justify-center rounded-full bg-white/55 px-3 py-1 text-xs font-semibold text-slate-900 ring-1 ring-white/70 backdrop-blur">
+                        {statusLabel[(r.status ?? "disponivel") as PropertyStatus]}
+                      </span>
                     </div>
                   </div>
 
                   <div className="p-5">
-                    <div className="text-sm font-semibold text-slate-900 line-clamp-2">{title}</div>
-                    <div className="mt-1 flex items-center gap-2 text-xs font-semibold text-slate-500">
-                      <MapPin className="h-3.5 w-3.5" />
-                      <span className="truncate">{local}</span>
+                    <div className="text-base font-semibold tracking-tight text-slate-900 line-clamp-2">{title}</div>
+                    <div className="mt-1 flex items-center gap-2 text-sm font-semibold text-slate-600">
+                      <MapPin className="h-4 w-4 text-slate-500" />
+                      <span className="truncate">
+                        <span className="text-slate-700">{neighborhood}</span>
+                        {city ? <span className="text-slate-500"> • {city}</span> : null}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl bg-slate-50/80 p-3 ring-1 ring-slate-200/70">
+                      <div className="flex items-center gap-2">
+                        <Ruler className="h-4 w-4 text-slate-600" />
+                        <div className="text-xs font-semibold text-slate-700">{area}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Cuboid className="h-4 w-4 text-slate-600" />
+                        <div className="text-xs font-semibold text-slate-700">{roomsLine}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CarFront className="h-4 w-4 text-slate-600" />
+                        <div className="text-xs font-semibold text-slate-700">{parkingLine}</div>
+                      </div>
                     </div>
 
                     <div className="mt-4 flex items-end justify-between gap-4">
