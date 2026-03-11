@@ -63,6 +63,7 @@ type DirecionamentoViewRow = {
   propertyLabel: string;
   directedAtIso: string;
   directedTs: number;
+  daysSince: number;
 };
 
 type TopProperty = {
@@ -228,17 +229,6 @@ function formatDaysSinceLabel(days: number) {
   if (days === 0) return "Hoje";
   if (days === 1) return "Há 1 dia";
   return `Há ${days} dias`;
-}
-
-function formatElapsedLabel(ms: number) {
-  if (!Number.isFinite(ms) || ms < 0) return "-";
-  const mins = Math.floor(ms / (60 * 1000));
-  if (mins <= 0) return "Agora";
-  if (mins < 60) return `Há ${mins} min`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `Há ${hours} hora${hours === 1 ? "" : "s"}`;
-  const days = Math.floor(hours / 24);
-  return formatDaysSinceLabel(days);
 }
 
 function timeToneClass(ms: number) {
@@ -635,7 +625,7 @@ export default function AdminDashboardClient() {
 
           // Relatório de direcionamento (posse)
           // Relatório de direcionamento (posse)
-          // (busca completa; une assigned_broker_id + broker_id + corretor_id conforme schema)
+          // (busca completa; prioridade: assigned_broker_id, depois broker_id, depois corretor_id)
           (async () => {
             const columns: Array<"assigned_broker_id" | "broker_id" | "corretor_id"> = [
               "assigned_broker_id",
@@ -647,11 +637,15 @@ export default function AdminDashboardClient() {
             for (const col of columns) {
               const base = (supabase as any)
                 .from("properties")
-                .select(`id, title, neighborhood, city, ${col}, data_direcionamento, updated_at, created_at`)
+                .select(`id, title, neighborhood, city, ${col}, updated_at, created_at`)
                 .not(col, "is", null);
 
               const q = propertiesHasDeletedAt ? base.is("deleted_at", null) : base;
-              const res = await q.order("data_direcionamento", { ascending: false, nullsFirst: false }).limit(5000);
+              let res = await q.order("updated_at", { ascending: false }).limit(5000);
+              if (res?.error) {
+                res = await q.order("created_at", { ascending: false }).limit(5000);
+              }
+
               const msg = String(res?.error?.message ?? "");
               const code = (res?.error as any)?.code;
               const isAssignColMissing = new RegExp(
@@ -660,6 +654,7 @@ export default function AdminDashboardClient() {
               ).test(msg);
               const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
               if (res?.error && (isAssignColMissing || isSchemaMismatch)) continue;
+
               items.push({ col, res });
             }
 
@@ -678,7 +673,9 @@ export default function AdminDashboardClient() {
             for (const col of columns) {
               const base = (supabase as any)
                 .from("developments")
-                .select(`id, name, title, neighborhood, bairro, localidade, city, cidade, ${col}, data_direcionamento, updated_at, created_at`)
+                .select(
+                  `id, name, title, neighborhood, bairro, localidade, city, cidade, ${col}, updated_at, created_at`,
+                )
                 .not(col, "is", null);
 
               const q = developmentsHasDeletedAt ? base.is("deleted_at", null) : base;
@@ -695,6 +692,7 @@ export default function AdminDashboardClient() {
               ).test(msg);
               const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
               if (res?.error && (isAssignColMissing || isSchemaMismatch)) continue;
+
               items.push({ col, res });
             }
 
@@ -813,7 +811,7 @@ export default function AdminDashboardClient() {
               neighborhood: (r?.neighborhood ?? null) as string | null,
               city: (r?.city ?? null) as string | null,
               corretor_id: corretor_id ? String(corretor_id) : null,
-              data_direcionamento: (r?.data_direcionamento ?? null) as string | null,
+              data_direcionamento: null,
               updated_at: (r?.updated_at ?? null) as string | null,
               created_at: (r?.created_at ?? null) as string | null,
               source: "properties",
@@ -843,7 +841,7 @@ export default function AdminDashboardClient() {
               neighborhood: (r?.localidade ?? r?.bairro ?? r?.neighborhood ?? null) as string | null,
               city: (r?.city ?? r?.cidade ?? null) as string | null,
               corretor_id: corretor_id ? String(corretor_id) : null,
-              data_direcionamento: (r?.data_direcionamento ?? null) as string | null,
+              data_direcionamento: null,
               updated_at: (r?.updated_at ?? null) as string | null,
               created_at: (r?.created_at ?? null) as string | null,
               source: "developments",
@@ -875,14 +873,18 @@ export default function AdminDashboardClient() {
             const brokerName = (profilesById.get(brokerId)?.full_name ?? "").trim() || brokerId;
             const loc = [r.neighborhood, r.city].filter(Boolean).join(" • ");
             const propertyLabel = (r.title ?? "").trim() || loc || r.id;
-            const directedAt = r.data_direcionamento ?? r.updated_at ?? r.created_at ?? "";
+            const directedAt = r.updated_at ?? r.created_at ?? "";
             const directedTs = directedAt ? new Date(directedAt).getTime() : NaN;
+            const daysSince = Number.isFinite(directedTs)
+              ? Math.max(0, Math.floor((nowTick - directedTs) / (24 * 60 * 60 * 1000)))
+              : -1;
             return {
               id: r.id,
               brokerName,
               propertyLabel,
               directedAtIso: directedAt,
               directedTs,
+              daysSince,
             };
           })
           .sort((a, b) => {
@@ -1514,7 +1516,7 @@ export default function AdminDashboardClient() {
                         (r.directedAtIso ? timeToneClass(nowTick - r.directedTs) : "text-slate-900")
                       }
                     >
-                      {r.directedAtIso ? formatElapsedLabel(nowTick - r.directedTs) : "-"}
+                      {r.directedAtIso ? formatDaysSinceLabel(r.daysSince) : "-"}
                     </td>
                   </tr>
                 ))
