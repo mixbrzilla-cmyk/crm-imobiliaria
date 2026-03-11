@@ -271,6 +271,12 @@ export default function AdminDashboardClient() {
   const [leadsWeekCount, setLeadsWeekCount] = useState<number>(0);
   const [leadsWeekTrend, setLeadsWeekTrend] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
   const [vgvValue, setVgvValue] = useState<number>(0);
+
+  const [grossInventoryValue, setGrossInventoryValue] = useState<number>(0);
+  const [grossPropertiesValue, setGrossPropertiesValue] = useState<number>(0);
+  const [grossDevelopmentsValue, setGrossDevelopmentsValue] = useState<number>(0);
+  const [commissionValue, setCommissionValue] = useState<number>(0);
+  const [netProfitValue, setNetProfitValue] = useState<number>(0);
   const [trafficBySource, setTrafficBySource] = useState<Record<LeadSource, number>>({
     meta: 0,
     google: 0,
@@ -323,6 +329,11 @@ export default function AdminDashboardClient() {
       setLeadsWeekCount(0);
       setLeadsWeekTrend([0, 0, 0, 0, 0, 0, 0]);
       setVgvValue(0);
+      setGrossInventoryValue(0);
+      setGrossPropertiesValue(0);
+      setGrossDevelopmentsValue(0);
+      setCommissionValue(0);
+      setNetProfitValue(0);
       setTrafficBySource({
         meta: 0,
         google: 0,
@@ -350,6 +361,15 @@ export default function AdminDashboardClient() {
         }
       };
 
+      const supportsColumn = async (table: string, column: string) => {
+        try {
+          const res = await (supabase as any).from(table).select(`id, ${column}`).limit(1);
+          return !res?.error;
+        } catch {
+          return false;
+        }
+      };
+
       const [propertiesHasDeletedAt, developmentsHasDeletedAt] = await Promise.all([
         supportsDeletedAt("properties"),
         supportsDeletedAt("developments"),
@@ -369,6 +389,17 @@ export default function AdminDashboardClient() {
         if (test.error) developmentsBrokerColumn = "corretor_id";
       } catch {
         developmentsBrokerColumn = "corretor_id";
+      }
+
+      const developmentsValueColumnCandidates = ["lot_value", "price", "value"];
+      let developmentsValueColumn: string | null = null;
+      for (const col of developmentsValueColumnCandidates) {
+        // eslint-disable-next-line no-await-in-loop
+        const ok = await supportsColumn("developments", col);
+        if (ok) {
+          developmentsValueColumn = col;
+          break;
+        }
       }
 
       const now = new Date();
@@ -404,6 +435,8 @@ export default function AdminDashboardClient() {
         leadsRes,
         propertiesRes,
         vgvRes,
+        vgvWithBrokerRes,
+        vgvDevsRes,
         obraMaterialsRes,
         whatsRes,
         devIdsRes,
@@ -431,6 +464,25 @@ export default function AdminDashboardClient() {
           (() => {
             const q = supabase.from("properties").select("price").not("price", "is", null);
             return propertiesHasDeletedAt ? q.is("deleted_at", null) : q;
+          })(),
+
+          (() => {
+            const q = supabase
+              .from("properties")
+              .select(`price, ${propertiesBrokerColumn}`)
+              .not("price", "is", null);
+            return propertiesHasDeletedAt ? q.is("deleted_at", null) : q;
+          })(),
+
+          (() => {
+            if (!developmentsValueColumn) {
+              return Promise.resolve({ data: [], error: null } as any);
+            }
+            const q = (supabase as any)
+              .from("developments")
+              .select(`${developmentsValueColumn}, ${developmentsBrokerColumn}`)
+              .not(developmentsValueColumn, "is", null);
+            return developmentsHasDeletedAt ? q.is("deleted_at", null) : q;
           })(),
           (supabase as any)
             .from("obra_materials")
@@ -759,6 +811,53 @@ export default function AdminDashboardClient() {
         }
       }
 
+      let propsGross = 0;
+      let propsAssignedGross = 0;
+      if (vgvWithBrokerRes.status === "fulfilled") {
+        const value: any = vgvWithBrokerRes.value;
+        if (value?.error) {
+          console.log("[Dashboard] Erro ao carregar VGV properties (com broker)", value.error);
+        } else {
+          const rows = (value?.data ?? []) as Array<any>;
+          for (const r of rows) {
+            const price = typeof r?.price === "number" ? r.price : r?.price != null ? Number(r.price) : 0;
+            if (!Number.isFinite(price)) continue;
+            propsGross += price;
+            const brokerId = r?.[propertiesBrokerColumn] ?? null;
+            if (brokerId) propsAssignedGross += price;
+          }
+        }
+      }
+
+      let devGross = 0;
+      let devAssignedGross = 0;
+      if (vgvDevsRes.status === "fulfilled") {
+        const value: any = vgvDevsRes.value;
+        if (value?.error) {
+          console.log("[Dashboard] Erro ao carregar VGV developments", value.error);
+        } else {
+          const rows = (value?.data ?? []) as Array<any>;
+          for (const r of rows) {
+            const raw = developmentsValueColumn ? r?.[developmentsValueColumn] : null;
+            const v = typeof raw === "number" ? raw : raw != null ? Number(raw) : 0;
+            if (!Number.isFinite(v)) continue;
+            devGross += v;
+            const brokerId = r?.[developmentsBrokerColumn] ?? null;
+            if (brokerId) devAssignedGross += v;
+          }
+        }
+      }
+
+      const gross = propsGross + devGross;
+      const commission = 0.05 * (propsAssignedGross + devAssignedGross);
+      const net = gross - commission;
+
+      setGrossPropertiesValue(propsGross);
+      setGrossDevelopmentsValue(devGross);
+      setGrossInventoryValue(gross);
+      setCommissionValue(commission);
+      setNetProfitValue(net);
+
       if (obraMaterialsRes.status === "fulfilled") {
         if (obraMaterialsRes.value.error) {
           setObraMaterialsTotal(0);
@@ -913,7 +1012,7 @@ export default function AdminDashboardClient() {
         </p>
       </header>
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200/70 border-l-4 border-l-sky-500">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -951,6 +1050,24 @@ export default function AdminDashboardClient() {
               <div className="mt-2 text-xs text-slate-600">Ações pendentes de distribuição</div>
             </div>
             <AlertTriangle className={"h-6 w-6 " + (unassignedImoveisCount > 0 ? "text-amber-700" : "text-sky-700")} />
+          </div>
+        </div>
+
+        <div className="rounded-2xl bg-gradient-to-br from-emerald-50 via-white to-emerald-50 p-6 shadow-sm ring-1 ring-emerald-200/70 border-l-4 border-l-emerald-500">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-sm font-medium text-emerald-800">Lucro Líquido (Estoque)</div>
+              <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
+                {netProfitValue > 0 ? formatCurrencyBRL(netProfitValue) : formatCurrencyBRL(0)}
+              </div>
+              <div className="mt-2 text-xs text-emerald-700">
+                Total {formatCurrencyBRL(grossInventoryValue)} • Comissão (5%) {formatCurrencyBRL(commissionValue)}
+              </div>
+              <div className="mt-2 text-[11px] font-semibold text-emerald-800/80">
+                Inventário: {formatCurrencyBRL(grossPropertiesValue)} • Empreendimentos: {formatCurrencyBRL(grossDevelopmentsValue)}
+              </div>
+            </div>
+            <BadgeDollarSign className="h-6 w-6 text-emerald-700" />
           </div>
         </div>
       </section>
