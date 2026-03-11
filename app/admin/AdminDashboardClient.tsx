@@ -1162,6 +1162,42 @@ export default function AdminDashboardClient() {
   }, [supabase]);
 
   useEffect(() => {
+    if (!supabase) return;
+
+    const channel = (supabase as any)
+      .channel("admin-dashboard-costs-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "obra_materials" },
+        () => void loadDashboard(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "obra_worker_entries" },
+        () => void loadDashboard(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "marketing_expenses" },
+        () => void loadDashboard(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "vehicle_expenses" },
+        () => void loadDashboard(),
+      )
+      .subscribe();
+
+    return () => {
+      try {
+        void (supabase as any).removeChannel(channel);
+      } catch {
+        // ignore
+      }
+    };
+  }, [loadDashboard, supabase]);
+
+  useEffect(() => {
     void loadDashboard();
   }, [loadDashboard]);
 

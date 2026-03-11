@@ -12,6 +12,7 @@ import {
   Minus,
   Plus,
   RefreshCw,
+  Trash2,
   Users,
 } from "lucide-react";
 
@@ -297,6 +298,74 @@ export default function ObrasAdminPage() {
       setIsMaterialsLoading(false);
     }
   }, [supabase]);
+
+  async function deleteMaterial(id: string) {
+    if (!supabase) return;
+    const ok = window.confirm("Tem certeza que deseja excluir este gasto?");
+    if (!ok) return;
+    setErrorMessage(null);
+    try {
+      const res = await (supabase as any).from("obra_materials").delete().eq("id", id);
+      if (res.error) {
+        setErrorMessage(res.error.message);
+        return;
+      }
+      await loadMaterials();
+    } catch {
+      setErrorMessage("Não foi possível excluir o insumo agora.");
+    }
+  }
+
+  async function deleteWorkerEntry(id: string) {
+    if (!supabase) return;
+    const ok = window.confirm("Tem certeza que deseja excluir este gasto?");
+    if (!ok) return;
+    setErrorMessage(null);
+    try {
+      const res = await (supabase as any).from("obra_worker_entries").delete().eq("id", id);
+      if (res.error) {
+        setErrorMessage(res.error.message);
+        return;
+      }
+      await loadWorkersAndEntries();
+    } catch {
+      setErrorMessage("Não foi possível excluir a medição agora.");
+    }
+  }
+
+  async function deleteMarketingExpense(id: string) {
+    if (!supabase) return;
+    const ok = window.confirm("Tem certeza que deseja excluir este gasto?");
+    if (!ok) return;
+    setErrorMessage(null);
+    try {
+      const res = await (supabase as any).from("marketing_expenses").delete().eq("id", id);
+      if (res.error) {
+        setErrorMessage(res.error.message);
+        return;
+      }
+      await loadMarketingExpenses();
+    } catch {
+      setErrorMessage("Não foi possível excluir o gasto de marketing agora.");
+    }
+  }
+
+  async function deleteVehicleExpense(id: string) {
+    if (!supabase) return;
+    const ok = window.confirm("Tem certeza que deseja excluir este gasto?");
+    if (!ok) return;
+    setErrorMessage(null);
+    try {
+      const res = await (supabase as any).from("vehicle_expenses").delete().eq("id", id);
+      if (res.error) {
+        setErrorMessage(res.error.message);
+        return;
+      }
+      await loadVehicleExpenses();
+    } catch {
+      setErrorMessage("Não foi possível excluir o gasto de veículo agora.");
+    }
+  }
 
   const loadWorkersAndEntries = useCallback(async () => {
     setErrorMessage(null);
@@ -1031,6 +1100,15 @@ export default function ObrasAdminPage() {
                               >
                                 Marcar como Entregue
                               </button>
+                              <button
+                                type="button"
+                                onClick={() => void deleteMaterial(m.id)}
+                                className="inline-flex h-9 items-center justify-center rounded-xl bg-red-50 px-3 text-xs font-semibold text-red-700 ring-1 ring-red-200/70 transition-all duration-300 hover:bg-red-100"
+                                title="Excluir"
+                                aria-label="Excluir"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -1138,6 +1216,7 @@ export default function ObrasAdminPage() {
                     <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Tipo</th>
                     <th className="px-5 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">Horas</th>
                     <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Observações</th>
+                    <th className="px-5 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1163,12 +1242,25 @@ export default function ObrasAdminPage() {
                           </td>
                           <td className="px-5 py-4 text-right text-sm text-slate-700">{e.hours ?? "-"}</td>
                           <td className="px-5 py-4 text-sm text-slate-700">{e.notes ?? "-"}</td>
+                          <td className="px-5 py-4">
+                            <div className="flex justify-end">
+                              <button
+                                type="button"
+                                onClick={() => void deleteWorkerEntry(e.id)}
+                                className="inline-flex h-9 items-center justify-center rounded-xl bg-red-50 px-3 text-xs font-semibold text-red-700 ring-1 ring-red-200/70 transition-all duration-300 hover:bg-red-100"
+                                title="Excluir"
+                                aria-label="Excluir"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       );
                     })
                   ) : (
                     <tr>
-                      <td className="px-5 py-8 text-sm text-slate-600" colSpan={5}>
+                      <td className="px-5 py-8 text-sm text-slate-600" colSpan={6}>
                         Nenhuma medição lançada.
                       </td>
                     </tr>
@@ -1297,6 +1389,7 @@ export default function ObrasAdminPage() {
                         <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Categoria</th>
                         <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Descrição</th>
                         <th className="px-5 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">Valor</th>
+                        <th className="px-5 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">Ações</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1307,11 +1400,24 @@ export default function ObrasAdminPage() {
                             <td className="px-5 py-4 text-sm font-semibold text-slate-900">{expenseCategoryLabel(r.category as any)}</td>
                             <td className="px-5 py-4 text-sm text-slate-600">{r.description ?? "-"}</td>
                             <td className="px-5 py-4 text-right text-sm font-semibold text-slate-900">{formatCurrencyBRL(r.amount ?? 0)}</td>
+                            <td className="px-5 py-4">
+                              <div className="flex justify-end">
+                                <button
+                                  type="button"
+                                  onClick={() => void deleteMarketingExpense(r.id)}
+                                  className="inline-flex h-9 items-center justify-center rounded-xl bg-red-50 px-3 text-xs font-semibold text-red-700 ring-1 ring-red-200/70 transition-all duration-300 hover:bg-red-100"
+                                  title="Excluir"
+                                  aria-label="Excluir"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td className="px-5 py-8 text-sm text-slate-600" colSpan={4}>
+                          <td className="px-5 py-8 text-sm text-slate-600" colSpan={5}>
                             Nenhum gasto lançado.
                           </td>
                         </tr>
@@ -1435,6 +1541,7 @@ export default function ObrasAdminPage() {
                         <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Categoria</th>
                         <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Descrição</th>
                         <th className="px-5 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">Valor</th>
+                        <th className="px-5 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">Ações</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1445,11 +1552,24 @@ export default function ObrasAdminPage() {
                             <td className="px-5 py-4 text-sm font-semibold text-slate-900">{expenseCategoryLabel(r.category as any)}</td>
                             <td className="px-5 py-4 text-sm text-slate-600">{r.description ?? "-"}</td>
                             <td className="px-5 py-4 text-right text-sm font-semibold text-slate-900">{formatCurrencyBRL(r.amount ?? 0)}</td>
+                            <td className="px-5 py-4">
+                              <div className="flex justify-end">
+                                <button
+                                  type="button"
+                                  onClick={() => void deleteVehicleExpense(r.id)}
+                                  className="inline-flex h-9 items-center justify-center rounded-xl bg-red-50 px-3 text-xs font-semibold text-red-700 ring-1 ring-red-200/70 transition-all duration-300 hover:bg-red-100"
+                                  title="Excluir"
+                                  aria-label="Excluir"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td className="px-5 py-8 text-sm text-slate-600" colSpan={4}>
+                          <td className="px-5 py-8 text-sm text-slate-600" colSpan={5}>
                             Nenhum gasto lançado.
                           </td>
                         </tr>
