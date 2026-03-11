@@ -1078,7 +1078,7 @@ export default function ObrasAdminPage() {
                           </td>
                           <td className="px-5 py-4 text-right text-sm font-semibold text-slate-900">{formatCurrencyBRL(total)}</td>
                           <td className="px-5 py-4">
-                            <div className="flex justify-end gap-2">
+                            <div className="flex flex-wrap justify-end gap-2">
                               <button
                                 type="button"
                                 onClick={() => void updateMaterialStatus(m.id, "cotado")}
@@ -1096,9 +1096,10 @@ export default function ObrasAdminPage() {
                               <button
                                 type="button"
                                 onClick={() => void updateMaterialStatus(m.id, "entregue")}
-                                className="inline-flex h-9 items-center justify-center rounded-xl bg-emerald-600 px-3 text-xs font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:bg-emerald-700"
+                                className="inline-flex min-h-9 items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:bg-emerald-700"
                               >
-                                Marcar como Entregue
+                                <span className="sm:hidden">✅ Entregue</span>
+                                <span className="hidden sm:inline">Marcar como Entregue</span>
                               </button>
                               <button
                                 type="button"

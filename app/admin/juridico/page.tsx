@@ -618,7 +618,7 @@ export default function JuridicoAdminPage() {
 
       <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-start gap-4">
+          <div className="flex w-full flex-col gap-4 md:flex-row md:items-start">
             <div className="w-full rounded-2xl bg-slate-50 p-5 shadow-lg ring-1 ring-slate-200/70 md:min-w-[520px]">
               <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">STATUS DO ESCRITÓRIO</div>
               <div className="mt-2 text-sm font-semibold text-slate-900">
@@ -656,7 +656,7 @@ export default function JuridicoAdminPage() {
             <button
               type="button"
               onClick={() => void loadAll()}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50 sm:w-auto"
             >
               <RefreshCw className="h-4 w-4" />
               Atualizar
