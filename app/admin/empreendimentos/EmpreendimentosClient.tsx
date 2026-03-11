@@ -27,6 +27,8 @@ type DevelopmentStatus = "pre_lancamento" | "em_obras" | "pronto_para_construir"
 type Development = {
   id: string;
   name: string;
+  titulo?: string | null;
+  title?: string | null;
   cover_url: string | null;
   video_url: string | null;
   sales_material_url: string | null;
@@ -139,6 +141,18 @@ function infraBadgeCls(active: boolean) {
   return active
     ? "bg-emerald-50 text-emerald-700 ring-emerald-200/70"
     : "bg-slate-50 text-slate-600 ring-slate-200/70";
+}
+
+function normalizeDevelopment(row: any): Development {
+  const name =
+    String(row?.name ?? row?.titulo ?? row?.title ?? "")
+      .trim() || "-";
+
+  return {
+    ...row,
+    id: String(row?.id ?? crypto.randomUUID()),
+    name,
+  } as Development;
 }
 
 export default function EmpreendimentosClient() {
@@ -304,35 +318,27 @@ export default function EmpreendimentosClient() {
     }
 
     try {
-      const fullSelect =
-        "id, name, cover_url, video_url, sales_material_url, price_table_url, city, localidade, is_premium, status, lot_value, preco, progress_percent, total_area_m2, lots_count, green_area_m2, units_count, infra_asphalt, infra_power, infra_water, infra_sewage, infra_leisure, gallery_urls, corretor_id, created_at";
-
-      let res = await supabase.from("developments").select(fullSelect).order("created_at", { ascending: false });
-
+      let res = await supabase.from("developments").select("*").order("created_at", { ascending: false });
       if (res.error) {
         const code = (res.error as any)?.code;
         if (code === "PGRST204" || code === "PGRST301") {
           await testProfilesConnection("load(developments)", res.error);
         }
 
-        const fallbackSelect =
-          "id, name, cover_url, video_url, sales_material_url, price_table_url, city, localidade, is_premium, status, lot_value, preco, corretor_id, created_at";
-        const fallback = await supabase
-          .from("developments")
-          .select(fallbackSelect)
-          .order("created_at", { ascending: false });
-
-        if (fallback.error) throw fallback.error;
-        setSupportsDetails(false);
-        setRows((fallback.data ?? []) as Development[]);
-      } else {
-        setSupportsDetails(true);
-        setRows((res.data ?? []) as Development[]);
+        res = await supabase.from("developments").select("*").order("id", { ascending: false });
       }
+
+      if (res.error) throw res.error;
+
+      setSupportsDetails(true);
+      const normalized = (res.data ?? []).map(normalizeDevelopment);
+      setRows(normalized);
     } catch (e) {
-      console.log("DEBUG SUPABASE:", e);
+      const errAny = e as any;
+      console.log("DEBUG SUPABASE:", errAny);
       setRows([]);
       setSupportsDetails(false);
+      setErrorMessage(errAny?.message ? String(errAny.message) : "Não foi possível carregar os empreendimentos agora.");
     }
 
     setIsLoading(false);
@@ -527,10 +533,11 @@ export default function EmpreendimentosClient() {
 
       const saved = (res.data ?? null) as Development | null;
       if (saved) {
+        const normalized = normalizeDevelopment(saved);
         setRows((current) => {
-          const exists = current.some((r) => r.id === saved.id);
-          if (exists) return current.map((r) => (r.id === saved.id ? { ...r, ...saved } : r));
-          return [saved, ...current];
+          const exists = current.some((r) => r.id === normalized.id);
+          if (exists) return current.map((r) => (r.id === normalized.id ? { ...r, ...normalized } : r));
+          return [normalized, ...current];
         });
       }
 
