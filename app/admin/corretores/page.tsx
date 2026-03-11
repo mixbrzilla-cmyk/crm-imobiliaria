@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
-import { CheckCircle2, MessageCircle, Plus, Trash2, X, XCircle } from "lucide-react";
+import { BedDouble, Car, CheckCircle2, MessageCircle, Plus, Ruler, Trash2, X, XCircle } from "lucide-react";
 
 import { getSupabaseClient } from "@/lib/supabaseClient";
 
@@ -35,6 +35,11 @@ type BrokerRowView = {
     purpose: string | null;
     data_direcionamento: string | null;
     clicks: number;
+    area_m2: number | null;
+    bedrooms: number | null;
+    parking_spots: number | null;
+    neighborhood: string | null;
+    city: string | null;
   }>;
   whatsClicks: number;
 };
@@ -230,6 +235,14 @@ export default function CorretoresAdminPage() {
     const propsByBroker = new Map<string, BrokerRowView["assignedProperties"]>();
     const whatsClicksByBroker = new Map<string, number>();
 
+    let propertiesBrokerColumn: "corretor_id" | "broker_id" = "corretor_id";
+    try {
+      const brokerIdTest = await (supabase as any).from("properties").select("id, broker_id").limit(1);
+      if (!brokerIdTest.error) propertiesBrokerColumn = "broker_id";
+    } catch {
+      propertiesBrokerColumn = "corretor_id";
+    }
+
     function addClicks(brokerId: string, value: unknown) {
       const v = typeof value === "number" ? value : Number(value ?? 0);
       if (!Number.isFinite(v)) return;
@@ -245,7 +258,7 @@ export default function CorretoresAdminPage() {
 
     let propertiesClickColumn: string | null = null;
     for (const col of clickColumnsToTry) {
-      const test = await supabase.from("properties").select(`id, corretor_id, ${col}`).limit(1);
+      const test = await supabase.from("properties").select(`id, ${propertiesBrokerColumn}, ${col}`).limit(1);
       if (!test.error) {
         propertiesClickColumn = col;
         break;
@@ -253,15 +266,15 @@ export default function CorretoresAdminPage() {
     }
 
     const propsSelect = propertiesClickColumn
-      ? `id, title, purpose, corretor_id, data_direcionamento, ${propertiesClickColumn}`
-      : "id, title, purpose, corretor_id, data_direcionamento";
+      ? `id, title, purpose, ${propertiesBrokerColumn}, data_direcionamento, ${propertiesClickColumn}, area_m2, bedrooms, parking_spots, neighborhood, city`
+      : `id, title, purpose, ${propertiesBrokerColumn}, data_direcionamento, area_m2, bedrooms, parking_spots, neighborhood, city`;
 
     const propsRes = brokerIds.length
       ? await supabase
           .from("properties")
           .select(propsSelect)
-          .in("corretor_id", brokerIds)
-          .not("corretor_id", "is", null)
+          .in(propertiesBrokerColumn, brokerIds)
+          .not(propertiesBrokerColumn, "is", null)
           .order("data_direcionamento", { ascending: false })
       : { data: [], error: null };
 
@@ -274,7 +287,7 @@ export default function CorretoresAdminPage() {
 
     const props = (propsRes.data ?? []) as Array<any>;
     for (const row of props) {
-      const brokerId = String(row?.corretor_id ?? "").trim();
+      const brokerId = String(row?.[propertiesBrokerColumn] ?? "").trim();
       if (!brokerId) continue;
 
       const title = String(row?.title ?? "").trim() || "-";
@@ -291,6 +304,16 @@ export default function CorretoresAdminPage() {
         purpose,
         data_direcionamento: directedAt,
         clicks: safeClicks,
+        area_m2: typeof row?.area_m2 === "number" ? row.area_m2 : row?.area_m2 != null ? Number(row.area_m2) : null,
+        bedrooms: typeof row?.bedrooms === "number" ? row.bedrooms : row?.bedrooms != null ? Number(row.bedrooms) : null,
+        parking_spots:
+          typeof row?.parking_spots === "number"
+            ? row.parking_spots
+            : row?.parking_spots != null
+              ? Number(row.parking_spots)
+              : null,
+        neighborhood: row?.neighborhood ?? null,
+        city: row?.city ?? null,
       });
       propsByBroker.set(brokerId, list);
       addClicks(brokerId, safeClicks);
@@ -612,7 +635,70 @@ export default function CorretoresAdminPage() {
 
                     <div className="mt-4">
                       <div className="flex flex-wrap items-center gap-2">
-                        {showTags.length > 0 ? (
+                        {r.isActive ? (
+                          <div className="w-full rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200/70">
+                            <div className="text-xs font-semibold tracking-wide text-slate-700">Imóveis sob Gestão</div>
+
+                            {r.assignedProperties.length === 0 ? (
+                              <div className="mt-3 rounded-xl bg-white px-4 py-3 text-sm text-slate-600 ring-1 ring-slate-200/70">
+                                Nenhum imóvel vinculado.
+                              </div>
+                            ) : (
+                              <div className="mt-3 space-y-2">
+                                {r.assignedProperties.slice(0, 6).map((p) => {
+                                  const addr = [p.neighborhood, p.city].filter(Boolean).join(" / ") || "-";
+                                  return (
+                                    <div
+                                      key={p.id}
+                                      className="rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-slate-200/70"
+                                    >
+                                      <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                          <div className="truncate text-sm font-semibold text-slate-900" title={p.title}>
+                                            {p.title}
+                                          </div>
+                                          <div className="mt-1 truncate text-xs font-semibold text-slate-500" title={addr}>
+                                            {addr}
+                                          </div>
+                                        </div>
+                                        <span
+                                          className={
+                                            "shrink-0 rounded-full px-3 py-1 text-[11px] font-semibold ring-1 " +
+                                            purposeBadgeCls(p.purpose)
+                                          }
+                                        >
+                                          {purposeLabel(p.purpose)}
+                                        </span>
+                                      </div>
+
+                                      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-semibold text-slate-600">
+                                        <div className="inline-flex items-center gap-1.5">
+                                          <Ruler className="h-3.5 w-3.5 text-slate-400" />
+                                          <span>{p.area_m2 != null && Number.isFinite(p.area_m2) ? `${p.area_m2} m²` : "-"}</span>
+                                        </div>
+                                        <div className="inline-flex items-center gap-1.5">
+                                          <BedDouble className="h-3.5 w-3.5 text-slate-400" />
+                                          <span>{p.bedrooms != null && Number.isFinite(p.bedrooms) ? `${p.bedrooms}` : "-"}</span>
+                                        </div>
+                                        <div className="inline-flex items-center gap-1.5">
+                                          <Car className="h-3.5 w-3.5 text-slate-400" />
+                                          <span>
+                                            {p.parking_spots != null && Number.isFinite(p.parking_spots) ? `${p.parking_spots}` : "-"}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                                {hiddenCount > 0 ? (
+                                  <div className="rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-600 ring-1 ring-slate-200/70">
+                                    +{hiddenCount} imóveis
+                                  </div>
+                                ) : null}
+                              </div>
+                            )}
+                          </div>
+                        ) : showTags.length > 0 ? (
                           showTags.map((p) => (
                             <div
                               key={p.id}
@@ -628,11 +714,6 @@ export default function CorretoresAdminPage() {
                             Nenhum imóvel atribuído.
                           </div>
                         )}
-                        {hiddenCount > 0 ? (
-                          <div className="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200/70">
-                            +{hiddenCount}
-                          </div>
-                        ) : null}
                       </div>
                     </div>
                   </div>
