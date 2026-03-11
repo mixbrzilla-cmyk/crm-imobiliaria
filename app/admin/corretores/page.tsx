@@ -363,7 +363,7 @@ export default function CorretoresAdminPage() {
         for (const row of (fallbackDevs.data ?? []) as Array<any>) {
         const brokerId = String(row?.[developmentsBrokerColumn] ?? "").trim();
         if (!brokerId) continue;
-        const name = String(row?.name ?? row?.titulo ?? row?.title ?? "").trim() || "-";
+        const name = String(row?.name ?? row?.title ?? "").trim() || "-";
         const city = (row?.city ?? row?.cidade ?? null) as string | null;
         const neighborhood = (row?.localidade ?? row?.bairro ?? null) as string | null;
         const list = devsByBroker.get(brokerId) ?? [];
@@ -384,7 +384,7 @@ export default function CorretoresAdminPage() {
         const brokerId = String(row?.[developmentsBrokerColumn] ?? "").trim();
         if (!brokerId) continue;
 
-        const name = String(row?.name ?? row?.titulo ?? row?.title ?? "").trim() || "-";
+        const name = String(row?.name ?? row?.title ?? "").trim() || "-";
         const unitsRaw = row?.units_count ?? row?.total_units;
         const units = typeof unitsRaw === "number" ? unitsRaw : unitsRaw != null ? Number(unitsRaw) : null;
         const safeUnits = Number.isFinite(units as any) ? Math.trunc(units as any) : null;
@@ -418,7 +418,7 @@ export default function CorretoresAdminPage() {
       const status = statusBadge(b.status ?? null);
       const assignedProperties = propsByBroker.get(b.id) ?? [];
       const assignedDevelopments = devsByBroker.get(b.id) ?? [];
-      const inHands = assignedProperties.length;
+      const inHands = assignedProperties.length + assignedDevelopments.length;
       const clicks = whatsClicksByBroker.get(b.id) ?? 0;
       return {
         id: b.id,
@@ -737,7 +737,7 @@ export default function CorretoresAdminPage() {
                     <div className="mt-5 flex items-center justify-between gap-4">
                       <div className="inline-flex items-center gap-2 rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70">
                         <div className="text-2xl font-semibold tracking-tight text-slate-900">{r.propertiesInHands}</div>
-                        <div className="text-xs font-semibold text-slate-600">imóveis</div>
+                        <div className="text-xs font-semibold text-slate-600">itens</div>
                       </div>
 
                       <div
@@ -838,7 +838,7 @@ export default function CorretoresAdminPage() {
                                 })}
                                 {hiddenCount > 0 ? (
                                   <div className="rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-600 ring-1 ring-slate-200/70">
-                                    +{hiddenCount} imóveis
+                                    +{hiddenCount} itens
                                   </div>
                                 ) : null}
                               </div>

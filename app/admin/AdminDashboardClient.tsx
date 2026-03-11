@@ -43,6 +43,17 @@ type DirecionamentoRow = {
   created_at?: string | null;
 };
 
+type DirecionamentoUnionRow = {
+  id: string;
+  title: string | null;
+  neighborhood: string | null;
+  city: string | null;
+  corretor_id: string | null;
+  data_direcionamento: string | null;
+  created_at?: string | null;
+  source: "properties" | "developments";
+};
+
 type DirecionamentoViewRow = {
   id: string;
   brokerName: string;
@@ -246,6 +257,8 @@ export default function AdminDashboardClient() {
   const [activeCount, setActiveCount] = useState<number>(0);
   const [propertiesCount, setPropertiesCount] = useState<number>(0);
 
+  const [propertiesStockCount, setPropertiesStockCount] = useState<number>(0);
+
   const [carteiraByBrokerId, setCarteiraByBrokerId] = useState<Record<string, number>>({});
   const [totalImoveisCount, setTotalImoveisCount] = useState<number>(0);
   const [assignedImoveisCount, setAssignedImoveisCount] = useState<number>(0);
@@ -301,6 +314,7 @@ export default function AdminDashboardClient() {
       setPendingCount(0);
       setActiveCount(0);
       setPropertiesCount(0);
+      setPropertiesStockCount(0);
       setCarteiraByBrokerId({});
       setTotalImoveisCount(0);
       setAssignedImoveisCount(0);
@@ -341,6 +355,22 @@ export default function AdminDashboardClient() {
         supportsDeletedAt("developments"),
       ]);
 
+      let propertiesBrokerColumn: "corretor_id" | "broker_id" = "corretor_id";
+      try {
+        const test = await (supabase as any).from("properties").select("id, broker_id").limit(1);
+        if (!test.error) propertiesBrokerColumn = "broker_id";
+      } catch {
+        propertiesBrokerColumn = "corretor_id";
+      }
+
+      let developmentsBrokerColumn: "corretor_id" | "broker_id" = "broker_id";
+      try {
+        const test = await (supabase as any).from("developments").select("id, broker_id").limit(1);
+        if (test.error) developmentsBrokerColumn = "corretor_id";
+      } catch {
+        developmentsBrokerColumn = "corretor_id";
+      }
+
       const now = new Date();
       const startOfToday = new Date(now);
       startOfToday.setHours(0, 0, 0, 0);
@@ -379,6 +409,7 @@ export default function AdminDashboardClient() {
         devIdsRes,
         inventarioIdsRes,
         direcionamentosRes,
+        direcionamentosDevsRes,
         legalCasesRes,
         appraisalsRes,
       ] =
@@ -416,13 +447,13 @@ export default function AdminDashboardClient() {
             .order("sent_at", { ascending: false })
             .limit(500),
 
-          // unificação: Empreendimentos + Inventário (properties), sempre via corretor_id
+          // unificação: Empreendimentos + Inventário (properties), via broker_id/corretor_id autodetect
           (() => {
-            const q = (supabase as any).from("developments").select("id, corretor_id");
+            const q = (supabase as any).from("developments").select(`id, ${developmentsBrokerColumn}`);
             return developmentsHasDeletedAt ? q.is("deleted_at", null) : q;
           })(),
           (() => {
-            const q = supabase.from("properties").select("id, corretor_id");
+            const q = supabase.from("properties").select(`id, ${propertiesBrokerColumn}`);
             return propertiesHasDeletedAt ? q.is("deleted_at", null) : q;
           })(),
 
@@ -430,11 +461,22 @@ export default function AdminDashboardClient() {
           (() => {
             const q = supabase
               .from("properties")
-              .select("id, title, neighborhood, city, corretor_id, data_direcionamento, created_at")
-              .not("corretor_id", "is", null)
+              .select(`id, title, neighborhood, city, ${propertiesBrokerColumn}, data_direcionamento, created_at`)
+              .not(propertiesBrokerColumn, "is", null)
               .order("data_direcionamento", { ascending: false, nullsFirst: false })
               .limit(50);
             return propertiesHasDeletedAt ? q.is("deleted_at", null) : q;
+          })(),
+
+          // Relatório de direcionamento (posse) - developments
+          (() => {
+            const q = (supabase as any)
+              .from("developments")
+              .select(`id, name, title, city, localidade, ${developmentsBrokerColumn}, created_at`)
+              .not(developmentsBrokerColumn, "is", null)
+              .order("created_at", { ascending: false })
+              .limit(50);
+            return developmentsHasDeletedAt ? q.is("deleted_at", null) : q;
           })(),
 
           // Jurídico (status do escritório)
@@ -508,10 +550,10 @@ export default function AdminDashboardClient() {
           continue;
         }
 
-        const data = (value?.data ?? []) as Array<{ id: string; corretor_id?: string | null }>;
+        const data = (value?.data ?? []) as Array<any>;
         for (const row of data) {
           totalCount += 1;
-          const brokerId = (row as any)?.corretor_id ?? null;
+          const brokerId = (row as any)?.[src.label === "developments" ? developmentsBrokerColumn : propertiesBrokerColumn] ?? null;
           if (brokerId) {
             assignedCount += 1;
             brokerCountMap.set(brokerId, (brokerCountMap.get(brokerId) ?? 0) + 1);
@@ -526,51 +568,95 @@ export default function AdminDashboardClient() {
       setAssignedImoveisCount(assignedCount);
       setUnassignedImoveisCount(unassignedCount);
 
+      const unionRows: DirecionamentoUnionRow[] = [];
+
       if (direcionamentosRes.status === "fulfilled") {
         if (direcionamentosRes.value.error) {
-          console.log("[Dashboard] Erro ao carregar direcionamentos:", direcionamentosRes.value.error);
-          setDirecionamentos([]);
+          console.log("[Dashboard] Erro ao carregar direcionamentos properties:", direcionamentosRes.value.error);
         } else {
-          const data = (direcionamentosRes.value.data ?? []) as DirecionamentoRow[];
-          const brokerIds = Array.from(
-            new Set(data.map((r) => (r.corretor_id ?? "").trim()).filter(Boolean)),
-          );
-
-          const profilesById = new Map<string, { id: string; full_name: string | null }>();
-          if (brokerIds.length > 0) {
-            const profRes = await supabase
-              .from("profiles")
-              .select("id, full_name")
-              .in("id", brokerIds);
-            if (!profRes.error) {
-              const profRows = (profRes.data ?? []) as Array<{ id: string; full_name: string | null }>;
-              for (const p of profRows) profilesById.set(p.id, p);
-            }
-          }
-
-          const nowTs = Date.now();
-          const view = data
-            .filter((r) => Boolean(r.corretor_id))
-            .map((r) => {
-              const brokerId = r.corretor_id ?? "";
-              const brokerName = (profilesById.get(brokerId)?.full_name ?? "").trim() || brokerId;
-              const loc = [r.neighborhood, r.city].filter(Boolean).join(" • ");
-              const propertyLabel = (r.title ?? "").trim() || loc || r.id;
-              const directedAt = r.data_direcionamento ?? "";
-              const directedTs = directedAt ? new Date(directedAt).getTime() : NaN;
-              const daysSince = Number.isFinite(directedTs)
-                ? Math.max(0, Math.floor((nowTs - directedTs) / (24 * 60 * 60 * 1000)))
-                : -1;
-              return {
-                id: r.id,
-                brokerName,
-                propertyLabel,
-                directedAtIso: directedAt,
-                daysSince,
-              };
+          const data = (direcionamentosRes.value.data ?? []) as Array<any>;
+          for (const r of data) {
+            const corretor_id = (r as any)?.[propertiesBrokerColumn] ?? null;
+            unionRows.push({
+              id: String(r?.id ?? crypto.randomUUID()),
+              title: (r?.title ?? null) as string | null,
+              neighborhood: (r?.neighborhood ?? null) as string | null,
+              city: (r?.city ?? null) as string | null,
+              corretor_id: corretor_id ? String(corretor_id) : null,
+              data_direcionamento: (r?.data_direcionamento ?? null) as string | null,
+              created_at: (r?.created_at ?? null) as string | null,
+              source: "properties",
             });
-          setDirecionamentos(view);
+          }
         }
+      }
+
+      if (direcionamentosDevsRes.status === "fulfilled") {
+        if (direcionamentosDevsRes.value.error) {
+          console.log("[Dashboard] Erro ao carregar direcionamentos developments:", direcionamentosDevsRes.value.error);
+        } else {
+          const data = (direcionamentosDevsRes.value.data ?? []) as Array<any>;
+          for (const r of data) {
+            const corretor_id = (r as any)?.[developmentsBrokerColumn] ?? null;
+            unionRows.push({
+              id: String(r?.id ?? crypto.randomUUID()),
+              title: (String(r?.name ?? r?.title ?? "").trim() || null) as string | null,
+              neighborhood: (r?.localidade ?? null) as string | null,
+              city: (r?.city ?? null) as string | null,
+              corretor_id: corretor_id ? String(corretor_id) : null,
+              data_direcionamento: null,
+              created_at: (r?.created_at ?? null) as string | null,
+              source: "developments",
+            });
+          }
+        }
+      }
+
+      if (unionRows.length > 0) {
+        const brokerIds = Array.from(
+          new Set(unionRows.map((r) => (r.corretor_id ?? "").trim()).filter(Boolean)),
+        );
+
+        const profilesById = new Map<string, { id: string; full_name: string | null }>();
+        if (brokerIds.length > 0) {
+          const profRes = await supabase.from("profiles").select("id, full_name").in("id", brokerIds);
+          if (!profRes.error) {
+            const profRows = (profRes.data ?? []) as Array<{ id: string; full_name: string | null }>;
+            for (const p of profRows) profilesById.set(p.id, p);
+          }
+        }
+
+        const nowTs = Date.now();
+        const view = unionRows
+          .filter((r) => Boolean(r.corretor_id))
+          .sort((a, b) => {
+            const aKey = a.data_direcionamento ?? a.created_at ?? "";
+            const bKey = b.data_direcionamento ?? b.created_at ?? "";
+            return bKey.localeCompare(aKey);
+          })
+          .slice(0, 50)
+          .map((r) => {
+            const brokerId = r.corretor_id ?? "";
+            const brokerName = (profilesById.get(brokerId)?.full_name ?? "").trim() || brokerId;
+            const loc = [r.neighborhood, r.city].filter(Boolean).join(" • ");
+            const propertyLabel = (r.title ?? "").trim() || loc || r.id;
+            const directedAt = r.data_direcionamento ?? r.created_at ?? "";
+            const directedTs = directedAt ? new Date(directedAt).getTime() : NaN;
+            const daysSince = Number.isFinite(directedTs)
+              ? Math.max(0, Math.floor((nowTs - directedTs) / (24 * 60 * 60 * 1000)))
+              : -1;
+            return {
+              id: r.id,
+              brokerName,
+              propertyLabel,
+              directedAtIso: directedAt,
+              daysSince,
+            };
+          });
+
+        setDirecionamentos(view);
+      } else {
+        setDirecionamentos([]);
       }
 
       if (leadsRes.status === "fulfilled") {
@@ -636,11 +722,22 @@ export default function AdminDashboardClient() {
           setErrorMessage(propertiesRes.value.error.message);
           setTopProperties([]);
           setPropertiesCount(0);
+          setPropertiesStockCount(0);
         } else {
           const top = (propertiesRes.value.data ?? []) as TopProperty[];
           setTopProperties(top);
           setPropertiesCount(top.length);
         }
+      }
+
+      const propsStockRes = await (propertiesHasDeletedAt
+        ? supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null)
+        : supabase.from("properties").select("id", { count: "exact", head: true }));
+      if (propsStockRes.error) {
+        console.log("[Dashboard] Erro ao contar properties", propsStockRes.error);
+        setPropertiesStockCount(0);
+      } else {
+        setPropertiesStockCount(propsStockRes.count ?? 0);
       }
 
       if (vgvRes.status === "fulfilled") {

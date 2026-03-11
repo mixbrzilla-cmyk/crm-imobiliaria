@@ -28,7 +28,6 @@ type DevelopmentStatus = "pre_lancamento" | "em_obras" | "pronto_para_construir"
 type Development = {
   id: string;
   name: string;
-  titulo?: string | null;
   title?: string | null;
   cover_url: string | null;
   video_url: string | null;
@@ -147,7 +146,7 @@ function infraBadgeCls(active: boolean) {
 
 function normalizeDevelopment(row: any): Development {
   const name =
-    String(row?.name ?? row?.titulo ?? row?.title ?? "")
+    String(row?.name ?? row?.title ?? "")
       .trim() || "-";
 
   const unitsRaw = row?.units_count ?? row?.total_units ?? row?.units ?? row?.unidades ?? row?.qtd_unidades;
