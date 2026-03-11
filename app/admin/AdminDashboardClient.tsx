@@ -470,13 +470,21 @@ export default function AdminDashboardClient() {
 
           // Relatório de direcionamento (posse) - developments
           (() => {
-            const q = (supabase as any)
+            const base = (supabase as any)
               .from("developments")
-              .select(`id, name, title, city, localidade, ${developmentsBrokerColumn}, created_at`)
+              .select("*")
               .not(developmentsBrokerColumn, "is", null)
-              .order("created_at", { ascending: false })
               .limit(50);
-            return developmentsHasDeletedAt ? q.is("deleted_at", null) : q;
+
+            return (async () => {
+              const q = developmentsHasDeletedAt ? base.is("deleted_at", null) : base;
+
+              let res = await q.order("created_at", { ascending: false });
+              if (res?.error) {
+                res = await q.order("id", { ascending: false });
+              }
+              return res;
+            })();
           })(),
 
           // Jurídico (status do escritório)
@@ -601,8 +609,8 @@ export default function AdminDashboardClient() {
             unionRows.push({
               id: String(r?.id ?? crypto.randomUUID()),
               title: (String(r?.name ?? r?.title ?? "").trim() || null) as string | null,
-              neighborhood: (r?.localidade ?? null) as string | null,
-              city: (r?.city ?? null) as string | null,
+              neighborhood: (r?.localidade ?? r?.bairro ?? r?.neighborhood ?? null) as string | null,
+              city: (r?.city ?? r?.cidade ?? null) as string | null,
               corretor_id: corretor_id ? String(corretor_id) : null,
               data_direcionamento: null,
               created_at: (r?.created_at ?? null) as string | null,
