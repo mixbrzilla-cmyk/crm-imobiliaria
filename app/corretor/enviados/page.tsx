@@ -55,6 +55,32 @@ function pickBaths(row: any) {
   return Number.isFinite(n) ? n : null;
 }
 
+function pickSuites(row: any) {
+  const v = row?.suites ?? row?.suitas ?? row?.suítes ?? null;
+  const n = typeof v === "number" ? v : v != null ? Number(v) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+
+function pickParking(row: any) {
+  const v = row?.parking_spots ?? row?.vagas ?? row?.garagem ?? row?.garage ?? null;
+  const n = typeof v === "number" ? v : v != null ? Number(v) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+
+function pickAreaLabel(row: any) {
+  const v = row?.area_m2 ?? row?.area ?? row?.area_total ?? row?.metragem ?? row?.m2 ?? null;
+  const n = typeof v === "number" ? v : v != null ? Number(v) : NaN;
+  if (!Number.isFinite(n)) return null;
+  const rounded = Math.round(n);
+  return `${rounded} m²`;
+}
+
+function pickPropertyType(row: any) {
+  const v = row?.property_type ?? row?.tipo_imovel ?? row?.tipo ?? row?.type ?? null;
+  const s = String(v ?? "").trim();
+  return s ? s : null;
+}
+
 function pickDealTypeLabel(row: any) {
   const rawCandidates = [
     row?.business_type,
@@ -306,6 +332,10 @@ export default function CorretorEnviadosPage() {
               const priceLabel = formatCurrencyBRL(r.data?.price ?? r.data?.valor ?? null);
               const beds = pickBeds(r.data);
               const baths = pickBaths(r.data);
+              const suites = pickSuites(r.data);
+              const parking = pickParking(r.data);
+              const areaLabel = pickAreaLabel(r.data);
+              const propertyType = pickPropertyType(r.data);
               const dealTypeLabel = pickDealTypeLabel(r.data);
 
               return (
@@ -348,12 +378,62 @@ export default function CorretorEnviadosPage() {
                         <span className="font-semibold">{baths}</span>
                       </div>
                     ) : null}
-                    {r.data?.area != null ? (
+                    {suites != null ? (
+                      <div className="inline-flex items-center gap-2 rounded-full bg-zinc-50 px-3 py-1 ring-1 ring-zinc-200">
+                        <span className="text-xs font-semibold text-zinc-700">Suítes</span>
+                        <span className="font-semibold">{suites}</span>
+                      </div>
+                    ) : null}
+                    {parking != null ? (
+                      <div className="inline-flex items-center gap-2 rounded-full bg-zinc-50 px-3 py-1 ring-1 ring-zinc-200">
+                        <span className="text-xs font-semibold text-zinc-700">Vagas</span>
+                        <span className="font-semibold">{parking}</span>
+                      </div>
+                    ) : null}
+                    {areaLabel ? (
                       <div className="inline-flex items-center gap-2 rounded-full bg-zinc-50 px-3 py-1 text-xs font-semibold text-zinc-700 ring-1 ring-zinc-200">
-                        {String(r.data.area)} m²
+                        {areaLabel}
                       </div>
                     ) : null}
                   </div>
+
+                  {propertyType || beds != null || baths != null || suites != null || parking != null || areaLabel ? (
+                    <div className="mt-4 rounded-xl bg-zinc-50 p-4 ring-1 ring-zinc-200">
+                      <div className="text-xs font-semibold text-zinc-700">Ficha técnica</div>
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-zinc-700 sm:grid-cols-3">
+                        {propertyType ? (
+                          <div className="rounded-lg bg-white px-3 py-2 ring-1 ring-zinc-200">
+                            <span className="font-semibold">Tipo:</span> {propertyType}
+                          </div>
+                        ) : null}
+                        {beds != null ? (
+                          <div className="rounded-lg bg-white px-3 py-2 ring-1 ring-zinc-200">
+                            <span className="font-semibold">Quartos:</span> {beds}
+                          </div>
+                        ) : null}
+                        {suites != null ? (
+                          <div className="rounded-lg bg-white px-3 py-2 ring-1 ring-zinc-200">
+                            <span className="font-semibold">Suítes:</span> {suites}
+                          </div>
+                        ) : null}
+                        {baths != null ? (
+                          <div className="rounded-lg bg-white px-3 py-2 ring-1 ring-zinc-200">
+                            <span className="font-semibold">Banheiros:</span> {baths}
+                          </div>
+                        ) : null}
+                        {parking != null ? (
+                          <div className="rounded-lg bg-white px-3 py-2 ring-1 ring-zinc-200">
+                            <span className="font-semibold">Vagas:</span> {parking}
+                          </div>
+                        ) : null}
+                        {areaLabel ? (
+                          <div className="rounded-lg bg-white px-3 py-2 ring-1 ring-zinc-200">
+                            <span className="font-semibold">Área:</span> {areaLabel}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
 
                   <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
                     <div className="text-xs font-medium text-zinc-500">
