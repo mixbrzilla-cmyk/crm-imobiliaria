@@ -101,69 +101,96 @@ export default function CorretorEnviadosPage() {
 
     const brokerId = authData.user.id;
 
+    console.log("[Corretor Enviados][DEBUG] brokerId", brokerId);
+
     setIsLoading(true);
 
     try {
-      const nextRows: EnviadoRow[] = [];
+      const brokerColumns: Array<"assigned_broker_id" | "broker_id" | "corretor_id"> = [
+        "assigned_broker_id",
+        "broker_id",
+        "corretor_id",
+      ];
 
-      const propsAssigned = await (supabase as any)
-        .from("properties")
-        .select("*")
-        .eq(propertiesAssignColumn, brokerId)
-        .order("created_at", { ascending: false })
-        .limit(300);
+      const union = new Map<string, EnviadoRow>();
 
-      let propsData: Array<any> = [];
-      if (propsAssigned?.error) {
-        const fallback = await (supabase as any)
+      for (const col of brokerColumns) {
+        const def = {
+          table: "properties",
+          filter: { column: col, value: brokerId },
+          order: "created_at desc",
+          limit: 300,
+        };
+        console.log("[Corretor Enviados][DEBUG] Query", def);
+
+        let res: any = await (supabase as any)
           .from("properties")
           .select("*")
-          .eq(propertiesAssignColumn, brokerId)
+          .eq(col, brokerId)
+          .order("created_at", { ascending: false })
           .limit(300);
-        if (fallback?.error) {
-          console.error("[Corretor Enviados] Falha ao carregar properties", fallback.error);
-        } else {
-          propsData = (fallback.data ?? []) as Array<any>;
+
+        if (res?.error) {
+          console.log("[Corretor Enviados][DEBUG] Query error", { def, error: res.error });
+          res = await (supabase as any).from("properties").select("*").eq(col, brokerId).limit(300);
         }
-      } else {
-        propsData = (propsAssigned.data ?? []) as Array<any>;
+
+        if (res?.error) {
+          console.log("[Corretor Enviados][DEBUG] Query fallback error", { def, error: res.error });
+          continue;
+        }
+
+        const data = (res?.data ?? []) as Array<any>;
+        console.log("[Corretor Enviados][DEBUG] Query result", { def, count: data.length });
+
+        for (const r of data) {
+          const sourceType = String(r?.source_type ?? "").toLowerCase().trim();
+          if (sourceType === "broker_capture") continue;
+          const id = String(r?.id ?? "");
+          if (!id) continue;
+          union.set(`properties:${id}`, { id, source: "properties", data: r });
+        }
       }
 
-      for (const r of propsData) {
-        const sourceType = String(r?.source_type ?? "").toLowerCase().trim();
-        if (sourceType === "broker_capture") continue;
-        nextRows.push({ id: String(r?.id ?? ""), source: "properties", data: r });
-      }
+      for (const col of brokerColumns) {
+        const def = {
+          table: "developments",
+          filter: { column: col, value: brokerId },
+          order: "created_at desc",
+          limit: 300,
+        };
+        console.log("[Corretor Enviados][DEBUG] Query", def);
 
-      const devsAssigned = await (supabase as any)
-        .from("developments")
-        .select("*")
-        .eq(developmentsAssignColumn, brokerId)
-        .order("created_at", { ascending: false })
-        .limit(300);
-
-      let devsData: Array<any> = [];
-      if (devsAssigned?.error) {
-        const fallback = await (supabase as any)
+        let res: any = await (supabase as any)
           .from("developments")
           .select("*")
-          .eq(developmentsAssignColumn, brokerId)
+          .eq(col, brokerId)
+          .order("created_at", { ascending: false })
           .limit(300);
-        if (fallback?.error) {
-          console.error("[Corretor Enviados] Falha ao carregar developments", fallback.error);
-        } else {
-          devsData = (fallback.data ?? []) as Array<any>;
+
+        if (res?.error) {
+          console.log("[Corretor Enviados][DEBUG] Query error", { def, error: res.error });
+          res = await (supabase as any).from("developments").select("*").eq(col, brokerId).limit(300);
         }
-      } else {
-        devsData = (devsAssigned.data ?? []) as Array<any>;
+
+        if (res?.error) {
+          console.log("[Corretor Enviados][DEBUG] Query fallback error", { def, error: res.error });
+          continue;
+        }
+
+        const data = (res?.data ?? []) as Array<any>;
+        console.log("[Corretor Enviados][DEBUG] Query result", { def, count: data.length });
+
+        for (const r of data) {
+          const sourceType = String(r?.source_type ?? "").toLowerCase().trim();
+          if (sourceType === "broker_capture") continue;
+          const id = String(r?.id ?? "");
+          if (!id) continue;
+          union.set(`developments:${id}`, { id, source: "developments", data: r });
+        }
       }
 
-      for (const r of devsData) {
-        const sourceType = String(r?.source_type ?? "").toLowerCase().trim();
-        if (sourceType === "broker_capture") continue;
-        nextRows.push({ id: String(r?.id ?? ""), source: "developments", data: r });
-      }
-
+      const nextRows = Array.from(union.values());
       setRows(nextRows);
       setIsLoading(false);
     } catch {
