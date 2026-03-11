@@ -954,7 +954,7 @@ export default function InventarioImoveisPage() {
       </section>
 
       {isFormOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8">
+        <div className="fixed inset-0 z-50 flex items-end justify-center px-4 py-4 sm:items-center sm:py-8">
           <button
             type="button"
             onClick={() => {
@@ -969,7 +969,8 @@ export default function InventarioImoveisPage() {
           <div
             role="dialog"
             aria-modal="true"
-            className="relative w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-200/70"
+            className="relative w-full max-w-[95vw] overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-200/70 sm:max-w-5xl"
+            style={{ maxHeight: "90vh" }}
           >
             <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
               <div>
@@ -1018,7 +1019,7 @@ export default function InventarioImoveisPage() {
               </div>
             ) : null}
 
-            <div className="grid grid-cols-1 gap-6 px-6 py-6 md:grid-cols-12">
+            <div className="grid grid-cols-1 gap-6 overflow-y-auto px-6 py-6 md:grid-cols-12">
               <div className="md:col-span-3">
                 <div className="flex flex-col gap-2 rounded-2xl bg-slate-50 p-2 ring-1 ring-slate-200/70">
                   {tabs.map((tab) => {

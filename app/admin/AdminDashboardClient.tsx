@@ -1685,7 +1685,7 @@ export default function AdminDashboardClient() {
             <div className="text-xs text-slate-500">Últimos 7 dias</div>
           </div>
 
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-3 xl:grid-cols-6">
             {(
               [
                 ["Meta", "meta"],
@@ -1698,12 +1698,12 @@ export default function AdminDashboardClient() {
             ).map(([label, key]) => (
               <div
                 key={key}
-                className="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70"
+                className="rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-200/70 sm:px-4 sm:py-3"
               >
-                <div className="text-xs font-semibold tracking-wide text-slate-600">
+                <div className="text-[11px] font-semibold tracking-wide text-slate-600 sm:text-xs">
                   {label}
                 </div>
-                <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+                <div className="mt-1 text-xl font-semibold tracking-tight text-slate-900 sm:mt-2 sm:text-2xl">
                   {trafficBySource[key] ?? 0}
                 </div>
               </div>

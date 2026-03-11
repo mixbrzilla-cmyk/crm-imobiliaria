@@ -1136,14 +1136,14 @@ export default function ObrasAdminPage() {
                   Setores + lançamentos recentes. Dica: o setor fica registrado no texto como [Fundação], [Alvenaria], [Elétrica].
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-end gap-2">
                 <div className="text-xs text-slate-500">
                   {isWorkersLoading ? "Atualizando..." : `${entries.length} lançamentos`}
                 </div>
                 <button
                   type="button"
                   onClick={() => void loadWorkersAndEntries()}
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-semibold text-slate-900 shadow-sm ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50"
+                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-semibold text-slate-900 shadow-sm ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50 sm:w-auto"
                 >
                   <RefreshCw className="h-4 w-4" />
                   Atualizar
@@ -1154,7 +1154,7 @@ export default function ObrasAdminPage() {
                     setErrorMessage(null);
                     setIsWorkerModalOpen(true);
                   }}
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-semibold text-slate-900 shadow-sm ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50"
+                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-semibold text-slate-900 shadow-sm ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50 sm:w-auto"
                 >
                   <HardHat className="h-4 w-4" />
                   Adicionar Colaborador
@@ -1165,7 +1165,7 @@ export default function ObrasAdminPage() {
                     setErrorMessage(null);
                     setIsEntryModalOpen(true);
                   }}
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#001f3f] px-4 text-xs font-semibold text-white shadow-sm transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#001a33]"
+                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#001f3f] px-4 text-xs font-semibold text-white shadow-sm transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#001a33] sm:w-auto"
                 >
                   <Plus className="h-4 w-4" />
                   Lançar Medição
