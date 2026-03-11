@@ -55,6 +55,15 @@ function parseBRLInputToNumber(value: string) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function maskBRLInput(value: string) {
+  const digits = String(value ?? "").replace(/\D+/g, "");
+  if (!digits) return "";
+  const cents = Number(digits);
+  if (!Number.isFinite(cents)) return "";
+  const amount = cents / 100;
+  return amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
 export default function CorretorInventarioPage() {
   const supabase = useMemo(() => getSupabaseClient(), []);
 
@@ -434,7 +443,7 @@ export default function CorretorInventarioPage() {
                 <input
                   className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none focus:border-[color:var(--imob-navy)] focus:ring-2 focus:ring-[color:var(--imob-navy)]/20"
                   value={form.price}
-                  onChange={(e) => setForm((s) => ({ ...s, price: e.target.value }))}
+                  onChange={(e) => setForm((s) => ({ ...s, price: maskBRLInput(e.target.value) }))}
                   inputMode="decimal"
                 />
               </label>
