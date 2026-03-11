@@ -9,7 +9,7 @@ async function loadWhatsappSettings(supabase: any) {
   try {
     const res = await supabase
       .from("whatsapp_settings")
-      .select("api_base_url, instance_id, token, client_key")
+      .select("instance_id, token, client_key, webhook_url")
       .limit(1)
       .maybeSingle();
     if (res.error) return null;

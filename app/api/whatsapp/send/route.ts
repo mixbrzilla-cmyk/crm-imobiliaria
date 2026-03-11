@@ -9,7 +9,7 @@ async function loadWhatsappSettings(supabase: any) {
   try {
     const res = await supabase
       .from("whatsapp_settings")
-      .select("api_base_url, instance_id, token, client_key")
+      .select("instance_id, token, client_key, webhook_url")
       .limit(1)
       .maybeSingle();
     if (res.error) return null;
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
   }
 
   const settings = await loadWhatsappSettings(supabase);
-  if (!settings?.api_base_url || !settings?.instance_id || !settings?.token) {
+  if (!settings?.instance_id || !settings?.token) {
     return NextResponse.json(
       {
         ok: false,

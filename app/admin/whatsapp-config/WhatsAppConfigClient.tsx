@@ -6,24 +6,24 @@ import { getSupabaseClient } from "@/lib/supabaseClient";
 
 type SettingsRow = {
   id?: string;
-  api_base_url: string | null;
   instance_id: string | null;
   token: string | null;
   client_key: string | null;
-  official_number?: string | null;
+  webhook_url: string | null;
   created_at?: string;
 };
 
 type FormState = {
-  api_base_url: string;
   instance_id: string;
   token: string;
   client_key: string;
-  official_number: string;
+  webhook_url: string;
 };
 
 export default function WhatsAppConfigClient() {
   const supabase = useMemo(() => getSupabaseClient(), []);
+
+  const SETTINGS_ID = "singleton";
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,11 +31,10 @@ export default function WhatsAppConfigClient() {
   const [supportsTable, setSupportsTable] = useState(true);
 
   const [form, setForm] = useState<FormState>({
-    api_base_url: "https://api.z-api.io",
     instance_id: "",
     token: "",
     client_key: "",
-    official_number: "",
+    webhook_url: "",
   });
 
   async function load() {
@@ -53,7 +52,7 @@ export default function WhatsAppConfigClient() {
     try {
       const res = await supabase
         .from("whatsapp_settings")
-        .select("api_base_url, instance_id, token, client_key, official_number, created_at")
+        .select("id, instance_id, token, client_key, webhook_url, created_at")
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -66,11 +65,10 @@ export default function WhatsAppConfigClient() {
       const row = (res.data ?? null) as SettingsRow | null;
       if (row) {
         setForm({
-          api_base_url: row.api_base_url ?? "https://api.z-api.io",
           instance_id: row.instance_id ?? "",
           token: row.token ?? "",
           client_key: row.client_key ?? "",
-          official_number: row.official_number ?? "",
+          webhook_url: row.webhook_url ?? "",
         });
       }
 
@@ -104,17 +102,33 @@ export default function WhatsAppConfigClient() {
 
     try {
       const payload = {
-        api_base_url: form.api_base_url.trim() ? form.api_base_url.trim() : null,
         instance_id: form.instance_id.trim() ? form.instance_id.trim() : null,
         token: form.token.trim() ? form.token.trim() : null,
         client_key: form.client_key.trim() ? form.client_key.trim() : null,
-        official_number: form.official_number.trim() ? form.official_number.trim() : null,
+        webhook_url: form.webhook_url.trim() ? form.webhook_url.trim() : null,
       };
 
-      const res = await (supabase as any).from("whatsapp_settings").insert({
-        id: crypto.randomUUID(),
-        ...payload,
+      if (!payload.instance_id || !payload.token) {
+        setErrorMessage("Preencha instance_id e token.");
+        setIsSaving(false);
+        return;
+      }
+
+      const validateRes = await fetch("/api/whatsapp/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ instance_id: payload.instance_id, token: payload.token }),
       });
+      const validateJson = await validateRes.json().catch(() => null);
+      if (!validateRes.ok || !validateJson?.ok) {
+        setErrorMessage(validateJson?.error ?? "Z-API não conectada. Verifique instance_id e token.");
+        setIsSaving(false);
+        return;
+      }
+
+      const res = await (supabase as any)
+        .from("whatsapp_settings")
+        .upsert({ id: SETTINGS_ID, ...payload }, { onConflict: "id" });
 
       if (res.error) {
         console.log("DEBUG SUPABASE:", res.error);
@@ -170,17 +184,6 @@ export default function WhatsAppConfigClient() {
         </div>
 
         <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-          <label className="flex flex-col gap-2 md:col-span-2">
-            <span className="text-xs font-semibold tracking-wide text-slate-600">API Base URL</span>
-            <input
-              value={form.api_base_url}
-              onChange={(e) => setForm((s) => ({ ...s, api_base_url: e.target.value }))}
-              placeholder="https://api.z-api.io"
-              className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
-              disabled={isLoading}
-            />
-          </label>
-
           <label className="flex flex-col gap-2">
             <span className="text-xs font-semibold tracking-wide text-slate-600">Instância</span>
             <input
@@ -215,11 +218,11 @@ export default function WhatsAppConfigClient() {
           </label>
 
           <label className="flex flex-col gap-2 md:col-span-2">
-            <span className="text-xs font-semibold tracking-wide text-slate-600">Número Oficial (WhatsApp da empresa)</span>
+            <span className="text-xs font-semibold tracking-wide text-slate-600">Webhook URL</span>
             <input
-              value={form.official_number}
-              onChange={(e) => setForm((s) => ({ ...s, official_number: e.target.value }))}
-              placeholder="Ex: 5591999999999"
+              value={form.webhook_url}
+              onChange={(e) => setForm((s) => ({ ...s, webhook_url: e.target.value }))}
+              placeholder="https://SEU_DOMINIO.com/api/whatsapp/webhook"
               className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
               disabled={isLoading}
             />

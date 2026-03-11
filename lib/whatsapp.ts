@@ -1,8 +1,8 @@
 export type WhatsAppSettings = {
-  api_base_url: string;
   instance_id: string;
   token: string;
   client_key: string;
+  webhook_url?: string | null;
 };
 
 export type NormalizedIncomingMessage = {
@@ -88,7 +88,7 @@ export async function sendZApiTextMessage(args: {
   phone: string;
   message: string;
 }) {
-  const base = args.settings.api_base_url.replace(/\/+$/, "");
+  const base = "https://api.z-api.io";
   const url = `${base}/instances/${encodeURIComponent(args.settings.instance_id)}/token/${encodeURIComponent(
     args.settings.token,
   )}/send-text`;
@@ -111,4 +111,33 @@ export async function sendZApiTextMessage(args: {
   }
 
   return res.json().catch(() => ({}));
+}
+
+export async function validateZApiConnection(args: {
+  instance_id: string;
+  token: string;
+}) {
+  const base = "https://api.z-api.io";
+  const instance = encodeURIComponent(args.instance_id);
+  const token = encodeURIComponent(args.token);
+
+  const candidates = [
+    `${base}/instances/${instance}/token/${token}/status`,
+    `${base}/instances/${instance}/token/${token}/me`,
+  ];
+
+  let lastText = "";
+
+  for (const url of candidates) {
+    // eslint-disable-next-line no-await-in-loop
+    const res = await fetch(url, { method: "GET" }).catch(() => null);
+    if (!res) continue;
+    if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      return { ok: true as const, url, data };
+    }
+    lastText = await res.text().catch(() => "");
+  }
+
+  return { ok: false as const, error: lastText || "Falha ao validar conexão na Z-API." };
 }
