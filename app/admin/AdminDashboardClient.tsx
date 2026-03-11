@@ -1113,18 +1113,38 @@ export default function AdminDashboardClient() {
             <BadgeDollarSign className="h-6 w-6 text-emerald-700" />
           </div>
         </div>
+      </section>
 
-        <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200/70 border-l-4 border-l-slate-400">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="text-sm font-medium text-slate-600">Último contato (Proprietário)</div>
-              <div className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">
-                {lastOwnerContactAt ? new Date(lastOwnerContactAt).toLocaleString("pt-BR") : "-"}
-              </div>
-              <div className="mt-2 text-xs text-slate-500">Baseado em owner_whatsapp (imóveis + empreendimentos)</div>
-            </div>
-            <User className="h-6 w-6 text-slate-700" />
+      <section className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
+        <div className="flex items-start justify-between gap-6">
+          <div>
+            <div className="text-sm font-semibold text-slate-900">Auditoria WhatsApp (Proprietário)</div>
+            <div className="mt-1 text-xs text-slate-500">Baseado em owner_whatsapp (imóveis + empreendimentos)</div>
           </div>
+          <User className="h-6 w-6 text-slate-700" />
+        </div>
+
+        <div className="mt-5 overflow-x-auto">
+          <table className="min-w-full border-separate border-spacing-0">
+            <thead>
+              <tr className="bg-slate-50">
+                <th className="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Indicador</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Data</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Observação</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-t border-slate-100">
+                <td className="px-4 py-3 text-sm font-semibold text-slate-900">Último contato (Proprietário)</td>
+                <td className="px-4 py-3 text-sm text-slate-700">
+                  {lastOwnerContactAt ? new Date(lastOwnerContactAt).toLocaleString("pt-BR") : "-"}
+                </td>
+                <td className="px-4 py-3 text-sm text-slate-600">
+                  Atualiza automaticamente via webhook/envio
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
