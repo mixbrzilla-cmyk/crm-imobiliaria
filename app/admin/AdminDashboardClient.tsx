@@ -103,6 +103,13 @@ type VehicleExpenseRow = {
   amount: number | null;
 };
 
+type ContractStatus = "draft" | "juridico" | "assinatura" | "assinado";
+
+type ContractStatusRow = {
+  id: string;
+  status: string | null;
+};
+
 type LegalCaseRow = {
   id: string;
   due_diligence_json?: any;
@@ -295,6 +302,14 @@ export default function AdminDashboardClient() {
   const [marketingExpensesTotal, setMarketingExpensesTotal] = useState<number>(0);
   const [vehicleExpensesTotal, setVehicleExpensesTotal] = useState<number>(0);
 
+  const [contractsStatusCounts, setContractsStatusCounts] = useState<Record<ContractStatus, number>>({
+    draft: 0,
+    juridico: 0,
+    assinatura: 0,
+    assinado: 0,
+  });
+  const [supportsContractsTable, setSupportsContractsTable] = useState(true);
+
   const [leadsTodayCount, setLeadsTodayCount] = useState<number>(0);
   const [leadsWeekCount, setLeadsWeekCount] = useState<number>(0);
   const [leadsWeekTrend, setLeadsWeekTrend] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
@@ -384,6 +399,8 @@ export default function AdminDashboardClient() {
       setObraLaborTotal(0);
       setMarketingExpensesTotal(0);
       setVehicleExpensesTotal(0);
+      setContractsStatusCounts({ draft: 0, juridico: 0, assinatura: 0, assinado: 0 });
+      setSupportsContractsTable(true);
       return;
     }
 
@@ -480,6 +497,7 @@ export default function AdminDashboardClient() {
         obraWorkerEntriesRes,
         marketingExpensesRes,
         vehicleExpensesRes,
+        contractsRes,
         whatsRes,
         devIdsRes,
         inventarioIdsRes,
@@ -564,6 +582,8 @@ export default function AdminDashboardClient() {
           (supabase as any).from("marketing_expenses").select("id, amount").limit(5000),
 
           (supabase as any).from("vehicle_expenses").select("id, amount").limit(5000),
+
+          (supabase as any).from("contracts").select("id, status").limit(5000),
 
           // WhatsApp activity today (schema optional)
           supabase
@@ -1001,6 +1021,34 @@ export default function AdminDashboardClient() {
       setVehicleExpensesTotal(vehicleExpense);
 
       try {
+        if (contractsRes.status === "fulfilled") {
+          const value: any = contractsRes.value;
+          if (value?.error) {
+            const code = (value.error as any)?.code;
+            if (code === "42P01" || code === "PGRST204" || code === "PGRST301") {
+              setSupportsContractsTable(false);
+              setContractsStatusCounts({ draft: 0, juridico: 0, assinatura: 0, assinado: 0 });
+            }
+          } else {
+            setSupportsContractsTable(true);
+            const rows = (value?.data ?? []) as ContractStatusRow[];
+            const counts: Record<ContractStatus, number> = { draft: 0, juridico: 0, assinatura: 0, assinado: 0 };
+            for (const r of rows) {
+              const s = String(r.status ?? "draft").trim().toLowerCase();
+              if (s === "juridico") counts.juridico += 1;
+              else if (s === "assinatura") counts.assinatura += 1;
+              else if (s === "assinado") counts.assinado += 1;
+              else counts.draft += 1;
+            }
+            setContractsStatusCounts(counts);
+          }
+        }
+      } catch {
+        setSupportsContractsTable(false);
+        setContractsStatusCounts({ draft: 0, juridico: 0, assinatura: 0, assinado: 0 });
+      }
+
+      try {
         const propRow: any =
           lastOwnerPropRes.status === "fulfilled" && !lastOwnerPropRes.value.error
             ? (lastOwnerPropRes.value.data ?? [])[0]
@@ -1093,6 +1141,8 @@ export default function AdminDashboardClient() {
       setObraLaborTotal(0);
       setMarketingExpensesTotal(0);
       setVehicleExpensesTotal(0);
+      setContractsStatusCounts({ draft: 0, juridico: 0, assinatura: 0, assinado: 0 });
+      setSupportsContractsTable(false);
       setTrafficBySource({
         meta: 0,
         google: 0,
@@ -1257,6 +1307,47 @@ export default function AdminDashboardClient() {
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
+        <div className="flex items-start justify-between gap-6">
+          <div>
+            <div className="text-sm font-semibold text-slate-900">Contratos (Pipeline)</div>
+            <div className="mt-1 text-xs text-slate-500">Draft → Jurídico → Assinatura → Assinado</div>
+          </div>
+        </div>
+
+        {!supportsContractsTable ? (
+          <div className="mt-5 rounded-2xl bg-amber-50 px-5 py-4 text-sm text-amber-900 ring-1 ring-amber-200/70">
+            Infra pendente: crie a tabela <span className="font-semibold">contracts</span> no Supabase.
+          </div>
+        ) : (
+          <div className="mt-5 overflow-x-auto">
+            <table className="min-w-full border-separate border-spacing-0">
+              <thead>
+                <tr className="bg-slate-50">
+                  <th className="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Qtd.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(
+                  [
+                    ["Draft", "draft"],
+                    ["Jurídico", "juridico"],
+                    ["Assinatura", "assinatura"],
+                    ["Assinado", "assinado"],
+                  ] as Array<[string, ContractStatus]>
+                ).map(([label, key]) => (
+                  <tr key={key} className="border-t border-slate-100">
+                    <td className="px-4 py-3 text-sm font-semibold text-slate-900">{label}</td>
+                    <td className="px-4 py-3 text-sm text-slate-700">{contractsStatusCounts[key] ?? 0}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <section className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
