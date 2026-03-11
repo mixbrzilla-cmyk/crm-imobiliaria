@@ -15,6 +15,7 @@ import {
   Route,
   Tag,
   Trees,
+  Trash2,
   Video,
   Waves,
 } from "lucide-react";
@@ -60,6 +61,7 @@ type Development = {
   gallery_urls?: string[] | null;
 
   corretor_id?: string | null;
+  broker_id?: string | null;
   created_at?: string;
 };
 
@@ -74,7 +76,7 @@ type BrokerProfile = {
 type FormState = {
   name: string;
   city: string;
-  corretor_id: string;
+  broker_id: string;
   is_premium: boolean;
 
   status: DevelopmentStatus;
@@ -207,7 +209,7 @@ export default function EmpreendimentosClient() {
   const [form, setForm] = useState<FormState>({
     name: "",
     city: "Marabá",
-    corretor_id: "",
+    broker_id: "",
     is_premium: false,
     status: "pre_lancamento",
     lot_value: "",
@@ -235,7 +237,7 @@ export default function EmpreendimentosClient() {
     setForm({
       name: "",
       city: "Marabá",
-      corretor_id: "",
+      broker_id: "",
       is_premium: false,
       status: "pre_lancamento",
       lot_value: "",
@@ -275,7 +277,7 @@ export default function EmpreendimentosClient() {
     setForm({
       name: row.name ?? "",
       city: row.city ?? "Marabá",
-      corretor_id: row.corretor_id ?? "",
+      broker_id: row.broker_id ?? row.corretor_id ?? "",
       is_premium: Boolean(row.is_premium),
       status: (row.status ?? "pre_lancamento") as DevelopmentStatus,
       lot_value:
@@ -302,6 +304,17 @@ export default function EmpreendimentosClient() {
     });
     setErrorMessage(null);
     setIsModalOpen(true);
+  }
+
+  async function detectDevelopmentsBrokerColumn(): Promise<"broker_id" | "corretor_id"> {
+    if (!supabase) return "broker_id";
+    try {
+      const test = await (supabase as any).from("developments").select("id, broker_id").limit(1);
+      if (!test.error) return "broker_id";
+    } catch {
+      return "corretor_id";
+    }
+    return "corretor_id";
   }
 
   async function load() {
@@ -419,9 +432,10 @@ export default function EmpreendimentosClient() {
     setDispatchingId(developmentId);
 
     try {
+      const brokerColumn = await detectDevelopmentsBrokerColumn();
       const { error } = await (supabase as any)
         .from("developments")
-        .update({ corretor_id: brokerId })
+        .update({ [brokerColumn]: brokerId })
         .eq("id", developmentId);
 
       if (error) {
@@ -433,11 +447,41 @@ export default function EmpreendimentosClient() {
 
       void logDispatch("development", developmentId, brokerId);
 
-      setRows((current) => current.map((r) => (r.id === developmentId ? { ...r, corretor_id: brokerId } : r)));
+      setRows((current) =>
+        current.map((r) => (r.id === developmentId ? { ...r, broker_id: brokerId, corretor_id: brokerId } : r)),
+      );
     } catch {
       setErrorMessage("Não foi possível enviar ao corretor agora.");
     } finally {
       setDispatchingId(null);
+    }
+  }
+
+  async function deleteDevelopment(developmentId: string) {
+    setErrorMessage(null);
+    if (!supabase) {
+      setErrorMessage(
+        "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+      );
+      return;
+    }
+
+    const devName = (rows.find((r) => r.id === developmentId)?.name ?? "").trim() || developmentId;
+    const ok = window.confirm(`Excluir o empreendimento "${devName}"?`);
+    if (!ok) return;
+
+    try {
+      const { error } = await (supabase as any).from("developments").delete().eq("id", developmentId);
+      if (error) {
+        console.log("DEBUG SUPABASE:", error);
+        setErrorMessage(error.message);
+        return;
+      }
+
+      setRows((current) => current.filter((r) => r.id !== developmentId));
+      if (selectedId === developmentId) setSelectedId(null);
+    } catch {
+      setErrorMessage("Não foi possível excluir o empreendimento agora.");
     }
   }
 
@@ -473,8 +517,10 @@ export default function EmpreendimentosClient() {
       .map((l) => l.trim())
       .filter(Boolean);
 
+    const brokerColumn = await detectDevelopmentsBrokerColumn();
+
     const basePayload: any = {
-      id: selectedId ?? crypto.randomUUID(),
+      ...(selectedId ? {} : { id: crypto.randomUUID() }),
       name: form.name.trim(),
       cover_url: form.cover_url.trim() ? form.cover_url.trim() : null,
       video_url: form.video_url.trim() ? form.video_url.trim() : null,
@@ -485,7 +531,7 @@ export default function EmpreendimentosClient() {
     const detailsPayload: any = {
       ...basePayload,
       city: form.city.trim() ? form.city.trim() : null,
-      corretor_id: form.corretor_id.trim() ? form.corretor_id.trim() : null,
+      [brokerColumn]: form.broker_id.trim() ? form.broker_id.trim() : null,
       is_premium: form.is_premium,
       status: form.status,
       lot_value: parseBRLInputToNumber(form.lot_value),
@@ -676,6 +722,14 @@ export default function EmpreendimentosClient() {
                         VALOR
                       </div>
                       <div className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">{value}</div>
+                      <div className="mt-3 flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-600">
+                        <span className="inline-flex items-center justify-center rounded-full bg-slate-50 px-3 py-1 ring-1 ring-slate-200/70">
+                          🏢 Unidades: {r.units_count != null ? r.units_count : "-"}
+                        </span>
+                        <span className="inline-flex items-center justify-center rounded-full bg-slate-50 px-3 py-1 ring-1 ring-slate-200/70">
+                          📐 Área: {r.total_area_m2 != null ? `${r.total_area_m2} m²` : "-"}
+                        </span>
+                      </div>
                     </div>
                     <div className="flex flex-col items-end gap-2">
                       <span className="inline-flex items-center justify-center rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200/70">
@@ -715,18 +769,29 @@ export default function EmpreendimentosClient() {
                     >
                       Editar
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedId(r.id);
-                        setDispatchSelectionById((c) => ({ ...c, [r.id]: r.corretor_id ?? "" }));
-                        setIsModalOpen(true);
-                        setModalStep(0);
-                      }}
-                      className="inline-flex h-11 items-center justify-center rounded-xl bg-[#001f3f] px-4 text-sm font-semibold text-white shadow-[0_6px_14px_-10px_rgba(15,23,42,0.45)] transition-all duration-300 hover:bg-[#001a33]"
-                    >
-                      Abrir
-                    </button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedId(r.id);
+                          setDispatchSelectionById((c) => ({ ...c, [r.id]: r.broker_id ?? r.corretor_id ?? "" }));
+                          setIsModalOpen(true);
+                          setModalStep(0);
+                        }}
+                        className="inline-flex h-11 items-center justify-center rounded-xl bg-[#001f3f] px-4 text-sm font-semibold text-white shadow-[0_6px_14px_-10px_rgba(15,23,42,0.45)] transition-all duration-300 hover:bg-[#001a33]"
+                      >
+                        Abrir
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void deleteDevelopment(r.id)}
+                        className="inline-flex h-11 items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-rose-700 ring-1 ring-rose-200/70 transition-all duration-300 hover:bg-rose-50"
+                        title="Excluir"
+                        aria-label="Excluir"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
 
                   <div className="mt-4 text-xs text-slate-500">
@@ -745,8 +810,8 @@ export default function EmpreendimentosClient() {
 
       {isModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 p-4 sm:items-center">
-          <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-[0_20px_60px_-24px_rgba(15,23,42,0.65)] ring-1 ring-slate-200/70">
-            <div className="flex items-start justify-between gap-6 border-b border-slate-100 px-6 py-5">
+          <div className="flex w-full max-w-3xl max-h-[90vh] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_20px_60px_-24px_rgba(15,23,42,0.65)] ring-1 ring-slate-200/70">
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-6 border-b border-slate-100 bg-white px-6 py-5">
               <div>
                 <div className="text-sm font-semibold text-slate-900">
                   {selectedId ? "Editar Empreendimento" : "Novo Empreendimento"}
@@ -784,7 +849,8 @@ export default function EmpreendimentosClient() {
               </div>
             ) : null}
 
-            <form onSubmit={createDevelopment} className="px-6 py-6">
+            <form onSubmit={createDevelopment} className="flex min-h-0 flex-1 flex-col">
+              <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
               <div className="grid grid-cols-4 gap-2 rounded-2xl bg-slate-50 p-2 ring-1 ring-slate-200/70">
                 {(
                   [
@@ -869,8 +935,8 @@ export default function EmpreendimentosClient() {
                       <label className="flex flex-col gap-2">
                         <span className="text-xs font-semibold tracking-wide text-slate-600">Corretor responsável</span>
                         <select
-                          value={form.corretor_id}
-                          onChange={(e) => setForm((s) => ({ ...s, corretor_id: e.target.value }))}
+                          value={form.broker_id}
+                          onChange={(e) => setForm((s) => ({ ...s, broker_id: e.target.value }))}
                           className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
                         >
                           <option value="">Sem corretor</option>
@@ -1078,7 +1144,10 @@ export default function EmpreendimentosClient() {
                 ) : null}
               </div>
 
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              </div>
+
+              <div className="sticky bottom-0 z-10 mt-auto border-t border-slate-100 bg-white px-6 py-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -1115,7 +1184,7 @@ export default function EmpreendimentosClient() {
                     {isSaving ? "Salvando..." : selectedId ? "Atualizar" : "Cadastrar"}
                   </button>
                 </div>
-              </div>
+                </div>
 
               {selectedId ? (
                 <div className="mt-6 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200/70">
@@ -1146,6 +1215,8 @@ export default function EmpreendimentosClient() {
                   </div>
                 </div>
               ) : null}
+
+              </div>
             </form>
           </div>
         </div>
