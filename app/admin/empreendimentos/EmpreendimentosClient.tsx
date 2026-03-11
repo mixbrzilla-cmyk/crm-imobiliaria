@@ -504,8 +504,8 @@ export default function EmpreendimentosClient() {
     try {
       const query = (supabase as any).from("developments");
       let res = selectedId
-        ? await query.update(detailsPayload).eq("id", selectedId)
-        : await query.insert(detailsPayload);
+        ? await query.update(detailsPayload).eq("id", selectedId).select().single()
+        : await query.insert(detailsPayload).select().single();
 
       if (res.error) {
         const code = (res.error as any)?.code;
@@ -518,12 +518,21 @@ export default function EmpreendimentosClient() {
           });
 
           res = selectedId
-            ? await query.update(basePayload).eq("id", selectedId)
-            : await query.insert(basePayload);
+            ? await query.update(basePayload).eq("id", selectedId).select().single()
+            : await query.insert(basePayload).select().single();
         }
       }
 
       if (res.error) throw res.error;
+
+      const saved = (res.data ?? null) as Development | null;
+      if (saved) {
+        setRows((current) => {
+          const exists = current.some((r) => r.id === saved.id);
+          if (exists) return current.map((r) => (r.id === saved.id ? { ...r, ...saved } : r));
+          return [saved, ...current];
+        });
+      }
 
       setIsSaving(false);
       closeModal();
