@@ -86,7 +86,7 @@ export default function CorretorHomePage() {
               className="rounded-xl border border-zinc-200 bg-white p-6 transition-colors hover:bg-zinc-50"
             >
               <div className="text-sm font-semibold text-[#1e3a8a]">Leads para Qualificar</div>
-              <div className="mt-1 text-xs text-zinc-600">Fila enviada pelo Boss + acesso rápido ao WhatsApp.</div>
+              <div className="mt-1 text-xs text-zinc-600">Fila enviada pela Imobiliária Moderna + acesso rápido ao WhatsApp.</div>
             </Link>
             <Link
               href="/corretor/inventario"
@@ -99,7 +99,7 @@ export default function CorretorHomePage() {
               href="/corretor/enviados"
               className="rounded-xl border border-[#dc2626]/30 bg-[#dc2626]/5 p-6 transition-colors hover:bg-[#dc2626]/10"
             >
-              <div className="text-sm font-semibold text-[#dc2626]">Imóveis Enviados pelo Boss</div>
+              <div className="text-sm font-semibold text-[#dc2626]">Imóveis Enviados pela Imobiliária Moderna</div>
               <div className="mt-1 text-xs text-zinc-700">Atribuídos a você para atendimento (com WhatsApp do proprietário).</div>
             </Link>
             <Link
@@ -107,7 +107,7 @@ export default function CorretorHomePage() {
               className="rounded-xl border border-zinc-200 bg-white p-6 transition-colors hover:bg-zinc-50"
             >
               <div className="text-sm font-semibold text-[#1e3a8a]">Central WhatsApp</div>
-              <div className="mt-1 text-xs text-zinc-600">Conversas auditáveis no painel do Boss.</div>
+              <div className="mt-1 text-xs text-zinc-600">Conversas auditáveis no painel da Imobiliária Moderna.</div>
             </Link>
           </div>
         )}

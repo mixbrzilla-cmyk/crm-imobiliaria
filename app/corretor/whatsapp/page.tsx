@@ -326,7 +326,7 @@ export default function CorretorWhatsAppPage() {
     <div className="flex w-full flex-col gap-6">
       <header className="flex flex-col gap-1">
         <div className="text-sm font-semibold text-[#1e3a8a]">Central WhatsApp</div>
-        <div className="text-xs text-zinc-500">Converse com proprietários com auditoria do Boss no Admin.</div>
+        <div className="text-xs text-zinc-500">Converse com proprietários com auditoria da Imobiliária Moderna no Admin.</div>
       </header>
 
       {errorMessage ? (

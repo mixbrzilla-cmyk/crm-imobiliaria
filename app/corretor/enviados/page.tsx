@@ -106,90 +106,62 @@ export default function CorretorEnviadosPage() {
     try {
       const nextRows: EnviadoRow[] = [];
 
-      const propsAttempts = [
-        (supabase as any)
+      const propsAssigned = await (supabase as any)
+        .from("properties")
+        .select("*")
+        .eq(propertiesAssignColumn, brokerId)
+        .order("created_at", { ascending: false })
+        .limit(300);
+
+      let propsData: Array<any> = [];
+      if (propsAssigned?.error) {
+        const fallback = await (supabase as any)
           .from("properties")
           .select("*")
           .eq(propertiesAssignColumn, brokerId)
-          .eq("source_type", "admin")
-          .order("created_at", { ascending: false })
-          .limit(200),
-        (supabase as any)
-          .from("properties")
-          .select("*")
-          .eq(propertiesAssignColumn, brokerId)
-          .eq("source_type", "admin")
-          .limit(200),
-        (supabase as any)
-          .from("properties")
-          .select("*")
-          .eq(propertiesAssignColumn, brokerId)
-          .limit(200),
-      ];
-
-      let propsRes: any = null;
-      for (const q of propsAttempts) {
-        const res = await q;
-        if (!res?.error) {
-          propsRes = res;
-          break;
+          .limit(300);
+        if (fallback?.error) {
+          console.error("[Corretor Enviados] Falha ao carregar properties", fallback.error);
+        } else {
+          propsData = (fallback.data ?? []) as Array<any>;
         }
-        propsRes = res;
-        const msg = String(res.error?.message ?? "");
-        const code = (res.error as any)?.code;
-        const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
-        const isSourceTypeMissing = /column\s+\"?source_type\"?\s+does\s+not\s+exist|source_type\s+not\s+found/i.test(msg);
-        const isCreatedAtMissing = /created_at/i.test(msg);
-        if (!isSchemaMismatch && !isSourceTypeMissing && !isCreatedAtMissing) break;
+      } else {
+        propsData = (propsAssigned.data ?? []) as Array<any>;
       }
 
-      if (propsRes?.data) {
-        for (const r of propsRes.data as Array<any>) {
-          nextRows.push({ id: String(r?.id ?? ""), source: "properties", data: r });
-        }
+      for (const r of propsData) {
+        const sourceType = String(r?.source_type ?? "").toLowerCase().trim();
+        if (sourceType === "broker_capture") continue;
+        nextRows.push({ id: String(r?.id ?? ""), source: "properties", data: r });
       }
 
-      const devsAttempts = [
-        (supabase as any)
+      const devsAssigned = await (supabase as any)
+        .from("developments")
+        .select("*")
+        .eq(developmentsAssignColumn, brokerId)
+        .order("created_at", { ascending: false })
+        .limit(300);
+
+      let devsData: Array<any> = [];
+      if (devsAssigned?.error) {
+        const fallback = await (supabase as any)
           .from("developments")
           .select("*")
           .eq(developmentsAssignColumn, brokerId)
-          .eq("source_type", "admin")
-          .order("created_at", { ascending: false })
-          .limit(200),
-        (supabase as any)
-          .from("developments")
-          .select("*")
-          .eq(developmentsAssignColumn, brokerId)
-          .eq("source_type", "admin")
-          .limit(200),
-        (supabase as any)
-          .from("developments")
-          .select("*")
-          .eq(developmentsAssignColumn, brokerId)
-          .limit(200),
-      ];
-
-      let devsRes: any = null;
-      for (const q of devsAttempts) {
-        const res = await q;
-        if (!res?.error) {
-          devsRes = res;
-          break;
+          .limit(300);
+        if (fallback?.error) {
+          console.error("[Corretor Enviados] Falha ao carregar developments", fallback.error);
+        } else {
+          devsData = (fallback.data ?? []) as Array<any>;
         }
-        devsRes = res;
-        const msg = String(res.error?.message ?? "");
-        const code = (res.error as any)?.code;
-        const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
-        const isSourceTypeMissing = /column\s+\"?source_type\"?\s+does\s+not\s+exist|source_type\s+not\s+found/i.test(msg);
-        const isCreatedAtMissing = /created_at/i.test(msg);
-        if (!isSchemaMismatch && !isSourceTypeMissing && !isCreatedAtMissing) break;
+      } else {
+        devsData = (devsAssigned.data ?? []) as Array<any>;
       }
 
-      if (devsRes?.data) {
-        for (const r of devsRes.data as Array<any>) {
-          nextRows.push({ id: String(r?.id ?? ""), source: "developments", data: r });
-        }
+      for (const r of devsData) {
+        const sourceType = String(r?.source_type ?? "").toLowerCase().trim();
+        if (sourceType === "broker_capture") continue;
+        nextRows.push({ id: String(r?.id ?? ""), source: "developments", data: r });
       }
 
       setRows(nextRows);
@@ -210,7 +182,7 @@ export default function CorretorEnviadosPage() {
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
-        <div className="text-sm font-semibold text-[#dc2626]">Imóveis Enviados pelo Boss</div>
+        <div className="text-sm font-semibold text-[#dc2626]">Imóveis Enviados pela Imobiliária Moderna</div>
         <div className="text-xs text-zinc-600">Itens atribuídos a você para atender (com WhatsApp do proprietário).</div>
       </header>
 

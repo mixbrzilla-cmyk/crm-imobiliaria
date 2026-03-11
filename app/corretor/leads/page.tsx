@@ -76,7 +76,7 @@ export default function CorretorLeadsPage() {
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
         <div className="text-sm font-semibold text-[#1e3a8a]">Leads para Qualificar</div>
-        <div className="text-xs text-zinc-500">Proprietários vindos de landing pages ou enviados pelo Boss.</div>
+        <div className="text-xs text-zinc-500">Proprietários vindos de landing pages ou enviados pela Imobiliária Moderna.</div>
       </header>
 
       {errorMessage ? (

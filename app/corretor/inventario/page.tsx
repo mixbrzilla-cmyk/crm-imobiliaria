@@ -330,7 +330,7 @@ export default function CorretorInventarioPage() {
         }
       }
 
-      setSuccessMessage("Captação enviada com sucesso. Já aparece no painel do Boss.");
+      setSuccessMessage("Captação enviada com sucesso. Já aparece no painel da Imobiliária Moderna.");
       setForm((s) => ({
         ...s,
         title: "",
@@ -351,7 +351,7 @@ export default function CorretorInventarioPage() {
       <header className="flex flex-col gap-1">
         <div className="text-sm font-semibold text-[#1e3a8a]">Meu Inventário (Captação)</div>
         <div className="text-xs text-zinc-500">
-          Cadastre novos imóveis/empreendimentos no seu nome. O Boss vê instantaneamente no Admin.
+          Cadastre novos imóveis/empreendimentos no seu nome. A Imobiliária Moderna vê instantaneamente no Admin.
         </div>
       </header>
 
