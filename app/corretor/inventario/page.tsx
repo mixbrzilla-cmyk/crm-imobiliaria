@@ -172,14 +172,14 @@ export default function CorretorInventarioPage() {
           .from("properties")
           .select("*")
           .eq(propertiesAssignColumn, brokerId)
-          .eq("source_type", "broker_capture")
+          .or("source_type.eq.broker_capture,source_type.is.null")
           .order("created_at", { ascending: false })
           .limit(200),
         (supabase as any)
           .from("properties")
           .select("*")
           .eq(propertiesAssignColumn, brokerId)
-          .eq("source_type", "broker_capture")
+          .or("source_type.eq.broker_capture,source_type.is.null")
           .limit(200),
         (supabase as any).from("properties").select("*").eq(propertiesAssignColumn, brokerId).limit(200),
       ];
@@ -211,14 +211,14 @@ export default function CorretorInventarioPage() {
           .from("developments")
           .select("*")
           .eq(developmentsAssignColumn, brokerId)
-          .eq("source_type", "broker_capture")
+          .or("source_type.eq.broker_capture,source_type.is.null")
           .order("created_at", { ascending: false })
           .limit(200),
         (supabase as any)
           .from("developments")
           .select("*")
           .eq(developmentsAssignColumn, brokerId)
-          .eq("source_type", "broker_capture")
+          .or("source_type.eq.broker_capture,source_type.is.null")
           .limit(200),
         (supabase as any).from("developments").select("*").eq(developmentsAssignColumn, brokerId).limit(200),
       ];
@@ -294,11 +294,29 @@ export default function CorretorInventarioPage() {
           price: form.price.trim() ? parseBRLInputToNumber(form.price) : null,
           owner_whatsapp: ownerWhatsapp ? ownerWhatsapp : null,
           owner_name: form.owner_name.trim() ? form.owner_name.trim() : null,
+          source_type: "broker_capture",
           [propertiesAssignColumn]: brokerId,
         };
 
-        const payloadAttempts: Array<any> = [payloadBase, { ...payloadBase }];
-        delete payloadAttempts[1].owner_name;
+        const payloadAttempts: Array<any> = [
+          payloadBase,
+          (() => {
+            const p = { ...payloadBase };
+            delete p.owner_name;
+            return p;
+          })(),
+          (() => {
+            const p = { ...payloadBase };
+            delete p.source_type;
+            return p;
+          })(),
+          (() => {
+            const p = { ...payloadBase };
+            delete p.owner_name;
+            delete p.source_type;
+            return p;
+          })(),
+        ];
 
         let lastError: any = null;
         for (const payload of payloadAttempts) {
@@ -310,9 +328,10 @@ export default function CorretorInventarioPage() {
           lastError = res.error;
           const msg = String(res.error?.message ?? "");
           const isOwnerNameMissing = /column\s+\"?owner_name\"?\s+does\s+not\s+exist|owner_name\s+not\s+found/i.test(msg);
+          const isSourceTypeMissing = /column\s+\"?source_type\"?\s+does\s+not\s+exist|source_type\s+not\s+found/i.test(msg);
           const code = (res.error as any)?.code;
           const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
-          if (!isOwnerNameMissing && !isSchemaMismatch) break;
+          if (!isOwnerNameMissing && !isSourceTypeMissing && !isSchemaMismatch) break;
         }
 
         if (lastError) {
@@ -329,11 +348,29 @@ export default function CorretorInventarioPage() {
           localidade: form.neighborhood.trim() ? form.neighborhood.trim() : null,
           owner_whatsapp: ownerWhatsapp ? ownerWhatsapp : null,
           owner_name: form.owner_name.trim() ? form.owner_name.trim() : null,
+          source_type: "broker_capture",
           [developmentsAssignColumn]: brokerId,
         };
 
-        const payloadAttempts: Array<any> = [payloadBase, { ...payloadBase }];
-        delete payloadAttempts[1].owner_name;
+        const payloadAttempts: Array<any> = [
+          payloadBase,
+          (() => {
+            const p = { ...payloadBase };
+            delete p.owner_name;
+            return p;
+          })(),
+          (() => {
+            const p = { ...payloadBase };
+            delete p.source_type;
+            return p;
+          })(),
+          (() => {
+            const p = { ...payloadBase };
+            delete p.owner_name;
+            delete p.source_type;
+            return p;
+          })(),
+        ];
 
         let lastError: any = null;
         for (const payload of payloadAttempts) {
@@ -345,9 +382,10 @@ export default function CorretorInventarioPage() {
           lastError = res.error;
           const msg = String(res.error?.message ?? "");
           const isOwnerNameMissing = /column\s+\"?owner_name\"?\s+does\s+not\s+exist|owner_name\s+not\s+found/i.test(msg);
+          const isSourceTypeMissing = /column\s+\"?source_type\"?\s+does\s+not\s+exist|source_type\s+not\s+found/i.test(msg);
           const code = (res.error as any)?.code;
           const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
-          if (!isOwnerNameMissing && !isSchemaMismatch) break;
+          if (!isOwnerNameMissing && !isSourceTypeMissing && !isSchemaMismatch) break;
         }
 
         if (lastError) {
