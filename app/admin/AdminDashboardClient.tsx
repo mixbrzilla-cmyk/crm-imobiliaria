@@ -36,21 +36,15 @@ type LeadRow = {
 
 type DirecionamentoRow = {
   id: string;
-  name: string | null;
-  neighborhood: string | null;
-  city: string | null;
-  corretor_id: string | null;
-  data_direcionamento: string | null;
+  title: string | null;
+  assigned_broker_id: string | null;
   created_at?: string | null;
 };
 
 type DirecionamentoUnionRow = {
   id: string;
-  name: string | null;
-  neighborhood: string | null;
-  city: string | null;
-  corretor_id: string | null;
-  data_direcionamento: string | null;
+  label: string;
+  assigned_broker_id: string;
   created_at?: string | null;
   source: "properties" | "developments";
 };
@@ -357,6 +351,7 @@ export default function AdminDashboardClient() {
   const [ptamMonthAvgValue, setPtamMonthAvgValue] = useState<number>(0);
 
   const [direcionamentos, setDirecionamentos] = useState<DirecionamentoViewRow[]>([]);
+  const [direcionamentosError, setDirecionamentosError] = useState<string | null>(null);
 
   const [nowTick, setNowTick] = useState(() => Date.now());
 
@@ -405,6 +400,7 @@ export default function AdminDashboardClient() {
       });
       setTopProperties([]);
       setDirecionamentos([]);
+      setDirecionamentosError(null);
       setLeadFunnel({ entrada: 0, atendimento: 0, visita: 0, contrato: 0 });
       setLegalRiskCounts({ verde: 0, amarelo: 0, vermelho: 0 });
       setPtamMonthCount(0);
@@ -420,6 +416,7 @@ export default function AdminDashboardClient() {
     }
 
     try {
+      setDirecionamentosError(null);
       const supportsDeletedAt = async (table: string) => {
         try {
           const res = await (supabase as any).from(table).select("deleted_at").limit(1);
@@ -438,24 +435,12 @@ export default function AdminDashboardClient() {
         }
       };
 
-      const getAssignedColumns = async (table: string) => {
-        const candidates = ["assigned_broker_profile_id", "assigned_broker_id"] as const;
-        const cols: Array<(typeof candidates)[number]> = [];
-        for (const c of candidates) {
-          if (await supportsColumn(table, c)) cols.push(c);
-        }
-        return cols;
-      };
-
       const [propertiesHasDeletedAt, developmentsHasDeletedAt] = await Promise.all([
         supportsDeletedAt("properties"),
         supportsDeletedAt("developments"),
       ]);
 
-      const [propertiesAssignedColumns, developmentsAssignedColumns] = await Promise.all([
-        getAssignedColumns("properties"),
-        getAssignedColumns("developments"),
-      ]);
+      await Promise.all([supportsColumn("properties", "assigned_broker_id"), supportsColumn("developments", "assigned_broker_id")]);
 
       let propertiesBrokerColumn: "corretor_id" | "broker_id" = "corretor_id";
       try {
@@ -635,41 +620,20 @@ export default function AdminDashboardClient() {
           })(),
 
           // Relatório de direcionamento (posse)
-          // Relatório de direcionamento (posse)
-          // (UNION) properties com assigned_broker_id != null
-          (async () => {
-            const items: Array<{ col: string; res: any }> = [];
-            const cols = propertiesAssignedColumns.length > 0 ? propertiesAssignedColumns : ["assigned_broker_id"];
-            for (const col of cols) {
-              const base = (supabase as any)
-                .from("properties")
-                .select(`id, name, city, ${col}, created_at`);
-
-              const q = propertiesHasDeletedAt ? base.is("deleted_at", null) : base;
-              const res = await q.limit(5000);
-              items.push({ col, res });
-            }
-
-            return { items };
-          })(),
+          // Query cirúrgica: properties (id, title, created_at, assigned_broker_id)
+          (supabase as any)
+            .from("properties")
+            .select("id, title, created_at, assigned_broker_id")
+            .not("assigned_broker_id", "is", null)
+            .limit(5000),
 
           // Relatório de direcionamento (posse) - developments
-          // (UNION) developments com assigned_broker_id != null
-          (async () => {
-            const items: Array<{ col: string; res: any }> = [];
-            const cols = developmentsAssignedColumns.length > 0 ? developmentsAssignedColumns : ["assigned_broker_id"];
-            for (const col of cols) {
-              const base = (supabase as any)
-                .from("developments")
-                .select(`id, name, localidade, city, cidade, ${col}, created_at`);
-
-              const q = developmentsHasDeletedAt ? base.is("deleted_at", null) : base;
-              const res = await q.limit(5000);
-              items.push({ col, res });
-            }
-
-            return { items };
-          })(),
+          // Query cirúrgica: developments (id, name, created_at, assigned_broker_id)
+          (supabase as any)
+            .from("developments")
+            .select("id, name, created_at, assigned_broker_id")
+            .not("assigned_broker_id", "is", null)
+            .limit(5000),
 
           // Jurídico (status do escritório)
           (() => {
@@ -760,41 +724,24 @@ export default function AdminDashboardClient() {
       setAssignedImoveisCount(assignedCount);
       setUnassignedImoveisCount(unassignedCount);
 
-      try {
-        const propsPayload: any = direcionamentosRes.status === "fulfilled" ? direcionamentosRes.value : null;
-        const devsPayload: any = direcionamentosDevsRes.status === "fulfilled" ? direcionamentosDevsRes.value : null;
-        const props = (propsPayload?.items ?? []).flatMap((it: any) => it?.res?.data ?? []);
-        const devs = (devsPayload?.items ?? []).flatMap((it: any) => it?.res?.data ?? []);
-        console.log("DADOS BRUTOS DO BANCO:", { props, devs });
-      } catch {
-        // ignore
-      }
-
       const unionMap = new Map<string, DirecionamentoUnionRow>();
+      const direcionamentoErrors: string[] = [];
 
       if (direcionamentosRes.status === "fulfilled") {
-        const payload: any = direcionamentosRes.value;
-        const items = (payload?.items ?? []) as Array<{ col: string; res: any }>;
-        for (const it of items) {
-          if (it?.res?.error) {
-            console.log("[Dashboard] Erro ao carregar direcionamentos properties:", it.res.error);
-            continue;
-          }
-          const col = String(it?.col ?? "assigned_broker_id");
-          const data = (it?.res?.data ?? []) as Array<any>;
+        const res: any = direcionamentosRes.value;
+        if (res?.error) {
+          direcionamentoErrors.push(`properties: ${String(res.error?.message ?? res.error)}`);
+        } else {
+          const data = (res?.data ?? []) as Array<any>;
           for (const r of data) {
-            const assigned = (r as any)?.[col] ?? null;
+            const assigned = (r as any)?.assigned_broker_id ?? null;
             if (!assigned) continue;
             const id = String(r?.id ?? "");
             if (!id) continue;
-            if (unionMap.has(`properties:${id}`)) continue;
             unionMap.set(`properties:${id}`, {
               id,
-              name: (r?.name ?? null) as string | null,
-              neighborhood: null,
-              city: (r?.city ?? null) as string | null,
-              corretor_id: String(assigned),
-              data_direcionamento: null,
+              label: (String(r?.title ?? "").trim() || id) as string,
+              assigned_broker_id: String(assigned),
               created_at: (r?.created_at ?? null) as string | null,
               source: "properties",
             });
@@ -803,28 +750,20 @@ export default function AdminDashboardClient() {
       }
 
       if (direcionamentosDevsRes.status === "fulfilled") {
-        const payload: any = direcionamentosDevsRes.value;
-        const items = (payload?.items ?? []) as Array<{ col: string; res: any }>;
-        for (const it of items) {
-          if (it?.res?.error) {
-            console.log("[Dashboard] Erro ao carregar direcionamentos developments:", it.res.error);
-            continue;
-          }
-          const col = String(it?.col ?? "assigned_broker_id");
-          const data = (it?.res?.data ?? []) as Array<any>;
+        const res: any = direcionamentosDevsRes.value;
+        if (res?.error) {
+          direcionamentoErrors.push(`developments: ${String(res.error?.message ?? res.error)}`);
+        } else {
+          const data = (res?.data ?? []) as Array<any>;
           for (const r of data) {
-            const assigned = (r as any)?.[col] ?? null;
+            const assigned = (r as any)?.assigned_broker_id ?? null;
             if (!assigned) continue;
             const id = String(r?.id ?? "");
             if (!id) continue;
-            if (unionMap.has(`developments:${id}`)) continue;
             unionMap.set(`developments:${id}`, {
               id,
-              name: (String(r?.name ?? "").trim() || null) as string | null,
-              neighborhood: (r?.localidade ?? null) as string | null,
-              city: (r?.city ?? r?.cidade ?? null) as string | null,
-              corretor_id: String(assigned),
-              data_direcionamento: null,
+              label: (String(r?.name ?? "").trim() || id) as string,
+              assigned_broker_id: String(assigned),
               created_at: (r?.created_at ?? null) as string | null,
               source: "developments",
             });
@@ -832,12 +771,14 @@ export default function AdminDashboardClient() {
         }
       }
 
+      if (direcionamentoErrors.length > 0) {
+        setDirecionamentosError(direcionamentoErrors.join(" | "));
+      }
+
       const unionRows = Array.from(unionMap.values());
 
       if (unionRows.length > 0) {
-        const brokerIds = Array.from(
-          new Set(unionRows.map((r) => (r.corretor_id ?? "").trim()).filter(Boolean)),
-        );
+        const brokerIds = Array.from(new Set(unionRows.map((r) => r.assigned_broker_id).filter(Boolean)));
 
         const profilesById = new Map<string, { id: string; full_name: string | null }>();
         if (brokerIds.length > 0) {
@@ -849,12 +790,10 @@ export default function AdminDashboardClient() {
         }
 
         const view = unionRows
-          .filter((r) => Boolean(r.corretor_id))
           .map((r) => {
-            const brokerId = r.corretor_id ?? "";
+            const brokerId = r.assigned_broker_id;
             const brokerName = (profilesById.get(brokerId)?.full_name ?? "").trim() || `ID: ${brokerId}`;
-            const loc = [r.neighborhood, r.city].filter(Boolean).join(" • ");
-            const propertyLabel = (r.name ?? "").trim() || loc || r.id;
+            const propertyLabel = r.label;
             const directedAt = r.created_at ?? "";
             const directedTs = directedAt ? new Date(directedAt).getTime() : NaN;
             const daysSince = Number.isFinite(directedTs)
@@ -1459,6 +1398,12 @@ export default function AdminDashboardClient() {
             <div className="mt-1 text-xs text-slate-500">Quem está com a posse do imóvel</div>
           </div>
         </div>
+
+        {direcionamentosError ? (
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            {direcionamentosError}
+          </div>
+        ) : null}
 
         <div className="mt-5 max-h-[520px] overflow-auto rounded-xl ring-1 ring-slate-200/70">
           <table className="min-w-full border-separate border-spacing-0">
