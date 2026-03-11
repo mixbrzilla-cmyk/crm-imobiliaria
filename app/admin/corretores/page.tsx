@@ -340,9 +340,7 @@ export default function CorretoresAdminPage() {
     const devsRes = brokerIds.length
       ? await (supabase as any)
           .from("developments")
-          .select(
-            `id, name, titulo, title, status, units_count, total_units, total_area_m2, area_total_m2, area_m2, city, cidade, localidade, bairro, ${developmentsBrokerColumn}`,
-          )
+          .select("*")
           .in(developmentsBrokerColumn, brokerIds)
           .not(developmentsBrokerColumn, "is", null)
           .order("created_at", { ascending: false })
@@ -352,20 +350,17 @@ export default function CorretoresAdminPage() {
       const fallbackDevs = brokerIds.length
         ? await (supabase as any)
             .from("developments")
-            .select(`id, name, titulo, title, status, city, localidade, ${developmentsBrokerColumn}`)
+            .select("*")
             .in(developmentsBrokerColumn, brokerIds)
             .not(developmentsBrokerColumn, "is", null)
             .order("id", { ascending: false })
         : { data: [], error: null };
 
       if (fallbackDevs.error) {
+        console.error("[Corretores] Falha ao carregar empreendimentos", fallbackDevs.error);
         setErrorMessage(fallbackDevs.error.message);
-        setRows([]);
-        setIsLoading(false);
-        return;
-      }
-
-      for (const row of (fallbackDevs.data ?? []) as Array<any>) {
+      } else {
+        for (const row of (fallbackDevs.data ?? []) as Array<any>) {
         const brokerId = String(row?.[developmentsBrokerColumn] ?? "").trim();
         if (!brokerId) continue;
         const name = String(row?.name ?? row?.titulo ?? row?.title ?? "").trim() || "-";
@@ -382,6 +377,7 @@ export default function CorretoresAdminPage() {
           city,
         });
         devsByBroker.set(brokerId, list);
+        }
       }
     } else {
       for (const row of (devsRes.data ?? []) as Array<any>) {
