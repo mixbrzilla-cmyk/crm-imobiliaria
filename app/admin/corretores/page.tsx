@@ -4,6 +4,8 @@ export const dynamic = "force-dynamic";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { useRouter } from "next/navigation";
+
 import { CheckCircle2, MessageCircle, Plus, Trash2, X, XCircle } from "lucide-react";
 
 import { getSupabaseClient } from "@/lib/supabaseClient";
@@ -101,6 +103,7 @@ function WhatsappIcon({ className }: { className?: string }) {
 
 export default function CorretoresAdminPage() {
   const supabase = useMemo(() => getSupabaseClient(), []);
+  const router = useRouter();
 
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -153,10 +156,47 @@ export default function CorretoresAdminPage() {
         ),
       );
       await loadBaseData();
+      router.refresh();
     } catch {
       setErrorMessage("Não foi possível atualizar o status do corretor agora.");
     } finally {
       setUpdatingApprovalId(null);
+    }
+  }
+
+  async function handleApprove(brokerId: string) {
+    await setBrokerApproval(brokerId, "ativo");
+  }
+
+  async function handleDelete(brokerId: string) {
+    setErrorMessage(null);
+    if (!supabase) {
+      setErrorMessage(
+        "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+      );
+      return;
+    }
+
+    const brokerName = (rows.find((r) => r.id === brokerId)?.full_name ?? "").trim() || brokerId;
+    const ok = window.confirm(`Excluir o corretor "${brokerName}"?`);
+    if (!ok) return;
+
+    setDeletingId(brokerId);
+    try {
+      const { error } = await supabase.from("profiles").delete().eq("id", brokerId);
+      if (error) {
+        console.error("[Corretores] Falha ao excluir", { brokerId, error });
+        setErrorMessage(error.message);
+        return;
+      }
+
+      setRows((current) => current.filter((r) => r.id !== brokerId));
+      if (selectedBrokerId === brokerId) setSelectedBrokerId(null);
+      router.refresh();
+    } catch {
+      setErrorMessage("Não foi possível excluir o corretor agora.");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -511,7 +551,7 @@ export default function CorretoresAdminPage() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => void deleteBroker(r.id)}
+                          onClick={() => void handleDelete(r.id)}
                           disabled={deletingId === r.id}
                           className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-700 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
                           aria-label="Excluir corretor"
@@ -526,7 +566,7 @@ export default function CorretoresAdminPage() {
                       <div className="mt-4 grid grid-cols-2 gap-2">
                         <button
                           type="button"
-                          onClick={() => void setBrokerApproval(r.id, "ativo")}
+                          onClick={() => void handleApprove(r.id)}
                           disabled={isUpdatingApproval}
                           className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm transition-all duration-300 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                         >
