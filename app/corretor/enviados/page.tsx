@@ -55,6 +55,40 @@ function pickBaths(row: any) {
   return Number.isFinite(n) ? n : null;
 }
 
+function pickDealTypeLabel(row: any) {
+  const rawCandidates = [
+    row?.business_type,
+    row?.transaction_type,
+    row?.purpose,
+    row?.deal_type,
+    row?.listing_type,
+    row?.tipo_negocio,
+    row?.finalidade,
+  ].filter((v) => v != null);
+
+  const merged = rawCandidates
+    .map((v) => String(v).toLowerCase().trim())
+    .filter(Boolean)
+    .join(" ");
+
+  const wantsRent =
+    Boolean(row?.for_rent) ||
+    Boolean(row?.is_rent) ||
+    Boolean(row?.rent) ||
+    /loca|alug|rent/.test(merged);
+
+  const wantsSale =
+    Boolean(row?.for_sale) ||
+    Boolean(row?.is_sale) ||
+    Boolean(row?.sale) ||
+    /vend|sale/.test(merged);
+
+  if (wantsSale && wantsRent) return "Venda/Locação";
+  if (wantsRent) return "Locação";
+  if (wantsSale) return "Venda";
+  return null;
+}
+
 export default function CorretorEnviadosPage() {
   const supabase = useMemo(() => getSupabaseClient(), []);
 
@@ -272,6 +306,7 @@ export default function CorretorEnviadosPage() {
               const priceLabel = formatCurrencyBRL(r.data?.price ?? r.data?.valor ?? null);
               const beds = pickBeds(r.data);
               const baths = pickBaths(r.data);
+              const dealTypeLabel = pickDealTypeLabel(r.data);
 
               return (
                 <div
@@ -283,8 +318,15 @@ export default function CorretorEnviadosPage() {
                       <div className="truncate text-base font-semibold text-zinc-900">{title}</div>
                       <div className="mt-1 truncate text-sm font-medium text-zinc-600">{loc || "Localização não informada"}</div>
                     </div>
-                    <div className="shrink-0 rounded-full bg-[color:var(--imob-red)]/10 px-3 py-1 text-xs font-semibold text-[color:var(--imob-red)]">
-                      {r.source === "properties" ? "Imóvel" : "Empreendimento"}
+                    <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                      {dealTypeLabel ? (
+                        <div className="rounded-full bg-[color:var(--imob-navy)]/10 px-3 py-1 text-xs font-semibold text-[color:var(--imob-navy)]">
+                          {dealTypeLabel}
+                        </div>
+                      ) : null}
+                      <div className="rounded-full bg-[color:var(--imob-red)]/10 px-3 py-1 text-xs font-semibold text-[color:var(--imob-red)]">
+                        {r.source === "properties" ? "Imóvel" : "Empreendimento"}
+                      </div>
                     </div>
                   </div>
 
