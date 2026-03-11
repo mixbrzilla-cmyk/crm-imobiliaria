@@ -3,16 +3,6 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-const noopStorage = {
-  getItem: (_key: string) => null,
-  setItem: (_key: string, _value: string) => {
-    // no-op
-  },
-  removeItem: (_key: string) => {
-    // no-op
-  },
-};
-
 let cachedClient: SupabaseClient<any> | null = null;
 let cachedClientIsBrowser = false;
 
@@ -28,10 +18,10 @@ export function getSupabaseClient() {
       schema: "public",
     },
     auth: {
-      persistSession: false,
-      storage: typeof window === "undefined" ? undefined : (noopStorage as any),
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
+      persistSession: typeof window !== "undefined",
+      storage: typeof window === "undefined" ? undefined : undefined,
+      autoRefreshToken: typeof window !== "undefined",
+      detectSessionInUrl: typeof window !== "undefined",
     },
   });
 

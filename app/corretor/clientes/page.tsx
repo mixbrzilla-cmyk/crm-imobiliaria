@@ -33,8 +33,8 @@ export default function MeusClientesPage() {
   const supabase = getSupabaseClient();
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [brokers, setBrokers] = useState<Array<{ id: string; full_name: string | null }>>([]);
   const [brokerId, setBrokerId] = useState<string>("");
+  const [brokerName, setBrokerName] = useState<string>("");
   const [leads, setLeads] = useState<LeadRow[]>([]);
   const [movingLeadId, setMovingLeadId] = useState<string | null>(null);
 
@@ -69,53 +69,67 @@ export default function MeusClientesPage() {
       setErrorMessage(
         "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
       );
-      setBrokers([]);
       setBrokerId("");
+      setBrokerName("");
       setLeads([]);
       setIsLoading(false);
       return;
     }
 
-    const brokersRes = await supabase
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData.user) {
+      setErrorMessage("Sessão expirada. Faça login novamente.");
+      setBrokerId("");
+      setBrokerName("");
+      setLeads([]);
+      setIsLoading(false);
+      return;
+    }
+
+    const currentBrokerId = authData.user.id;
+    setBrokerId(currentBrokerId);
+
+    const profRes = await supabase
       .from("profiles")
       .select("id, full_name")
-      .eq("role", "broker")
-      .order("full_name", { ascending: true });
+      .eq("id", currentBrokerId)
+      .maybeSingle();
 
-    if (brokersRes.error) {
-      setErrorMessage(brokersRes.error.message);
-      setIsLoading(false);
-      return;
+    if (!profRes.error) {
+      setBrokerName(String(profRes.data?.full_name ?? ""));
     }
 
-    const brokerRows = (brokersRes.data ?? []) as Array<{ id: string; full_name: string | null }>;
-    setBrokers(brokerRows);
-
-    const saved = window.localStorage.getItem("active_broker_profile_id") ?? "";
-    const initial = saved && brokerRows.some((b) => b.id === saved) ? saved : brokerRows[0]?.id ?? "";
-    setBrokerId(initial);
-    if (initial) window.localStorage.setItem("active_broker_profile_id", initial);
-
-    if (!initial) {
-      setLeads([]);
-      setIsLoading(false);
-      return;
-    }
-
-    const { data, error } = await supabase
+    const primary = await (supabase as any)
       .from("leads")
-      .select("id, owner_broker_profile_id, full_name, phone, interest, stage")
-      .eq("owner_broker_profile_id", initial)
+      .select("id, owner_broker_profile_id, assigned_broker_profile_id, full_name, phone, interest, stage")
+      .eq("assigned_broker_profile_id", currentBrokerId)
       .order("created_at", { ascending: false });
 
-    if (error) {
-      setErrorMessage(error.message);
+    if (!primary.error) {
+      setLeads((primary.data ?? []) as LeadRow[]);
+      setIsLoading(false);
+      return;
+    }
+
+    console.error("[Corretor/Clientes] Falha ao carregar leads por assigned_broker_profile_id", {
+      brokerId: currentBrokerId,
+      error: primary.error,
+    });
+
+    const fallback = await supabase
+      .from("leads")
+      .select("id, owner_broker_profile_id, full_name, phone, interest, stage")
+      .eq("owner_broker_profile_id", currentBrokerId)
+      .order("created_at", { ascending: false });
+
+    if (fallback.error) {
+      setErrorMessage(fallback.error.message);
       setLeads([]);
       setIsLoading(false);
       return;
     }
 
-    setLeads((data ?? []) as LeadRow[]);
+    setLeads((fallback.data ?? []) as LeadRow[]);
     setIsLoading(false);
   }
 
@@ -139,7 +153,7 @@ export default function MeusClientesPage() {
     }
 
     if (!brokerId) {
-      setErrorMessage("Selecione um corretor para cadastrar leads.");
+      setErrorMessage("Sessão expirada. Faça login novamente.");
       return;
     }
 
@@ -148,7 +162,7 @@ export default function MeusClientesPage() {
     try {
       const payload = {
         id: crypto.randomUUID(),
-        owner_broker_profile_id: brokerId,
+        assigned_broker_profile_id: brokerId,
         full_name: form.full_name.trim(),
         phone: form.phone.trim(),
         interest: form.interest.trim() ? form.interest.trim() : null,
@@ -156,9 +170,31 @@ export default function MeusClientesPage() {
         source: "corretor" as const,
       };
 
-      const { error } = await (supabase as any).from("leads").insert(payload);
-      if (error) {
-        setErrorMessage(error.message);
+      let lastError: any = null;
+
+      const attempts: Array<any> = [payload, { ...payload }];
+      delete attempts[1].assigned_broker_profile_id;
+      attempts[1].owner_broker_profile_id = brokerId;
+
+      for (const p of attempts) {
+        const { error } = await (supabase as any).from("leads").insert(p);
+        if (!error) {
+          lastError = null;
+          break;
+        }
+        lastError = error;
+        const msg = String((error as any)?.message ?? "");
+        const isMissingAssigned =
+          /column\s+\"?assigned_broker_profile_id\"?\s+does\s+not\s+exist|assigned_broker_profile_id\s+not\s+found/i.test(
+            msg,
+          );
+        const code = (error as any)?.code;
+        const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
+        if (!isMissingAssigned && !isSchemaMismatch) break;
+      }
+
+      if (lastError) {
+        setErrorMessage(lastError.message);
         return;
       }
 
@@ -232,34 +268,13 @@ export default function MeusClientesPage() {
           </div>
         ) : null}
 
+        <div className="mb-6 rounded-xl border border-zinc-200 bg-white p-4 text-sm text-zinc-700">
+          Corretor: <span className="font-semibold text-zinc-900">{brokerName || brokerId || "-"}</span>
+        </div>
+
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
           <div className="rounded-xl border border-zinc-200 bg-white p-5">
             <div className="text-sm font-semibold text-[#1e3a8a]">Novo lead</div>
-
-            <label className="mt-4 flex flex-col gap-2">
-              <span className="text-xs font-medium text-zinc-600">Corretor</span>
-              <select
-                className="h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/20"
-                value={brokerId}
-                onChange={(e) => {
-                  const next = e.target.value;
-                  setBrokerId(next);
-                  window.localStorage.setItem("active_broker_profile_id", next);
-                  void load();
-                }}
-                disabled={isLoading || brokers.length === 0}
-              >
-                {brokers.length === 0 ? (
-                  <option value="">Nenhum corretor encontrado</option>
-                ) : (
-                  brokers.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.full_name ?? b.id}
-                    </option>
-                  ))
-                )}
-              </select>
-            </label>
 
             <form className="mt-4 flex flex-col gap-3" onSubmit={criarLead}>
               <label className="flex flex-col gap-2">

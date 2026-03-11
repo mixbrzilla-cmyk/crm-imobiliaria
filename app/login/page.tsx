@@ -41,6 +41,15 @@ export default function LoginPage() {
         return;
       }
 
+      try {
+        const userId = data.user?.id ?? "";
+        if (userId) {
+          document.cookie = `crm_user_id=${encodeURIComponent(userId)}; Path=/; Max-Age=2592000; SameSite=Lax`;
+        }
+      } catch {
+        // ignore
+      }
+
       const email = data.user?.email?.toLowerCase() ?? "";
       const ownerEmail = (
         process.env.NEXT_PUBLIC_OWNER_EMAIL ?? "imobmoderna2024@gmail.com"
