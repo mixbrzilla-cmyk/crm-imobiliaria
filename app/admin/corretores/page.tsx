@@ -16,6 +16,7 @@ type BrokerProfile = {
   email: string | null;
   whatsapp?: string | null;
   creci?: string | null;
+  cnai?: string | null;
   status: string | null;
   role?: string | null;
 };
@@ -132,6 +133,7 @@ export default function CorretoresAdminPage() {
   const [createEmail, setCreateEmail] = useState("");
   const [createWhatsapp, setCreateWhatsapp] = useState("");
   const [createCreci, setCreateCreci] = useState("");
+  const [createCnai, setCreateCnai] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -229,7 +231,7 @@ export default function CorretoresAdminPage() {
 
     const brokersRes = await supabase
       .from("profiles")
-      .select("id, full_name, email, whatsapp, creci, status, role")
+      .select("id, full_name, email, whatsapp, creci, cnai, status, role")
       .eq("role", "broker")
       .order("full_name", { ascending: true });
 
@@ -503,6 +505,7 @@ export default function CorretoresAdminPage() {
     const whatsappRaw = createWhatsapp.trim();
     const whatsapp = whatsappRaw.replace(/\D+/g, "");
     const creci = createCreci.trim();
+    const cnai = createCnai.trim();
     if (!name) {
       setCreateError("Nome é obrigatório.");
       return;
@@ -518,6 +521,11 @@ export default function CorretoresAdminPage() {
       return;
     }
 
+    if (!cnai) {
+      setCreateError("CNAI é obrigatório.");
+      return;
+    }
+
     setCreating(true);
     try {
       const payload: any = {
@@ -526,6 +534,7 @@ export default function CorretoresAdminPage() {
         email: email || null,
         whatsapp,
         creci,
+        cnai,
         role: "broker",
         status: "ativo",
       };
@@ -541,6 +550,7 @@ export default function CorretoresAdminPage() {
       setCreateEmail("");
       setCreateWhatsapp("");
       setCreateCreci("");
+      setCreateCnai("");
       await loadBaseData();
     } catch {
       setCreateError("Não foi possível cadastrar o corretor agora.");
@@ -985,6 +995,7 @@ export default function CorretoresAdminPage() {
                 setCreateEmail("");
                 setCreateWhatsapp("");
                 setCreateCreci("");
+                setCreateCnai("");
               }}
               className="absolute inset-0 bg-slate-900/40"
               aria-label="Fechar"
@@ -1012,6 +1023,7 @@ export default function CorretoresAdminPage() {
                     setCreateEmail("");
                     setCreateWhatsapp("");
                     setCreateCreci("");
+                    setCreateCnai("");
                   }}
                   className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-white text-slate-700 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
                   aria-label="Fechar"
@@ -1060,6 +1072,16 @@ export default function CorretoresAdminPage() {
                 </div>
 
                 <div>
+                  <div className="text-xs font-semibold text-slate-600">CNAI</div>
+                  <input
+                    value={createCnai}
+                    onChange={(e) => setCreateCnai(e.target.value)}
+                    className="mt-2 h-12 w-full rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all focus:ring-2 focus:ring-[#2b6cff]/40"
+                    placeholder="Ex: 123456"
+                  />
+                </div>
+
+                <div>
                   <div className="text-xs font-semibold text-slate-600">Email (opcional)</div>
                   <input
                     value={createEmail}
@@ -1081,6 +1103,7 @@ export default function CorretoresAdminPage() {
                     setCreateEmail("");
                     setCreateWhatsapp("");
                     setCreateCreci("");
+                    setCreateCnai("");
                   }}
                   className="inline-flex h-11 items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                   disabled={creating}

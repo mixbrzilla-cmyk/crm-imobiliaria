@@ -25,6 +25,13 @@ import { formatBRLInput, formatCurrencyBRL, parseBRLInputToNumber } from "@/lib/
 
 type AppraisalStatus = "solicitada" | "vistoria_agendada" | "em_elaboracao" | "entregue";
 
+const ALLOWED_APPRAISAL_STATUS: readonly AppraisalStatus[] = [
+  "solicitada",
+  "vistoria_agendada",
+  "em_elaboracao",
+  "entregue",
+];
+
 type ParadigmRow = {
   id: string;
   label: string;
@@ -727,6 +734,13 @@ export default function AvaliacoesAdminPage() {
 
     setIsSaving(true);
 
+    const normalizedStatus = String(form.status ?? "")
+      .toLowerCase()
+      .trim() as AppraisalStatus;
+    const safeStatus: AppraisalStatus = (ALLOWED_APPRAISAL_STATUS as readonly string[]).includes(normalizedStatus)
+      ? normalizedStatus
+      : "solicitada";
+
     const payloadBase: any = {
       id: selectedId ?? crypto.randomUUID(),
       client_name: form.client_name.trim() || null,
@@ -734,7 +748,7 @@ export default function AvaliacoesAdminPage() {
       neighborhood: form.neighborhood.trim() || null,
       city: form.city.trim() || null,
       scheduled_at: form.scheduled_at ? new Date(form.scheduled_at).toISOString() : null,
-      status: form.status,
+      status: selectedId ? safeStatus : "solicitada",
       evaluator_id: form.evaluator_id.trim() ? form.evaluator_id.trim() : null,
       inspection_date: form.inspection_date ? form.inspection_date : null,
       area_m2: parseOptionalNumber(form.area_m2),
