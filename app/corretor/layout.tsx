@@ -28,20 +28,26 @@ export default function CorretorLayout({ children }: { children: React.ReactNode
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [profile, setProfile] = useState<ProfileRow | null>(null);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
   useEffect(() => {
     let canceled = false;
 
-    async function loadOnce() {
-      setIsLoading(true);
-      setErrorMessage(null);
+    async function loadOnce(options?: { silent?: boolean }) {
+      const silent = Boolean(options?.silent);
+      if (!silent) {
+        setIsLoading(true);
+        setErrorMessage(null);
+      }
 
       if (!supabase) {
-        setErrorMessage(
-          "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
-        );
-        setProfile(null);
-        setIsLoading(false);
+        if (!silent) {
+          setErrorMessage(
+            "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+          );
+          setProfile(null);
+          setIsLoading(false);
+        }
         return;
       }
 
@@ -66,9 +72,11 @@ export default function CorretorLayout({ children }: { children: React.ReactNode
 
       if (profRes.error) {
         console.error("[Corretor Guard] Falha ao carregar profile", { userId, error: profRes.error });
-        setErrorMessage(profRes.error.message);
-        setProfile(null);
-        setIsLoading(false);
+        if (!silent) {
+          setErrorMessage(profRes.error.message);
+          setProfile(null);
+          setIsLoading(false);
+        }
         return;
       }
 
@@ -80,17 +88,23 @@ export default function CorretorLayout({ children }: { children: React.ReactNode
         return;
       }
 
-      setIsLoading(false);
+      if (!silent) {
+        setIsLoading(false);
+        setHasLoadedOnce(true);
+      } else if (!hasLoadedOnce) {
+        setHasLoadedOnce(true);
+        setIsLoading(false);
+      }
     }
 
     void loadOnce();
 
     const intervalId = window.setInterval(() => {
-      void loadOnce();
+      void loadOnce({ silent: true });
     }, 15000);
 
     function onFocus() {
-      void loadOnce();
+      void loadOnce({ silent: true });
     }
 
     window.addEventListener("focus", onFocus);
@@ -100,7 +114,7 @@ export default function CorretorLayout({ children }: { children: React.ReactNode
       window.clearInterval(intervalId);
       window.removeEventListener("focus", onFocus);
     };
-  }, [router, supabase]);
+  }, [router, supabase, hasLoadedOnce]);
 
   if (isLoading) {
     return (
