@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
-import { BedDouble, Car, CheckCircle2, MessageCircle, Plus, Ruler, Trash2, X, XCircle } from "lucide-react";
+import { BedDouble, Building2, Car, CheckCircle2, MessageCircle, Plus, Ruler, Trash2, X, XCircle } from "lucide-react";
 
 import { getSupabaseClient } from "@/lib/supabaseClient";
 
@@ -38,6 +38,15 @@ type BrokerRowView = {
     area_m2: number | null;
     bedrooms: number | null;
     parking_spots: number | null;
+    neighborhood: string | null;
+    city: string | null;
+  }>;
+  assignedDevelopments: Array<{
+    id: string;
+    name: string;
+    status: string | null;
+    units_count: number | null;
+    total_area_m2: number | null;
     neighborhood: string | null;
     city: string | null;
   }>;
@@ -233,6 +242,7 @@ export default function CorretoresAdminPage() {
     const brokerIds = brokerRows.map((b) => b.id);
 
     const propsByBroker = new Map<string, BrokerRowView["assignedProperties"]>();
+    const devsByBroker = new Map<string, BrokerRowView["assignedDevelopments"]>();
     const whatsClicksByBroker = new Map<string, number>();
 
     let propertiesBrokerColumn: "corretor_id" | "broker_id" = "corretor_id";
@@ -319,6 +329,91 @@ export default function CorretoresAdminPage() {
       addClicks(brokerId, safeClicks);
     }
 
+    let developmentsBrokerColumn: "corretor_id" | "broker_id" = "broker_id";
+    try {
+      const test = await (supabase as any).from("developments").select("id, broker_id").limit(1);
+      if (test.error) developmentsBrokerColumn = "corretor_id";
+    } catch {
+      developmentsBrokerColumn = "corretor_id";
+    }
+
+    const devsRes = brokerIds.length
+      ? await (supabase as any)
+          .from("developments")
+          .select(
+            `id, name, titulo, title, status, units_count, total_units, total_area_m2, area_total_m2, area_m2, city, cidade, localidade, bairro, ${developmentsBrokerColumn}`,
+          )
+          .in(developmentsBrokerColumn, brokerIds)
+          .not(developmentsBrokerColumn, "is", null)
+          .order("created_at", { ascending: false })
+      : { data: [], error: null };
+
+    if (devsRes.error) {
+      const fallbackDevs = brokerIds.length
+        ? await (supabase as any)
+            .from("developments")
+            .select(`id, name, titulo, title, status, city, localidade, ${developmentsBrokerColumn}`)
+            .in(developmentsBrokerColumn, brokerIds)
+            .not(developmentsBrokerColumn, "is", null)
+            .order("id", { ascending: false })
+        : { data: [], error: null };
+
+      if (fallbackDevs.error) {
+        setErrorMessage(fallbackDevs.error.message);
+        setRows([]);
+        setIsLoading(false);
+        return;
+      }
+
+      for (const row of (fallbackDevs.data ?? []) as Array<any>) {
+        const brokerId = String(row?.[developmentsBrokerColumn] ?? "").trim();
+        if (!brokerId) continue;
+        const name = String(row?.name ?? row?.titulo ?? row?.title ?? "").trim() || "-";
+        const city = (row?.city ?? row?.cidade ?? null) as string | null;
+        const neighborhood = (row?.localidade ?? row?.bairro ?? null) as string | null;
+        const list = devsByBroker.get(brokerId) ?? [];
+        list.push({
+          id: String(row?.id ?? crypto.randomUUID()),
+          name,
+          status: (row?.status ?? null) as string | null,
+          units_count: null,
+          total_area_m2: null,
+          neighborhood,
+          city,
+        });
+        devsByBroker.set(brokerId, list);
+      }
+    } else {
+      for (const row of (devsRes.data ?? []) as Array<any>) {
+        const brokerId = String(row?.[developmentsBrokerColumn] ?? "").trim();
+        if (!brokerId) continue;
+
+        const name = String(row?.name ?? row?.titulo ?? row?.title ?? "").trim() || "-";
+        const unitsRaw = row?.units_count ?? row?.total_units;
+        const units = typeof unitsRaw === "number" ? unitsRaw : unitsRaw != null ? Number(unitsRaw) : null;
+        const safeUnits = Number.isFinite(units as any) ? Math.trunc(units as any) : null;
+
+        const areaRaw = row?.total_area_m2 ?? row?.area_total_m2 ?? row?.area_m2;
+        const area = typeof areaRaw === "number" ? areaRaw : areaRaw != null ? Number(areaRaw) : null;
+        const safeArea = Number.isFinite(area as any) ? (area as any) : null;
+
+        const city = (row?.city ?? row?.cidade ?? null) as string | null;
+        const neighborhood = (row?.localidade ?? row?.bairro ?? null) as string | null;
+
+        const list = devsByBroker.get(brokerId) ?? [];
+        list.push({
+          id: String(row?.id ?? crypto.randomUUID()),
+          name,
+          status: (row?.status ?? null) as string | null,
+          units_count: safeUnits,
+          total_area_m2: safeArea,
+          neighborhood,
+          city,
+        });
+        devsByBroker.set(brokerId, list);
+      }
+    }
+
     const view: BrokerRowView[] = brokerRows.map((b) => {
       const name = (b.full_name ?? "").trim() || "-";
       const email = (b.email ?? "").trim() || "-";
@@ -326,6 +421,7 @@ export default function CorretoresAdminPage() {
       const creci = (b.creci ?? "").trim() || "-";
       const status = statusBadge(b.status ?? null);
       const assignedProperties = propsByBroker.get(b.id) ?? [];
+      const assignedDevelopments = devsByBroker.get(b.id) ?? [];
       const inHands = assignedProperties.length;
       const clicks = whatsClicksByBroker.get(b.id) ?? 0;
       return {
@@ -338,6 +434,7 @@ export default function CorretoresAdminPage() {
         isActive: status.active,
         propertiesInHands: inHands,
         assignedProperties,
+        assignedDevelopments,
         whatsClicks: clicks,
       };
     });
@@ -522,12 +619,45 @@ export default function CorretoresAdminPage() {
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
               {rows.map((r) => {
                 const showTags = r.assignedProperties.slice(0, 6);
-                const hiddenCount = Math.max(0, r.assignedProperties.length - showTags.length);
                 const hasClicks = r.whatsClicks > 0;
                 const creciLabel = r.creci !== "-" ? `CRECI: ${r.creci}` : "CRECI: -";
                 const statusInfo = approvalBadge(r.statusLabel);
                 const canApprove = !r.isActive;
                 const isUpdatingApproval = updatingApprovalId === r.id;
+
+                const managedItems = (
+                  [
+                    ...r.assignedProperties.map((p) => ({
+                      kind: "property" as const,
+                      id: p.id,
+                      title: p.title,
+                      purpose: p.purpose,
+                      neighborhood: p.neighborhood,
+                      city: p.city,
+                      area_m2: p.area_m2,
+                      bedrooms: p.bedrooms,
+                      parking_spots: p.parking_spots,
+                      units_count: null as number | null,
+                      status: null as string | null,
+                    })),
+                    ...r.assignedDevelopments.map((d) => ({
+                      kind: "development" as const,
+                      id: d.id,
+                      title: d.name,
+                      purpose: null as string | null,
+                      neighborhood: d.neighborhood,
+                      city: d.city,
+                      area_m2: d.total_area_m2,
+                      bedrooms: null as number | null,
+                      parking_spots: null as number | null,
+                      units_count: d.units_count,
+                      status: d.status,
+                    })),
+                  ]
+                ).slice(0, 6);
+
+                const managedTotal = r.assignedProperties.length + r.assignedDevelopments.length;
+                const hiddenCount = Math.max(0, managedTotal - managedItems.length);
 
                 return (
                   <div
@@ -639,13 +769,13 @@ export default function CorretoresAdminPage() {
                           <div className="w-full rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200/70">
                             <div className="text-xs font-semibold tracking-wide text-slate-700">Imóveis sob Gestão</div>
 
-                            {r.assignedProperties.length === 0 ? (
+                            {managedTotal === 0 ? (
                               <div className="mt-3 rounded-xl bg-white px-4 py-3 text-sm text-slate-600 ring-1 ring-slate-200/70">
                                 Nenhum imóvel vinculado.
                               </div>
                             ) : (
                               <div className="mt-3 space-y-2">
-                                {r.assignedProperties.slice(0, 6).map((p) => {
+                                {managedItems.map((p) => {
                                   const addr = [p.neighborhood, p.city].filter(Boolean).join(" / ") || "-";
                                   return (
                                     <div
@@ -661,14 +791,21 @@ export default function CorretoresAdminPage() {
                                             {addr}
                                           </div>
                                         </div>
-                                        <span
-                                          className={
-                                            "shrink-0 rounded-full px-3 py-1 text-[11px] font-semibold ring-1 " +
-                                            purposeBadgeCls(p.purpose)
-                                          }
-                                        >
-                                          {purposeLabel(p.purpose)}
-                                        </span>
+                                        {p.kind === "property" ? (
+                                          <span
+                                            className={
+                                              "shrink-0 rounded-full px-3 py-1 text-[11px] font-semibold ring-1 " +
+                                              purposeBadgeCls(p.purpose)
+                                            }
+                                          >
+                                            {purposeLabel(p.purpose)}
+                                          </span>
+                                        ) : (
+                                          <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200/70">
+                                            <Building2 className="h-3.5 w-3.5" />
+                                            {p.status ? String(p.status) : "Empreendimento"}
+                                          </span>
+                                        )}
                                       </div>
 
                                       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-semibold text-slate-600">
@@ -676,16 +813,29 @@ export default function CorretoresAdminPage() {
                                           <Ruler className="h-3.5 w-3.5 text-slate-400" />
                                           <span>{p.area_m2 != null && Number.isFinite(p.area_m2) ? `${p.area_m2} m²` : "-"}</span>
                                         </div>
-                                        <div className="inline-flex items-center gap-1.5">
-                                          <BedDouble className="h-3.5 w-3.5 text-slate-400" />
-                                          <span>{p.bedrooms != null && Number.isFinite(p.bedrooms) ? `${p.bedrooms}` : "-"}</span>
-                                        </div>
-                                        <div className="inline-flex items-center gap-1.5">
-                                          <Car className="h-3.5 w-3.5 text-slate-400" />
-                                          <span>
-                                            {p.parking_spots != null && Number.isFinite(p.parking_spots) ? `${p.parking_spots}` : "-"}
-                                          </span>
-                                        </div>
+                                        {p.kind === "property" ? (
+                                          <>
+                                            <div className="inline-flex items-center gap-1.5">
+                                              <BedDouble className="h-3.5 w-3.5 text-slate-400" />
+                                              <span>{p.bedrooms != null && Number.isFinite(p.bedrooms) ? `${p.bedrooms}` : "-"}</span>
+                                            </div>
+                                            <div className="inline-flex items-center gap-1.5">
+                                              <Car className="h-3.5 w-3.5 text-slate-400" />
+                                              <span>
+                                                {p.parking_spots != null && Number.isFinite(p.parking_spots)
+                                                  ? `${p.parking_spots}`
+                                                  : "-"}
+                                              </span>
+                                            </div>
+                                          </>
+                                        ) : (
+                                          <div className="inline-flex items-center gap-1.5">
+                                            <span className="text-slate-500">Unidades:</span>
+                                            <span>
+                                              {p.units_count != null && Number.isFinite(p.units_count) ? `${p.units_count}` : "-"}
+                                            </span>
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
                                   );

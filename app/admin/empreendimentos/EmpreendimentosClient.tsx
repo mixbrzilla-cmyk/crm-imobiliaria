@@ -150,10 +150,29 @@ function normalizeDevelopment(row: any): Development {
     String(row?.name ?? row?.titulo ?? row?.title ?? "")
       .trim() || "-";
 
+  const unitsRaw = row?.units_count ?? row?.total_units ?? row?.units ?? row?.unidades ?? row?.qtd_unidades;
+  const units =
+    typeof unitsRaw === "number" ? unitsRaw : unitsRaw != null && unitsRaw !== "" ? Number(unitsRaw) : null;
+  const safeUnits = Number.isFinite(units as any) ? Math.trunc(units as any) : null;
+
+  const areaRaw = row?.total_area_m2 ?? row?.area_total_m2 ?? row?.area_m2 ?? row?.area_total;
+  const area = typeof areaRaw === "number" ? areaRaw : areaRaw != null && areaRaw !== "" ? Number(areaRaw) : null;
+  const safeArea = Number.isFinite(area as any) ? (area as any) : null;
+
+  const city = (row?.city ?? row?.cidade ?? null) as string | null;
+  const localidade = (row?.localidade ?? row?.bairro ?? row?.neighborhood ?? null) as string | null;
+
+  const brokerId = (row?.broker_id ?? row?.corretor_id ?? null) as string | null;
+
   return {
     ...row,
     id: String(row?.id ?? crypto.randomUUID()),
     name,
+    units_count: safeUnits,
+    total_area_m2: safeArea,
+    city,
+    localidade,
+    broker_id: brokerId,
   } as Development;
 }
 
@@ -517,7 +536,8 @@ export default function EmpreendimentosClient() {
       .map((l) => l.trim())
       .filter(Boolean);
 
-    const brokerColumn = await detectDevelopmentsBrokerColumn();
+    const brokerId = form.broker_id.trim() ? form.broker_id.trim() : null;
+    const brokerCandidates: Array<"broker_id" | "corretor_id"> = ["broker_id", "corretor_id"];
 
     const basePayload: any = {
       ...(selectedId ? {} : { id: crypto.randomUUID() }),
@@ -528,10 +548,9 @@ export default function EmpreendimentosClient() {
       price_table_url: form.price_table_url.trim() ? form.price_table_url.trim() : null,
     };
 
-    const detailsPayload: any = {
+    const detailsPayloadBase: any = {
       ...basePayload,
       city: form.city.trim() ? form.city.trim() : null,
-      [brokerColumn]: form.broker_id.trim() ? form.broker_id.trim() : null,
       is_premium: form.is_premium,
       status: form.status,
       lot_value: parseBRLInputToNumber(form.lot_value),
@@ -555,25 +574,33 @@ export default function EmpreendimentosClient() {
 
     try {
       const query = (supabase as any).from("developments");
-      let res = selectedId
-        ? await query.update(detailsPayload).eq("id", selectedId).select().single()
-        : await query.insert(detailsPayload).select().single();
+      let res: any = null;
+      let lastError: any = null;
 
-      if (res.error) {
-        const code = (res.error as any)?.code;
-        if (code === "PGRST204" || code === "PGRST301") {
-          console.log("[Empreendimentos] Retry save with basePayload due to schema mismatch", {
-            code,
-            message: res.error.message,
-            details: (res.error as any)?.details,
-            hint: (res.error as any)?.hint,
-          });
-
-          res = selectedId
-            ? await query.update(basePayload).eq("id", selectedId).select().single()
-            : await query.insert(basePayload).select().single();
+      const payloadAttempts: Array<any> = [];
+      if (brokerId) {
+        for (const col of brokerCandidates) {
+          payloadAttempts.push({ ...detailsPayloadBase, [col]: brokerId });
         }
       }
+      payloadAttempts.push(detailsPayloadBase);
+
+      for (const payload of payloadAttempts) {
+        res = selectedId
+          ? await query.update(payload).eq("id", selectedId).select().single()
+          : await query.insert(payload).select().single();
+
+        if (!res.error) break;
+
+        lastError = res.error;
+        const msg = String((res.error as any)?.message ?? "");
+        const isColumnNotFound = /column\s+\w+\s+not\s+found|column\s+\".*\"\s+does\s+not\s+exist/i.test(msg);
+        const code = (res.error as any)?.code;
+        const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
+        if (!isColumnNotFound && !isSchemaMismatch) break;
+      }
+
+      if (res?.error) throw lastError ?? res.error;
 
       if (res.error) throw res.error;
 
@@ -594,7 +621,7 @@ export default function EmpreendimentosClient() {
       return;
     } catch (e) {
       const errAny = e as any;
-      console.log("DEBUG SUPABASE:", errAny);
+      console.error("DEBUG SUPABASE:", errAny);
       console.log("[Empreendimentos] save error", {
         code: errAny?.code,
         message: errAny?.message,
