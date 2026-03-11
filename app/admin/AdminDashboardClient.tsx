@@ -36,23 +36,21 @@ type LeadRow = {
 
 type DirecionamentoRow = {
   id: string;
-  title: string | null;
+  name: string | null;
   neighborhood: string | null;
   city: string | null;
   corretor_id: string | null;
   data_direcionamento: string | null;
-  updated_at?: string | null;
   created_at?: string | null;
 };
 
 type DirecionamentoUnionRow = {
   id: string;
-  title: string | null;
+  name: string | null;
   neighborhood: string | null;
   city: string | null;
   corretor_id: string | null;
   data_direcionamento: string | null;
-  updated_at?: string | null;
   created_at?: string | null;
   source: "properties" | "developments";
 };
@@ -629,7 +627,7 @@ export default function AdminDashboardClient() {
             const col: "assigned_broker_id" = "assigned_broker_id";
             const base = (supabase as any)
               .from("properties")
-              .select(`id, title, neighborhood, city, ${col}, updated_at, created_at`)
+              .select(`id, name, neighborhood, city, ${col}, created_at`)
               .not(col, "is", null);
 
             const q = propertiesHasDeletedAt ? base.is("deleted_at", null) : base;
@@ -644,7 +642,7 @@ export default function AdminDashboardClient() {
             const col: "assigned_broker_id" = "assigned_broker_id";
             const base = (supabase as any)
               .from("developments")
-              .select(`id, name, title, neighborhood, bairro, localidade, city, cidade, ${col}, updated_at, created_at`)
+              .select(`id, name, neighborhood, bairro, localidade, city, cidade, ${col}, created_at`)
               .not(col, "is", null);
 
             const q = developmentsHasDeletedAt ? base.is("deleted_at", null) : base;
@@ -756,12 +754,11 @@ export default function AdminDashboardClient() {
             if (!id) continue;
             unionMap.set(`properties:${id}`, {
               id,
-              title: (r?.title ?? null) as string | null,
+              name: (r?.name ?? null) as string | null,
               neighborhood: (r?.neighborhood ?? null) as string | null,
               city: (r?.city ?? null) as string | null,
               corretor_id: (r as any)?.[col] ? String((r as any)[col]) : null,
               data_direcionamento: null,
-              updated_at: (r?.updated_at ?? null) as string | null,
               created_at: (r?.created_at ?? null) as string | null,
               source: "properties",
             });
@@ -781,12 +778,11 @@ export default function AdminDashboardClient() {
             if (!id) continue;
             unionMap.set(`developments:${id}`, {
               id,
-              title: (String(r?.name ?? r?.title ?? "").trim() || null) as string | null,
+              name: (String(r?.name ?? "").trim() || null) as string | null,
               neighborhood: (r?.localidade ?? r?.bairro ?? r?.neighborhood ?? null) as string | null,
               city: (r?.city ?? r?.cidade ?? null) as string | null,
               corretor_id: (r as any)?.[col] ? String((r as any)[col]) : null,
               data_direcionamento: null,
-              updated_at: (r?.updated_at ?? null) as string | null,
               created_at: (r?.created_at ?? null) as string | null,
               source: "developments",
             });
@@ -816,8 +812,8 @@ export default function AdminDashboardClient() {
             const brokerId = r.corretor_id ?? "";
             const brokerName = (profilesById.get(brokerId)?.full_name ?? "").trim() || brokerId;
             const loc = [r.neighborhood, r.city].filter(Boolean).join(" • ");
-            const propertyLabel = (r.title ?? "").trim() || loc || r.id;
-            const directedAt = r.updated_at ?? r.created_at ?? "";
+            const propertyLabel = (r.name ?? "").trim() || loc || r.id;
+            const directedAt = r.created_at ?? "";
             const directedTs = directedAt ? new Date(directedAt).getTime() : NaN;
             const daysSince = Number.isFinite(directedTs)
               ? Math.max(0, Math.floor((nowTick - directedTs) / (24 * 60 * 60 * 1000)))
