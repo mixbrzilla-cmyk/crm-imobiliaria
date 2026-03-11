@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 
 import { getSupabaseClient } from "@/lib/supabaseClient";
@@ -58,6 +59,9 @@ function inferStoredValue(keys: string[]) {
 
 export default function CadastroDetalhadoPage() {
   const supabase = useMemo(() => getSupabaseClient(), []);
+
+  const PRIMARY = "#2F3B77";
+  const ACCENT = "#C1121F";
 
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -268,19 +272,37 @@ export default function CadastroDetalhadoPage() {
   const canFinish = step === steps.length - 1;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-[#F4F7FA]">
       <div className="mx-auto w-full max-w-xl px-6 py-10">
-        <div className="rounded-3xl bg-white p-6 shadow-[0_12px_40px_-24px_rgba(15,23,42,0.35)] ring-1 ring-slate-200/70">
+        <div className="rounded-3xl bg-white p-6 shadow-[0_18px_50px_-32px_rgba(47,59,119,0.35)] ring-1 ring-slate-200/70">
+          <div className="flex items-center justify-center">
+            <div className="relative h-16 w-16 overflow-hidden rounded-full ring-2 ring-slate-200/70">
+              <Image
+                src="/imobiliaria-moderna-logo.png"
+                alt="Imobiliária Moderna"
+                fill
+                sizes="64px"
+                className="object-cover"
+                priority
+              />
+            </div>
+          </div>
+
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">CADASTRO</div>
-              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Cadastro detalhado</h1>
+              <div className="mt-4 text-xs font-semibold tracking-[0.18em] text-slate-500">CADASTRO</div>
+              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+                Imobiliária <span className="font-extrabold" style={{ color: PRIMARY }}>
+                  MODERNA
+                </span>
+              </h1>
+              <div className="mt-1 text-sm text-slate-600">Cadastro detalhado</div>
             </div>
             <div className="text-xs font-semibold tabular-nums text-slate-600">{progress}%</div>
           </div>
 
           <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200/70">
-            <div className="h-full bg-emerald-600" style={{ width: `${progress}%` }} />
+            <div className="h-full" style={{ width: `${progress}%`, backgroundColor: ACCENT }} />
           </div>
 
           <div className="mt-6">
@@ -357,9 +379,10 @@ export default function CadastroDetalhadoPage() {
                   className={
                     "inline-flex h-12 items-center justify-center rounded-2xl px-4 text-sm font-semibold ring-1 transition-all duration-300 " +
                     (state.intent === "comprar"
-                      ? "bg-slate-900 text-white ring-slate-900/10"
+                      ? "text-white"
                       : "bg-white text-slate-800 ring-slate-200/70 hover:bg-slate-50")
                   }
+                  style={state.intent === "comprar" ? { backgroundColor: PRIMARY, borderColor: PRIMARY } : undefined}
                 >
                   Comprar
                 </button>
@@ -369,9 +392,10 @@ export default function CadastroDetalhadoPage() {
                   className={
                     "inline-flex h-12 items-center justify-center rounded-2xl px-4 text-sm font-semibold ring-1 transition-all duration-300 " +
                     (state.intent === "alugar"
-                      ? "bg-slate-900 text-white ring-slate-900/10"
+                      ? "text-white"
                       : "bg-white text-slate-800 ring-slate-200/70 hover:bg-slate-50")
                   }
+                  style={state.intent === "alugar" ? { backgroundColor: PRIMARY, borderColor: PRIMARY } : undefined}
                 >
                   Alugar
                 </button>
@@ -458,7 +482,8 @@ export default function CadastroDetalhadoPage() {
                 type="button"
                 onClick={() => void finish()}
                 disabled={isSubmitting}
-                className="inline-flex h-11 flex-[1.4] items-center justify-center rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white shadow-[0_10px_24px_-18px_rgba(16,185,129,0.55)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 flex-[1.4] items-center justify-center rounded-xl px-5 text-sm font-semibold text-white shadow-[0_10px_24px_-18px_rgba(47,59,119,0.45)] transition-all duration-300 hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-60"
+                style={{ backgroundColor: PRIMARY }}
               >
                 {isSubmitting ? "Finalizando..." : "Criar meu acesso"}
               </button>
@@ -467,7 +492,14 @@ export default function CadastroDetalhadoPage() {
                 type="button"
                 onClick={next}
                 disabled={isSubmitting}
-                className="inline-flex h-11 flex-[1.4] items-center justify-center rounded-xl bg-slate-900 px-5 text-sm font-semibold text-white shadow-[0_10px_24px_-18px_rgba(15,23,42,0.55)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 flex-[1.4] items-center justify-center rounded-xl px-5 text-sm font-semibold text-white shadow-[0_10px_24px_-18px_rgba(47,59,119,0.45)] transition-all duration-300 hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-60"
+                style={{ backgroundColor: PRIMARY }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = ACCENT;
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = PRIMARY;
+                }}
               >
                 Próximo
               </button>
