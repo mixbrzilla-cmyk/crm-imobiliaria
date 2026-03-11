@@ -158,6 +158,7 @@ export default function InventarioImoveisPage() {
   const supabase = useMemo(() => getSupabaseClient(), []);
 
   const [propertiesBrokerColumn, setPropertiesBrokerColumn] = useState<"corretor_id" | "broker_id">("corretor_id");
+  const [supportsAssignedBrokerId, setSupportsAssignedBrokerId] = useState(false);
 
   const [activeTab, setActiveTab] = useState<TabKey>("basicos");
 
@@ -220,10 +221,12 @@ export default function InventarioImoveisPage() {
 
     try {
       const brokerCol = propertiesBrokerColumn;
+      const baseSelect = `id, title, property_type, purpose, price, is_premium, ${brokerCol}, data_direcionamento, owner_whatsapp, last_owner_contact_at, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description, created_at`;
+      const selectStr = supportsAssignedBrokerId ? `${baseSelect}, assigned_broker_id` : baseSelect;
       const { data, error } = await supabase
         .from("properties")
         .select(
-          `id, title, property_type, purpose, price, is_premium, ${brokerCol}, data_direcionamento, owner_whatsapp, last_owner_contact_at, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description, created_at`,
+          selectStr,
         )
         .order("created_at", { ascending: false });
 
@@ -237,10 +240,12 @@ export default function InventarioImoveisPage() {
     } catch {
       try {
         const brokerCol = propertiesBrokerColumn;
+        const baseSelect = `id, title, property_type, purpose, price, is_premium, ${brokerCol}, owner_whatsapp, last_owner_contact_at, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description, created_at`;
+        const selectStr = supportsAssignedBrokerId ? `${baseSelect}, assigned_broker_id` : baseSelect;
         const { data, error } = await supabase
           .from("properties")
           .select(
-            `id, title, property_type, purpose, price, is_premium, ${brokerCol}, owner_whatsapp, last_owner_contact_at, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description, created_at`,
+            selectStr,
           )
           .order("created_at", { ascending: false });
         if (error) {
@@ -308,6 +313,13 @@ export default function InventarioImoveisPage() {
 
     const timeoutId = window.setTimeout(async () => {
       try {
+        try {
+          const testAssigned = await (supabase as any).from("properties").select("id, assigned_broker_id").limit(1);
+          setSupportsAssignedBrokerId(!testAssigned?.error);
+        } catch {
+          setSupportsAssignedBrokerId(false);
+        }
+
         const test = await (supabase as any).from("properties").select("id, broker_id").limit(1);
         if (!test.error) {
           setPropertiesBrokerColumn("broker_id");
@@ -315,6 +327,7 @@ export default function InventarioImoveisPage() {
           setPropertiesBrokerColumn("corretor_id");
         }
       } catch {
+        setSupportsAssignedBrokerId(false);
         setPropertiesBrokerColumn("corretor_id");
       }
     }, 0);
@@ -335,32 +348,55 @@ export default function InventarioImoveisPage() {
     const nextBrokerId = brokerId || null;
     const nowIso = nextBrokerId ? new Date().toISOString() : null;
 
-    const payload = { [propertiesBrokerColumn]: nextBrokerId, data_direcionamento: nowIso } as any;
+    const payloadPrimary: any = supportsAssignedBrokerId
+      ? { assigned_broker_id: nextBrokerId, [propertiesBrokerColumn]: nextBrokerId, data_direcionamento: nowIso }
+      : { [propertiesBrokerColumn]: nextBrokerId, data_direcionamento: nowIso };
+    const payloadFallback: any = { [propertiesBrokerColumn]: nextBrokerId, data_direcionamento: nowIso };
+    const payloadAttempts: Array<any> = supportsAssignedBrokerId ? [payloadPrimary, payloadFallback] : [payloadFallback];
+
+    const payload = payloadAttempts[0];
     console.log("[Inventário] Salvando corretor/data_direcionamento", { rowId, payload });
 
     setUpdatingFieldByRowId((c) => ({ ...c, [rowId]: "corretor" }));
     setRows((current) =>
       current.map((r: any) =>
-        r.id === rowId ? { ...r, [propertiesBrokerColumn]: nextBrokerId, data_direcionamento: nowIso } : r,
+        r.id === rowId
+          ? {
+              ...r,
+              ...(supportsAssignedBrokerId ? { assigned_broker_id: nextBrokerId } : null),
+              [propertiesBrokerColumn]: nextBrokerId,
+              data_direcionamento: nowIso,
+            }
+          : r,
       ),
     );
 
     try {
-      const { error } = await (supabase as any)
-        .from("properties")
-        .update(payload)
-        .eq("id", rowId);
-
-      if (error) {
-        console.log("[Inventário] Erro ao salvar corretor/data_direcionamento", { rowId, error, payload });
+      let lastError: any = null;
+      for (const attempt of payloadAttempts) {
+        const { error } = await (supabase as any).from("properties").update(attempt).eq("id", rowId);
+        if (!error) {
+          lastError = null;
+          break;
+        }
+        lastError = error;
         const msg = String(error.message ?? "");
+        const isAssignedMissing = /assigned_broker_id/i.test(msg) && /does not exist|not found/i.test(msg);
+        const code = (error as any)?.code;
+        const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
+        if (!isAssignedMissing && !isSchemaMismatch) break;
+      }
+
+      if (lastError) {
+        console.log("[Inventário] Erro ao salvar corretor/data_direcionamento", { rowId, error: lastError, payload });
+        const msg = String(lastError.message ?? "");
         if (msg.toLowerCase().includes("data_direcionamento") && msg.toLowerCase().includes("does not exist")) {
           setErrorMessage(
             'Coluna "data_direcionamento" não existe na tabela properties (ou não está exposta). Crie a coluna (timestamptz) no Supabase e tente novamente.',
           );
         } else if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("rls")) {
           setErrorMessage(
-            'Permissão negada ao salvar "data_direcionamento". Verifique RLS/policies da tabela properties para update desse campo.',
+            'Permissão negada ao salvar. Verifique RLS/policies da tabela properties para update desses campos.',
           );
         } else {
           setErrorMessage(msg || "Erro ao salvar.");
@@ -368,6 +404,8 @@ export default function InventarioImoveisPage() {
         await load();
         return;
       }
+
+      if (nextBrokerId) showToast("Corretor vinculado com sucesso.");
     } catch {
       console.log("[Inventário] Falha inesperada ao salvar corretor/data_direcionamento", { rowId, payload });
       setErrorMessage("Não foi possível salvar o corretor agora.");
@@ -517,6 +555,9 @@ export default function InventarioImoveisPage() {
       purpose: form.purpose,
       price: parseBRLInputToNumber(form.price),
       owner_whatsapp: form.owner_whatsapp.trim() ? form.owner_whatsapp.trim() : null,
+      ...(supportsAssignedBrokerId
+        ? { assigned_broker_id: form.corretor_id.trim() ? form.corretor_id.trim() : null }
+        : null),
       [propertiesBrokerColumn]: form.corretor_id.trim() ? form.corretor_id.trim() : null,
       is_premium: form.is_premium,
       neighborhood: form.neighborhood.trim() ? form.neighborhood.trim() : null,
@@ -541,12 +582,14 @@ export default function InventarioImoveisPage() {
       if (error) throw error;
 
       setIsSaving(false);
+      if (form.corretor_id.trim()) showToast("Corretor vinculado com sucesso.");
       resetForm();
       setIsFormOpen(false);
       await load();
     } catch {
       try {
         const retryPayload: any = { ...payload };
+        delete retryPayload.assigned_broker_id;
         delete retryPayload[propertiesBrokerColumn];
         const query = (supabase as any).from("properties");
         const { error } = selectedId
