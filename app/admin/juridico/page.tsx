@@ -1118,10 +1118,9 @@ export default function JuridicoAdminPage() {
           <div
             role="dialog"
             aria-modal="true"
-            className="relative flex w-full max-w-[95vw] overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-slate-200/70 sm:max-w-5xl"
+            className="relative flex w-full max-w-[95vw] flex-col overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-slate-200/70 sm:max-w-5xl"
             style={{ maxHeight: "90vh" }}
           >
-            <div className="w-full">
             <div className="shrink-0 border-b border-slate-100 px-6 py-5">
               <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">
                 {activeModal === "case" ? "NOVO PROCESSO" : activeModal === "lawyer" ? "NOVO ADVOGADO" : "NOVA MINUTA"}
@@ -1221,21 +1220,21 @@ export default function JuridicoAdminPage() {
                     />
                   </label>
 
-                  <div className="mt-2 flex items-center justify-end gap-2 md:col-span-2">
+                  <div className="sticky bottom-0 -mx-6 mt-2 flex flex-col gap-2 border-t border-slate-100 bg-white px-6 py-4 sm:flex-row sm:items-center sm:justify-end md:col-span-2">
                     <button
                       type="button"
                       onClick={() => {
                         if (isSaving) return;
                         setActiveModal(null);
                       }}
-                      className="inline-flex h-11 items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200/70 hover:bg-slate-50"
+                      className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200/70 hover:bg-slate-50 sm:w-auto"
                     >
                       Cancelar
                     </button>
                     <button
                       type="submit"
                       disabled={isSaving}
-                      className="inline-flex h-11 items-center justify-center rounded-xl bg-[#ff0000] px-6 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-[#ff0000] px-6 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                     >
                       {isSaving ? "Salvando..." : "Salvar Processo"}
                     </button>
@@ -1301,21 +1300,21 @@ export default function JuridicoAdminPage() {
                       />
                     </div>
                   </label>
-                  <div className="mt-2 flex items-center justify-end gap-2 md:col-span-2">
+                  <div className="sticky bottom-0 -mx-6 mt-2 flex flex-col gap-2 border-t border-slate-100 bg-white px-6 py-4 sm:flex-row sm:items-center sm:justify-end md:col-span-2">
                     <button
                       type="button"
                       onClick={() => {
                         if (isSaving) return;
                         setActiveModal(null);
                       }}
-                      className="inline-flex h-11 items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200/70 hover:bg-slate-50"
+                      className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200/70 hover:bg-slate-50"
                     >
                       Cancelar
                     </button>
                     <button
                       type="submit"
                       disabled={isSaving}
-                      className="inline-flex h-11 items-center justify-center rounded-xl bg-[#001f3f] px-6 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:bg-[#001a33] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-[#001f3f] px-6 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:bg-[#001a33] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {isSaving ? "Salvando..." : "Salvar Advogado"}
                     </button>
@@ -1358,28 +1357,27 @@ export default function JuridicoAdminPage() {
                       />
                     </div>
                   </label>
-                  <div className="mt-2 flex items-center justify-end gap-2 md:col-span-2">
+                  <div className="sticky bottom-0 -mx-6 mt-2 flex flex-col gap-2 border-t border-slate-100 bg-white px-6 py-4 sm:flex-row sm:items-center sm:justify-end md:col-span-2">
                     <button
                       type="button"
                       onClick={() => {
                         if (isSaving) return;
                         setActiveModal(null);
                       }}
-                      className="inline-flex h-11 items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200/70 hover:bg-slate-50"
+                      className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200/70 hover:bg-slate-50 sm:w-auto"
                     >
                       Cancelar
                     </button>
                     <button
                       type="submit"
                       disabled={isSaving}
-                      className="inline-flex h-11 items-center justify-center rounded-xl bg-[#001f3f] px-6 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:bg-[#001a33] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-[#001f3f] px-6 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:bg-[#001a33] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                     >
                       {isSaving ? "Salvando..." : "Salvar Minuta"}
                     </button>
                   </div>
                 </form>
               )}
-            </div>
             </div>
           </div>
         </div>
