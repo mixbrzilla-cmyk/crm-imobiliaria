@@ -223,7 +223,14 @@ export default function WhatsAppPanelClient() {
         .select("id, full_name, status, role")
         .eq("role", "broker")
         .order("full_name", { ascending: true });
-      if (!res.error) setBrokers((res.data ?? []) as BrokerProfile[]);
+      if (!res.error) {
+        const all = (res.data ?? []) as BrokerProfile[];
+        const eligible = all.filter((b) => {
+          const s = String(b.status ?? "").toLowerCase();
+          return s === "ativo" || s === "aprovado";
+        });
+        setBrokers(eligible);
+      }
     } catch {
       setBrokers([]);
     }
@@ -333,6 +340,29 @@ export default function WhatsAppPanelClient() {
       setIsLoadingThreads(false);
     }
   }, [selectedThreadId, supabase]);
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    const channel = (supabase as any)
+      .channel("admin-chat-threads-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "chat_threads" },
+        () => {
+          void loadThreads();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      try {
+        void (supabase as any).removeChannel(channel);
+      } catch {
+        // ignore
+      }
+    };
+  }, [loadThreads, supabase]);
 
   const loadMessages = useCallback(
     async (threadId: string) => {
@@ -730,6 +760,7 @@ export default function WhatsAppPanelClient() {
               </div>
 
               <div className="flex items-center gap-2">
+                <div className="hidden text-xs font-semibold text-slate-600 sm:block">Enviar para Corretor</div>
                 <select
                   value={selectedThread?.assigned_broker_profile_id ?? ""}
                   onChange={(e) =>
