@@ -26,6 +26,7 @@ export default function WhatsAppConfigClient() {
   const SETTINGS_ID = "singleton";
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [supportsTable, setSupportsTable] = useState(true);
@@ -40,6 +41,7 @@ export default function WhatsAppConfigClient() {
   async function load() {
     setIsLoading(true);
     setErrorMessage(null);
+    setInfoMessage(null);
 
     if (!supabase) {
       setErrorMessage(
@@ -70,14 +72,24 @@ export default function WhatsAppConfigClient() {
           client_key: row.client_key ?? "",
           webhook_url: row.webhook_url ?? "",
         });
+      } else {
+        setInfoMessage("Aguardando configuração da Z-API. Preencha as credenciais quando estiverem disponíveis.");
       }
 
       setSupportsTable(true);
-    } catch {
-      setSupportsTable(false);
-      setErrorMessage(
-        "Tabela whatsapp_settings não encontrada. Crie a tabela no Supabase para salvar a configuração.",
-      );
+    } catch (e: any) {
+      const code = e?.code;
+      if (code === "42P01" || code === "PGRST204" || code === "PGRST301") {
+        setSupportsTable(false);
+        setInfoMessage(
+          "Infra do WhatsApp pendente no Supabase (tabelas ainda não criadas). Execute o SQL de infraestrutura para habilitar.",
+        );
+      } else {
+        setSupportsTable(false);
+        setInfoMessage(
+          "Infra do WhatsApp pendente no Supabase (tabelas ainda não criadas). Execute o SQL de infraestrutura para habilitar.",
+        );
+      }
     } finally {
       setIsLoading(false);
     }
@@ -160,6 +172,12 @@ export default function WhatsAppConfigClient() {
           <span className="font-semibold">/api/whatsapp/webhook</span>.
         </p>
       </header>
+
+      {infoMessage ? (
+        <div className="rounded-2xl bg-amber-50 px-5 py-4 text-sm text-amber-900 ring-1 ring-amber-200/70">
+          {infoMessage}
+        </div>
+      ) : null}
 
       {errorMessage ? (
         <div className="rounded-2xl bg-red-50 px-5 py-4 text-sm text-red-700 ring-1 ring-red-200/70">

@@ -96,6 +96,7 @@ export default function WhatsAppPanelClient() {
   const SETTINGS_ID = "singleton";
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [supportsTables, setSupportsTables] = useState(true);
 
   const [threads, setThreads] = useState<ThreadRow[]>([]);
@@ -128,6 +129,10 @@ export default function WhatsAppPanelClient() {
     client_key: "",
     webhook_url: "",
   });
+
+  const hasZapiConfig = useMemo(() => {
+    return Boolean(settingsForm.instance_id.trim() && settingsForm.token.trim());
+  }, [settingsForm.instance_id, settingsForm.token]);
 
   const testProfilesConnection = useCallback(
     async (context: string, error: unknown) => {
@@ -188,6 +193,7 @@ export default function WhatsAppPanelClient() {
   const loadThreads = useCallback(async () => {
     setIsLoadingThreads(true);
     setErrorMessage(null);
+    setInfoMessage(null);
 
     if (!supabase) {
       setErrorMessage(
@@ -211,7 +217,7 @@ export default function WhatsAppPanelClient() {
         console.log("[WhatsApp] Supabase error code:", (res.error as any)?.code);
         console.log("[WhatsApp] Erro ao carregar chat_threads:", res.error);
         const code = (res.error as any)?.code;
-        if (code === "PGRST204" || code === "PGRST301") {
+        if (code === "42P01" || code === "PGRST204" || code === "PGRST301") {
           await testProfilesConnection("loadThreads(chat_threads)", res.error);
         }
         throw res.error;
@@ -227,7 +233,7 @@ export default function WhatsAppPanelClient() {
     } catch {
       setSupportsTables(false);
       setThreads([]);
-      setErrorMessage("Não foi possível carregar as conversas do WhatsApp agora.");
+      setInfoMessage("Infra do WhatsApp pendente no Supabase (chat_threads/chat_messages). Execute o SQL para criar as tabelas.");
     } finally {
       setIsLoadingThreads(false);
     }
@@ -237,6 +243,7 @@ export default function WhatsAppPanelClient() {
     async (threadId: string) => {
       setIsLoadingMessages(true);
       setErrorMessage(null);
+      setInfoMessage(null);
 
       if (!supabase) {
         setMessages([]);
@@ -258,7 +265,7 @@ export default function WhatsAppPanelClient() {
           console.log("[WhatsApp] Supabase error code:", (res.error as any)?.code);
           console.log("[WhatsApp] Erro ao carregar chat_messages:", res.error);
           const code = (res.error as any)?.code;
-          if (code === "PGRST204" || code === "PGRST301") {
+          if (code === "42P01" || code === "PGRST204" || code === "PGRST301") {
             await testProfilesConnection("loadMessages(chat_messages)", res.error);
           }
           throw res.error;
@@ -307,6 +314,8 @@ export default function WhatsAppPanelClient() {
           client_key: row.client_key ?? "",
           webhook_url: row.webhook_url ?? "",
         });
+      } else {
+        setInfoMessage("Aguardando configuração da Z-API. Preencha as credenciais para habilitar envios.");
       }
       setSupportsSettingsTable(true);
     } catch {
@@ -485,6 +494,12 @@ export default function WhatsAppPanelClient() {
         </div>
       ) : null}
 
+      {infoMessage ? (
+        <div className="rounded-2xl bg-amber-50 px-5 py-4 text-sm text-amber-900 ring-1 ring-amber-200/70">
+          {infoMessage}
+        </div>
+      ) : null}
+
       <section className="overflow-hidden rounded-3xl bg-white shadow-[0_20px_45px_-45px_rgba(0,0,0,0.55)] ring-1 ring-slate-200/70">
         <div className="grid h-[calc(100vh-260px)] grid-cols-1 lg:grid-cols-12">
           <aside className="flex h-full flex-col border-b border-slate-200/70 lg:col-span-4 lg:border-b-0 lg:border-r">
@@ -645,6 +660,12 @@ export default function WhatsAppPanelClient() {
                       </div>
                     </div>
                   </div>
+                </div>
+              ) : null}
+
+              {supportsTables && !hasZapiConfig ? (
+                <div className="mb-4 rounded-2xl bg-slate-50 px-5 py-4 text-sm text-slate-700 ring-1 ring-slate-200/70">
+                  Aguardando configuração da Z-API.
                 </div>
               ) : null}
 
