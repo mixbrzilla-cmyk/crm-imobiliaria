@@ -41,9 +41,12 @@ type PropertyRow = {
   price: number | null;
   is_premium?: boolean | null;
   corretor_id?: string | null;
+  broker_id?: string | null;
   data_direcionamento?: string | null;
   neighborhood: string | null;
   city: string | null;
+  owner_whatsapp?: string | null;
+  last_owner_contact_at?: string | null;
   bedrooms: number | null;
   suites: number | null;
   bathrooms: number | null;
@@ -63,6 +66,7 @@ type FormState = {
   price: string;
   neighborhood: string;
   city: string;
+  owner_whatsapp: string;
   corretor_id: string;
   is_premium: boolean;
   bedrooms: string;
@@ -97,6 +101,22 @@ function parseOptionalNumber(value: string) {
   if (!trimmed) return null;
   const n = Number(trimmed.replace(/\./g, "").replace(",", "."));
   return Number.isFinite(n) ? n : null;
+}
+
+function formatTimeBR(value: string | null) {
+  if (!value) return "-";
+  try {
+    const d = new Date(value);
+    return d.toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "-";
+  }
 }
 
 function Badge({ status }: { status: PropertyStatus }) {
@@ -172,6 +192,7 @@ export default function InventarioImoveisPage() {
     price: "",
     neighborhood: "",
     city: "",
+    owner_whatsapp: "",
     corretor_id: "",
     is_premium: false,
     bedrooms: "",
@@ -201,7 +222,7 @@ export default function InventarioImoveisPage() {
       const { data, error } = await supabase
         .from("properties")
         .select(
-          `id, title, property_type, purpose, price, is_premium, ${brokerCol}, data_direcionamento, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description, created_at`,
+          `id, title, property_type, purpose, price, is_premium, ${brokerCol}, data_direcionamento, owner_whatsapp, last_owner_contact_at, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description, created_at`,
         )
         .order("created_at", { ascending: false });
 
@@ -218,7 +239,7 @@ export default function InventarioImoveisPage() {
         const { data, error } = await supabase
           .from("properties")
           .select(
-            `id, title, property_type, purpose, price, is_premium, ${brokerCol}, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description, created_at`,
+            `id, title, property_type, purpose, price, is_premium, ${brokerCol}, owner_whatsapp, last_owner_contact_at, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description, created_at`,
           )
           .order("created_at", { ascending: false });
         if (error) {
@@ -397,6 +418,7 @@ export default function InventarioImoveisPage() {
       price: "",
       neighborhood: "",
       city: "",
+      owner_whatsapp: "",
       corretor_id: "",
       is_premium: false,
       bedrooms: "",
@@ -422,6 +444,7 @@ export default function InventarioImoveisPage() {
         typeof row.price === "number" ? formatCurrencyBRL(row.price, { maximumFractionDigits: 2 }) : "",
       neighborhood: row.neighborhood ?? "",
       city: row.city ?? "",
+      owner_whatsapp: String(row.owner_whatsapp ?? ""),
       corretor_id: row.corretor_id ?? "",
       is_premium: Boolean(row.is_premium),
       bedrooms: row.bedrooms != null ? String(row.bedrooms) : "",
@@ -492,6 +515,7 @@ export default function InventarioImoveisPage() {
       property_type: form.property_type.trim() ? form.property_type.trim() : null,
       purpose: form.purpose,
       price: parseBRLInputToNumber(form.price),
+      owner_whatsapp: form.owner_whatsapp.trim() ? form.owner_whatsapp.trim() : null,
       [propertiesBrokerColumn]: form.corretor_id.trim() ? form.corretor_id.trim() : null,
       is_premium: form.is_premium,
       neighborhood: form.neighborhood.trim() ? form.neighborhood.trim() : null,
@@ -736,6 +760,8 @@ export default function InventarioImoveisPage() {
                   ? `${bedrooms ?? 0} qtos | ${suites ?? 0} suíte${(suites ?? 0) === 1 ? "" : "s"}`
                   : "-";
               const parkingLine = parking != null ? `${parking} vaga${parking === 1 ? "" : "s"}` : "-";
+              const ownerLast = (r as any)?.last_owner_contact_at ?? null;
+              const ownerWhatsapp = String((r as any)?.owner_whatsapp ?? "").trim();
 
               return (
                 <div
@@ -799,6 +825,19 @@ export default function InventarioImoveisPage() {
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
+                          onClick={() => {
+                            if (!ownerWhatsapp) return;
+                            const url = `/admin/whatsapp?phone=${encodeURIComponent(ownerWhatsapp)}`;
+                            window.location.href = url;
+                          }}
+                          disabled={!ownerWhatsapp}
+                          className="inline-flex h-10 items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          title="Iniciar conversa com o proprietário"
+                        >
+                          WhatsApp
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => editRow(r)}
                           className="inline-flex h-10 items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
                         >
@@ -848,6 +887,13 @@ export default function InventarioImoveisPage() {
                           </span>
                         </label>
                       </div>
+                    </div>
+
+                    <div className="mt-4 rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-200/70">
+                      <div className="text-[10px] font-semibold tracking-wide text-slate-500">
+                        Último contato com proprietário
+                      </div>
+                      <div className="mt-1 text-xs font-semibold text-slate-700">{formatTimeBR(ownerLast)}</div>
                     </div>
                   </div>
                 </div>
@@ -1020,6 +1066,21 @@ export default function InventarioImoveisPage() {
                           className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 shadow-sm ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#2b6cff]/30"
                           placeholder="Ex: Moinhos de Vento"
                         />
+                      </label>
+
+                      <label className="flex flex-col gap-2">
+                        <span className="text-xs font-semibold tracking-wide text-slate-600">WhatsApp do Proprietário</span>
+                        <input
+                          value={form.owner_whatsapp}
+                          onChange={(e) =>
+                            setForm((s) => ({ ...s, owner_whatsapp: e.target.value.replace(/\D+/g, "") }))
+                          }
+                          className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 shadow-sm ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#2b6cff]/30"
+                          placeholder="Ex: 5591999999999"
+                          inputMode="numeric"
+                          required
+                        />
+                        <div className="text-[11px] font-semibold text-slate-500">Use apenas números (DDD + número).</div>
                       </label>
 
                       <label className="flex flex-col gap-2">

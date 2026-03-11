@@ -26,6 +26,12 @@ type ThreadRow = {
   created_at?: string;
 };
 
+type OwnerMatch = {
+  source: "properties" | "developments";
+  id: string;
+  title: string;
+};
+
 type MessageRow = {
   id: string;
   thread_id: string;
@@ -102,6 +108,8 @@ export default function WhatsAppPanelClient() {
   const [threads, setThreads] = useState<ThreadRow[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
 
+  const [ownerByWhatsapp, setOwnerByWhatsapp] = useState<Record<string, OwnerMatch>>({});
+
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [isLoadingThreads, setIsLoadingThreads] = useState(true);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
@@ -167,6 +175,37 @@ export default function WhatsAppPanelClient() {
     [selectedThreadId, threads],
   );
 
+  const selectedOwnerMatch = useMemo(() => {
+    const num = String(selectedThread?.contact_number ?? "").replace(/\D+/g, "").trim();
+    if (!num) return null;
+    return ownerByWhatsapp[num] ?? null;
+  }, [ownerByWhatsapp, selectedThread?.contact_number]);
+
+  async function ensureThreadByPhone(phone: string) {
+    if (!supabase) return null;
+    const normalized = phone.replace(/\D+/g, "").trim();
+    if (!normalized) return null;
+
+    try {
+      const existing = await supabase.from("chat_threads").select("id").eq("external_id", normalized).maybeSingle();
+      if (!existing.error && existing.data?.id) return String(existing.data.id);
+
+      const id = crypto.randomUUID();
+      const insert = await (supabase as any).from("chat_threads").insert({
+        id,
+        external_id: normalized,
+        contact_number: normalized,
+        contact_name: null,
+        status: "active",
+        last_message_at: new Date().toISOString(),
+      });
+      if (insert.error) return null;
+      return id;
+    } catch {
+      return null;
+    }
+  }
+
   const filteredThreads = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return threads;
@@ -226,6 +265,62 @@ export default function WhatsAppPanelClient() {
       const rows = (res.data ?? []) as ThreadRow[];
       setThreads(rows);
       setSupportsTables(true);
+
+      try {
+        const numbers = Array.from(
+          new Set(
+            rows
+              .map((r) => String(r.contact_number ?? "").replace(/\D+/g, "").trim())
+              .filter(Boolean),
+          ),
+        );
+
+        if (numbers.length === 0) {
+          setOwnerByWhatsapp({});
+        } else {
+          const map: Record<string, OwnerMatch> = {};
+
+          const [propsRes, devsRes] = await Promise.allSettled([
+            supabase
+              .from("properties")
+              .select("id, title, owner_whatsapp")
+              .in("owner_whatsapp", numbers)
+              .limit(200),
+            (supabase as any)
+              .from("developments")
+              .select("id, name, title, owner_whatsapp")
+              .in("owner_whatsapp", numbers)
+              .limit(200),
+          ]);
+
+          if (propsRes.status === "fulfilled" && !propsRes.value.error) {
+            for (const r of (propsRes.value.data ?? []) as Array<any>) {
+              const w = String(r?.owner_whatsapp ?? "").replace(/\D+/g, "").trim();
+              if (!w) continue;
+              map[w] = { source: "properties", id: String(r?.id ?? ""), title: String(r?.title ?? "Imóvel") };
+            }
+          }
+
+          if (devsRes.status === "fulfilled") {
+            const value: any = devsRes.value;
+            if (!value?.error) {
+              for (const r of (value?.data ?? []) as Array<any>) {
+                const w = String(r?.owner_whatsapp ?? "").replace(/\D+/g, "").trim();
+                if (!w) continue;
+                map[w] = {
+                  source: "developments",
+                  id: String(r?.id ?? ""),
+                  title: String(r?.name ?? r?.title ?? "Empreendimento"),
+                };
+              }
+            }
+          }
+
+          setOwnerByWhatsapp(map);
+        }
+      } catch {
+        setOwnerByWhatsapp({});
+      }
 
       if (!selectedThreadId && rows.length > 0) {
         setSelectedThreadId(rows[0].id);
@@ -476,6 +571,20 @@ export default function WhatsAppPanelClient() {
     if (exists) setSelectedThreadId(threadFromUrl);
   }, [threads]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const phone = params.get("phone");
+    if (!phone) return;
+    void (async () => {
+      const id = await ensureThreadByPhone(phone);
+      if (id) {
+        await loadThreads();
+        setSelectedThreadId(id);
+      }
+    })();
+  }, [loadThreads]);
+
   return (
     <div className="flex w-full flex-col gap-8">
       <header className="flex flex-col gap-2">
@@ -547,6 +656,8 @@ export default function WhatsAppPanelClient() {
                 filteredThreads.map((t) => {
                   const isActive = t.id === selectedThreadId;
                   const displayName = t.contact_name ?? t.contact_number ?? t.external_id ?? "Contato";
+                  const normalized = String(t.contact_number ?? "").replace(/\D+/g, "").trim();
+                  const ownerMatch = normalized ? ownerByWhatsapp[normalized] ?? null : null;
                   const brokerName = t.assigned_broker_profile_id
                     ? brokerById.get(t.assigned_broker_profile_id)?.full_name ?? "Corretor"
                     : "Boss";
@@ -573,9 +684,16 @@ export default function WhatsAppPanelClient() {
                         </div>
                         <div className="mt-1 flex items-center justify-between gap-3">
                           <div className="truncate text-xs text-slate-500">{t.contact_number ?? ""}</div>
-                          <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-[#001f3f] ring-1 ring-slate-200/70">
-                            {brokerName}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            {ownerMatch ? (
+                              <span className="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-900 ring-1 ring-amber-200/70">
+                                [PROPRIETÁRIO]
+                              </span>
+                            ) : null}
+                            <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-[#001f3f] ring-1 ring-slate-200/70">
+                              {brokerName}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </button>
@@ -603,6 +721,11 @@ export default function WhatsAppPanelClient() {
                       : "Selecione uma conversa"}
                   </div>
                   <div className="truncate text-xs text-slate-500">{selectedThread?.contact_number ?? ""}</div>
+                  {selectedOwnerMatch ? (
+                    <div className="mt-1 text-[11px] font-semibold text-amber-700">
+                      [PROPRIETÁRIO] {selectedOwnerMatch.title}
+                    </div>
+                  ) : null}
                 </div>
               </div>
 

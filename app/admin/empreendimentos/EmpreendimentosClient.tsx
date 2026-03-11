@@ -59,6 +59,9 @@ type Development = {
 
   gallery_urls?: string[] | null;
 
+  owner_whatsapp?: string | null;
+  last_owner_contact_at?: string | null;
+
   corretor_id?: string | null;
   broker_id?: string | null;
   created_at?: string;
@@ -77,6 +80,8 @@ type FormState = {
   city: string;
   broker_id: string;
   is_premium: boolean;
+
+  owner_whatsapp: string;
 
   status: DevelopmentStatus;
   lot_value: string;
@@ -117,6 +122,22 @@ function formatBRLIntl(value: number) {
     return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
   } catch {
     return `R$ ${value}`;
+  }
+}
+
+function formatTimeBR(value: string | null) {
+  if (!value) return "-";
+  try {
+    const d = new Date(value);
+    return d.toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "-";
   }
 }
 
@@ -226,9 +247,12 @@ export default function EmpreendimentosClient() {
 
   const [form, setForm] = useState<FormState>({
     name: "",
-    city: "Marabá",
+    city: "",
     broker_id: "",
     is_premium: false,
+
+    owner_whatsapp: "",
+
     status: "pre_lancamento",
     lot_value: "",
     progress_percent: "",
@@ -257,6 +281,7 @@ export default function EmpreendimentosClient() {
       city: "Marabá",
       broker_id: "",
       is_premium: false,
+      owner_whatsapp: "",
       status: "pre_lancamento",
       lot_value: "",
       progress_percent: "",
@@ -297,6 +322,7 @@ export default function EmpreendimentosClient() {
       city: row.city ?? "Marabá",
       broker_id: row.broker_id ?? row.corretor_id ?? "",
       is_premium: Boolean(row.is_premium),
+      owner_whatsapp: String(row.owner_whatsapp ?? ""),
       status: (row.status ?? "pre_lancamento") as DevelopmentStatus,
       lot_value:
         typeof row.lot_value === "number"
@@ -541,6 +567,7 @@ export default function EmpreendimentosClient() {
     const basePayload: any = {
       ...(selectedId ? {} : { id: crypto.randomUUID() }),
       name: form.name.trim(),
+      owner_whatsapp: form.owner_whatsapp.trim() ? form.owner_whatsapp.trim() : null,
       cover_url: form.cover_url.trim() ? form.cover_url.trim() : null,
       video_url: form.video_url.trim() ? form.video_url.trim() : null,
       sales_material_url: form.sales_material_url.trim() ? form.sales_material_url.trim() : null,
@@ -705,6 +732,8 @@ export default function EmpreendimentosClient() {
               (r.infra_leisure ? 1 : 0);
             const progress = progressLabel(r);
             const value = getDisplayValue(r);
+            const ownerLast = (r as any)?.last_owner_contact_at ?? null;
+            const ownerWhatsapp = String((r as any)?.owner_whatsapp ?? "").trim();
             return (
               <div
                 key={r.id}
@@ -799,6 +828,19 @@ export default function EmpreendimentosClient() {
                       <button
                         type="button"
                         onClick={() => {
+                          if (!ownerWhatsapp) return;
+                          const url = `/admin/whatsapp?phone=${encodeURIComponent(ownerWhatsapp)}`;
+                          window.location.href = url;
+                        }}
+                        disabled={!ownerWhatsapp}
+                        className="inline-flex h-11 items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        title="Iniciar conversa com o proprietário"
+                      >
+                        WhatsApp
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
                           setSelectedId(r.id);
                           setDispatchSelectionById((c) => ({ ...c, [r.id]: r.broker_id ?? r.corretor_id ?? "" }));
                           setIsModalOpen(true);
@@ -818,6 +860,13 @@ export default function EmpreendimentosClient() {
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
+                  </div>
+
+                  <div className="mt-4 rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-200/70">
+                    <div className="text-[10px] font-semibold tracking-wide text-slate-500">
+                      Último contato com proprietário
+                    </div>
+                    <div className="mt-1 text-xs font-semibold text-slate-700">{formatTimeBR(ownerLast)}</div>
                   </div>
 
                   <div className="mt-4 text-xs text-slate-500">
@@ -918,6 +967,21 @@ export default function EmpreendimentosClient() {
                         placeholder="Ex: Residencial / Loteamento"
                         required
                       />
+                    </label>
+
+                    <label className="flex flex-col gap-2">
+                      <span className="text-xs font-semibold tracking-wide text-slate-600">WhatsApp do Proprietário</span>
+                      <input
+                        value={form.owner_whatsapp}
+                        onChange={(e) =>
+                          setForm((s) => ({ ...s, owner_whatsapp: e.target.value.replace(/\D+/g, "") }))
+                        }
+                        className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10"
+                        placeholder="Ex: 5591999999999"
+                        inputMode="numeric"
+                        required
+                      />
+                      <div className="text-[11px] font-semibold text-slate-500">Use apenas números (DDD + número).</div>
                     </label>
 
                     <label className="flex flex-col gap-2">

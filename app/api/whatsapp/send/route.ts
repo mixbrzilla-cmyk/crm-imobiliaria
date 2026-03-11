@@ -19,6 +19,25 @@ async function loadWhatsappSettings(supabase: any) {
   }
 }
 
+function normalizeWhatsapp(value: string) {
+  return String(value ?? "")
+    .replace(/\D+/g, "")
+    .trim();
+}
+
+async function touchOwnerLastContact(supabase: any, phone: string, iso: string) {
+  const normalized = normalizeWhatsapp(phone);
+  if (!normalized) return;
+  try {
+    await Promise.all([
+      (supabase as any).from("properties").update({ last_owner_contact_at: iso }).eq("owner_whatsapp", normalized),
+      (supabase as any).from("developments").update({ last_owner_contact_at: iso }).eq("owner_whatsapp", normalized),
+    ]);
+  } catch {
+    // silent
+  }
+}
+
 export async function POST(req: Request) {
   const supabase = getSupabaseClient();
   if (!supabase) {
@@ -81,6 +100,12 @@ export async function POST(req: Request) {
       } catch {
         // silent
       }
+    }
+
+    try {
+      await touchOwnerLastContact(supabase, phone, new Date().toISOString());
+    } catch {
+      // silent
     }
 
     return NextResponse.json({ ok: true, data: apiRes });

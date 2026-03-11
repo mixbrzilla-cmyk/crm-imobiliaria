@@ -9,6 +9,7 @@ import {
   BadgeDollarSign,
   LineChart,
   Scale,
+  User,
   Users,
 } from "lucide-react";
 
@@ -277,6 +278,8 @@ export default function AdminDashboardClient() {
   const [grossDevelopmentsValue, setGrossDevelopmentsValue] = useState<number>(0);
   const [commissionValue, setCommissionValue] = useState<number>(0);
   const [netProfitValue, setNetProfitValue] = useState<number>(0);
+
+  const [lastOwnerContactAt, setLastOwnerContactAt] = useState<string | null>(null);
   const [trafficBySource, setTrafficBySource] = useState<Record<LeadSource, number>>({
     meta: 0,
     google: 0,
@@ -334,6 +337,7 @@ export default function AdminDashboardClient() {
       setGrossDevelopmentsValue(0);
       setCommissionValue(0);
       setNetProfitValue(0);
+      setLastOwnerContactAt(null);
       setTrafficBySource({
         meta: 0,
         google: 0,
@@ -437,6 +441,8 @@ export default function AdminDashboardClient() {
         vgvRes,
         vgvWithBrokerRes,
         vgvDevsRes,
+        lastOwnerPropRes,
+        lastOwnerDevRes,
         obraMaterialsRes,
         whatsRes,
         devIdsRes,
@@ -482,6 +488,26 @@ export default function AdminDashboardClient() {
               .from("developments")
               .select(`${developmentsValueColumn}, ${developmentsBrokerColumn}`)
               .not(developmentsValueColumn, "is", null);
+            return developmentsHasDeletedAt ? q.is("deleted_at", null) : q;
+          })(),
+
+          (() => {
+            const q = supabase
+              .from("properties")
+              .select("last_owner_contact_at")
+              .not("last_owner_contact_at", "is", null)
+              .order("last_owner_contact_at", { ascending: false })
+              .limit(1);
+            return propertiesHasDeletedAt ? q.is("deleted_at", null) : q;
+          })(),
+
+          (() => {
+            const q = (supabase as any)
+              .from("developments")
+              .select("last_owner_contact_at")
+              .not("last_owner_contact_at", "is", null)
+              .order("last_owner_contact_at", { ascending: false })
+              .limit(1);
             return developmentsHasDeletedAt ? q.is("deleted_at", null) : q;
           })(),
           (supabase as any)
@@ -858,6 +884,23 @@ export default function AdminDashboardClient() {
       setCommissionValue(commission);
       setNetProfitValue(net);
 
+      try {
+        const propRow: any =
+          lastOwnerPropRes.status === "fulfilled" && !lastOwnerPropRes.value.error
+            ? (lastOwnerPropRes.value.data ?? [])[0]
+            : null;
+        const devRow: any =
+          lastOwnerDevRes.status === "fulfilled" && !lastOwnerDevRes.value.error
+            ? (lastOwnerDevRes.value.data ?? [])[0]
+            : null;
+        const p = String(propRow?.last_owner_contact_at ?? "").trim();
+        const d = String(devRow?.last_owner_contact_at ?? "").trim();
+        const latest = [p, d].filter(Boolean).sort((a, b) => b.localeCompare(a))[0] ?? null;
+        setLastOwnerContactAt(latest);
+      } catch {
+        setLastOwnerContactAt(null);
+      }
+
       if (obraMaterialsRes.status === "fulfilled") {
         if (obraMaterialsRes.value.error) {
           setObraMaterialsTotal(0);
@@ -1068,6 +1111,19 @@ export default function AdminDashboardClient() {
               </div>
             </div>
             <BadgeDollarSign className="h-6 w-6 text-emerald-700" />
+          </div>
+        </div>
+
+        <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200/70 border-l-4 border-l-slate-400">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-sm font-medium text-slate-600">Último contato (Proprietário)</div>
+              <div className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">
+                {lastOwnerContactAt ? new Date(lastOwnerContactAt).toLocaleString("pt-BR") : "-"}
+              </div>
+              <div className="mt-2 text-xs text-slate-500">Baseado em owner_whatsapp (imóveis + empreendimentos)</div>
+            </div>
+            <User className="h-6 w-6 text-slate-700" />
           </div>
         </div>
       </section>

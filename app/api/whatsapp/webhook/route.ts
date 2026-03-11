@@ -19,6 +19,23 @@ async function loadWhatsappSettings(supabase: any) {
   }
 }
 
+function normalizeWhatsapp(value: string | null) {
+  return String(value ?? "")
+    .replace(/\D+/g, "")
+    .trim();
+}
+
+async function touchOwnerLastContact(supabase: any, phone: string, iso: string) {
+  try {
+    await Promise.all([
+      (supabase as any).from("properties").update({ last_owner_contact_at: iso }).eq("owner_whatsapp", normalizeWhatsapp(phone)),
+      (supabase as any).from("developments").update({ last_owner_contact_at: iso }).eq("owner_whatsapp", normalizeWhatsapp(phone)),
+    ]);
+  } catch {
+    // silent
+  }
+}
+
 async function ensureThread(args: {
   supabase: any;
   threadExternalId: string;
@@ -138,6 +155,15 @@ export async function POST(req: Request) {
     timestamp: normalized.timestamp,
     raw: normalized.raw,
   });
+
+  try {
+    const phone = normalizeWhatsapp(normalized.fromNumber) || normalizeWhatsapp(normalized.toNumber);
+    if (phone) {
+      await touchOwnerLastContact(supabase, phone, normalized.timestamp);
+    }
+  } catch {
+    // silent
+  }
 
   try {
     await supabase
