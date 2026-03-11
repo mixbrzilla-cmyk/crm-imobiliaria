@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { CheckCircle2, FileText, Gavel, PenLine, RefreshCw, Send, Signature, User, X } from "lucide-react";
+import { CheckCircle2, FileDown, FileText, Gavel, MessageCircle, PenLine, RefreshCw, Send, Signature, User, X } from "lucide-react";
 
 import { getSupabaseClient } from "@/lib/supabaseClient";
 
@@ -25,6 +25,9 @@ type ContractRow = {
 
   signature_provider: string | null;
   signature_external_id: string | null;
+
+  owner_name?: string | null;
+  owner_whatsapp?: string | null;
 
   created_at?: string;
 };
@@ -56,6 +59,8 @@ type PropertyMini = {
   title: string | null;
   neighborhood: string | null;
   city: string | null;
+  owner_name?: string | null;
+  owner_whatsapp?: string | null;
 };
 
 type DevelopmentMini = {
@@ -63,15 +68,21 @@ type DevelopmentMini = {
   name: string;
   city: string | null;
   localidade: string | null;
+  owner_name?: string | null;
+  owner_whatsapp?: string | null;
 };
 
+type ContractModelKey = "compra_venda" | "locacao_residencial" | "locacao_comercial" | "exclusividade";
+
 type NewContractForm = {
-  title: string;
+  model: ContractModelKey;
   client_id: string;
   broker_id: string;
   property_id: string;
   development_id: string;
   template_body: string;
+  owner_name: string;
+  owner_whatsapp: string;
 };
 
 const statusMeta: Array<{ key: ContractStatus; label: string; icon: React.ReactNode }> = [
@@ -94,6 +105,8 @@ function placeholderMap(args: {
   broker: BrokerProfile | null;
   property: PropertyMini | null;
   development: DevelopmentMini | null;
+  owner_name: string | null;
+  owner_whatsapp: string | null;
 }) {
   const clientName = (args.client?.full_name ?? "").trim();
   const clientPhone = (args.client?.phone ?? "").trim();
@@ -105,6 +118,15 @@ function placeholderMap(args: {
   const developmentName = (args.development?.name ?? "").trim();
   const developmentLoc = [args.development?.localidade, args.development?.city].filter(Boolean).join(" • ");
 
+  const ownerName =
+    (args.owner_name ?? "").trim() ||
+    (args.property?.owner_name ?? "").trim() ||
+    (args.development?.owner_name ?? "").trim();
+  const ownerWhats =
+    (args.owner_whatsapp ?? "").trim() ||
+    (args.property?.owner_whatsapp ?? "").trim() ||
+    (args.development?.owner_whatsapp ?? "").trim();
+
   return {
     nome_cliente: clientName,
     whatsapp_cliente: clientPhone,
@@ -113,6 +135,8 @@ function placeholderMap(args: {
     local_imovel: propertyLoc,
     nome_empreendimento: developmentName,
     local_empreendimento: developmentLoc,
+    nome_proprietario: ownerName,
+    whatsapp_proprietario: ownerWhats,
   } as Record<string, string>;
 }
 
@@ -130,6 +154,48 @@ function contractTitleFallback(c: ContractRow) {
   return `${link} • ${c.id.slice(0, 6)}`;
 }
 
+function escapeHtml(value: string) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function normalizeWhatsapp(value: string) {
+  return String(value ?? "")
+    .replace(/\D+/g, "")
+    .trim();
+}
+
+const contractModels: Array<{ key: ContractModelKey; label: string; template: string }> = [
+  {
+    key: "compra_venda",
+    label: "Compra e Venda",
+    template:
+      "CONTRATO DE COMPRA E VENDA\n\nCliente: {{nome_cliente}}\nWhatsApp: {{whatsapp_cliente}}\nCorretor: {{nome_corretor}}\n\nImóvel: {{titulo_imovel}}\nLocal: {{local_imovel}}\n\nProprietário: {{nome_proprietario}}\nWhatsApp do Proprietário: {{whatsapp_proprietario}}\n\nCláusulas: (preencher...)\n",
+  },
+  {
+    key: "locacao_residencial",
+    label: "Locação Residencial",
+    template:
+      "CONTRATO DE LOCAÇÃO RESIDENCIAL\n\nLocatário: {{nome_cliente}}\nWhatsApp: {{whatsapp_cliente}}\nCorretor: {{nome_corretor}}\n\nImóvel: {{titulo_imovel}}\nLocal: {{local_imovel}}\n\nLocador/Proprietário: {{nome_proprietario}}\nWhatsApp do Proprietário: {{whatsapp_proprietario}}\n\nCondições: (preencher...)\n",
+  },
+  {
+    key: "locacao_comercial",
+    label: "Locação Comercial",
+    template:
+      "CONTRATO DE LOCAÇÃO COMERCIAL\n\nLocatário: {{nome_cliente}}\nWhatsApp: {{whatsapp_cliente}}\nCorretor: {{nome_corretor}}\n\nImóvel: {{titulo_imovel}}\nLocal: {{local_imovel}}\n\nLocador/Proprietário: {{nome_proprietario}}\nWhatsApp do Proprietário: {{whatsapp_proprietario}}\n\nCondições: (preencher...)\n",
+  },
+  {
+    key: "exclusividade",
+    label: "Exclusividade",
+    template:
+      "CONTRATO DE EXCLUSIVIDADE\n\nCliente: {{nome_cliente}}\nWhatsApp: {{whatsapp_cliente}}\nCorretor: {{nome_corretor}}\n\nObjeto (Imóvel/Empreendimento): {{titulo_imovel}}{{nome_empreendimento}}\nLocal: {{local_imovel}}{{local_empreendimento}}\n\nProprietário: {{nome_proprietario}}\nWhatsApp do Proprietário: {{whatsapp_proprietario}}\n\nCláusulas: (preencher...)\n",
+  },
+];
+
 export default function ContractsPipelineClient() {
   const supabase = useMemo(() => getSupabaseClient(), []);
 
@@ -138,6 +204,7 @@ export default function ContractsPipelineClient() {
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [contracts, setContracts] = useState<ContractRow[]>([]);
@@ -152,13 +219,14 @@ export default function ContractsPipelineClient() {
 
   const [isNewOpen, setIsNewOpen] = useState(false);
   const [newForm, setNewForm] = useState<NewContractForm>({
-    title: "",
+    model: "compra_venda",
     client_id: "",
     broker_id: "",
     property_id: "",
     development_id: "",
-    template_body:
-      "CONTRATO\n\nCliente: {{nome_cliente}}\nWhatsApp: {{whatsapp_cliente}}\nCorretor: {{nome_corretor}}\n\nImóvel: {{titulo_imovel}}\nLocal: {{local_imovel}}\n\nEmpreendimento: {{nome_empreendimento}}\nLocal: {{local_empreendimento}}\n",
+    template_body: contractModels[0].template,
+    owner_name: "",
+    owner_whatsapp: "",
   });
 
   const selectedContract = useMemo(
@@ -202,9 +270,18 @@ export default function ContractsPipelineClient() {
       broker: selectedContract.broker_id ? brokerById.get(selectedContract.broker_id) ?? null : null,
       property: selectedContract.property_id ? propertyById.get(selectedContract.property_id) ?? null : null,
       development: selectedContract.development_id ? developmentById.get(selectedContract.development_id) ?? null : null,
+      owner_name: (selectedContract.owner_name ?? null) as string | null,
+      owner_whatsapp: (selectedContract.owner_whatsapp ?? null) as string | null,
     });
     return renderTemplate(template, vars);
   }, [brokerById, developmentById, leadById, propertyById, selectedContract]);
+
+  const selectedRenderedOrPreview = useMemo(() => {
+    if (!selectedContract) return "";
+    const rendered = (selectedContract.rendered_body ?? "").trim();
+    if (rendered) return rendered;
+    return selectedPreview;
+  }, [selectedContract, selectedPreview]);
 
   const grouped = useMemo(() => {
     const base: Record<ContractStatus, ContractRow[]> = {
@@ -225,6 +302,7 @@ export default function ContractsPipelineClient() {
   const loadAll = useCallback(async () => {
     setErrorMessage(null);
     setInfoMessage(null);
+    setSuccessMessage(null);
     setIsLoading(true);
 
     if (!supabase) {
@@ -244,7 +322,7 @@ export default function ContractsPipelineClient() {
         (supabase as any)
           .from("contracts")
           .select(
-            "id, title, status, client_id, broker_id, property_id, development_id, template_body, rendered_body, document_url, signature_provider, signature_external_id, created_at",
+            "id, title, status, client_id, broker_id, property_id, development_id, template_body, rendered_body, document_url, signature_provider, signature_external_id, owner_name, owner_whatsapp, created_at",
           )
           .order("created_at", { ascending: false }),
         (supabase as any)
@@ -263,14 +341,35 @@ export default function ContractsPipelineClient() {
           .order("full_name", { ascending: true }),
         supabase
           .from("properties")
-          .select("id, title, neighborhood, city")
+          .select("id, title, neighborhood, city, owner_name, owner_whatsapp")
           .order("created_at", { ascending: false })
           .limit(500),
-        (supabase as any)
-          .from("developments")
-          .select("id, name, title, city, localidade")
-          .order("created_at", { ascending: false })
-          .limit(500),
+        (async () => {
+          const attempts = [
+            "id, name, city, localidade, owner_name, owner_whatsapp",
+            "id, title, city, localidade, owner_name, owner_whatsapp",
+            "id, name, title, city, localidade",
+            "id, title, city, localidade",
+            "id, name, title",
+          ];
+          let last: any = null;
+          for (const sel of attempts) {
+            // eslint-disable-next-line no-await-in-loop
+            const res = await (supabase as any)
+              .from("developments")
+              .select(sel)
+              .order("created_at", { ascending: false })
+              .limit(500);
+            if (!res?.error) return res;
+            last = res;
+            const msg = String(res?.error?.message ?? "");
+            const isColumnError = /column .* does not exist|not found/i.test(msg);
+            const code = (res?.error as any)?.code;
+            const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
+            if (!isColumnError && !isSchemaMismatch) break;
+          }
+          return last;
+        })(),
       ]);
 
       if (contractsRes.status === "fulfilled") {
@@ -329,6 +428,8 @@ export default function ContractsPipelineClient() {
               name: String(d.name ?? d.title ?? "-").trim() || "-",
               city: (d.city ?? d.cidade ?? null) as string | null,
               localidade: (d.localidade ?? d.bairro ?? null) as string | null,
+              owner_name: (d.owner_name ?? null) as string | null,
+              owner_whatsapp: (d.owner_whatsapp ?? null) as string | null,
             })),
           );
         }
@@ -360,9 +461,10 @@ export default function ContractsPipelineClient() {
     if (!supabase) return;
     if (!supportsContractsTable) return;
 
-    const payload: any = {
+    const model = contractModels.find((m) => m.key === newForm.model) ?? contractModels[0];
+    const payloadBase: any = {
       id: crypto.randomUUID(),
-      title: newForm.title.trim() || null,
+      title: model.label,
       status: "draft",
       client_id: newForm.client_id.trim() || null,
       broker_id: newForm.broker_id.trim() || null,
@@ -375,10 +477,34 @@ export default function ContractsPipelineClient() {
       signature_external_id: null,
     };
 
+    const payloadAttempts: Array<any> = [
+      {
+        ...payloadBase,
+        owner_name: newForm.owner_name.trim() || null,
+        owner_whatsapp: normalizeWhatsapp(newForm.owner_whatsapp),
+      },
+      payloadBase,
+    ];
+
     try {
-      const res = await (supabase as any).from("contracts").insert(payload);
-      if (res.error) {
-        setErrorMessage(res.error.message);
+      let lastError: any = null;
+      for (const payload of payloadAttempts) {
+        // eslint-disable-next-line no-await-in-loop
+        const res = await (supabase as any).from("contracts").insert(payload);
+        if (!res.error) {
+          lastError = null;
+          break;
+        }
+        lastError = res.error;
+        const msg = String((res.error as any)?.message ?? "");
+        const isOwnerColumnError = /owner_name|owner_whatsapp/i.test(msg) && /does not exist|not found/i.test(msg);
+        const code = (res.error as any)?.code;
+        const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
+        if (!isOwnerColumnError && !isSchemaMismatch) break;
+      }
+
+      if (lastError) {
+        setErrorMessage(lastError.message);
         return;
       }
       setIsNewOpen(false);
@@ -416,6 +542,8 @@ export default function ContractsPipelineClient() {
       broker: c.broker_id ? brokerById.get(c.broker_id) ?? null : null,
       property: c.property_id ? propertyById.get(c.property_id) ?? null : null,
       development: c.development_id ? developmentById.get(c.development_id) ?? null : null,
+      owner_name: (c.owner_name ?? null) as string | null,
+      owner_whatsapp: (c.owner_whatsapp ?? null) as string | null,
     });
 
     const rendered = renderTemplate(c.template_body ?? "", vars);
@@ -460,6 +588,87 @@ export default function ContractsPipelineClient() {
 
   const canSendToSignature = Boolean(selectedContract && selectedChecklist.hasRG && selectedChecklist.hasCPF);
 
+  const selectedOwnerName =
+    (selectedContract?.owner_name ?? "").trim() ||
+    (selectedContract?.property_id ? (propertyById.get(selectedContract.property_id)?.owner_name ?? "") : "").trim() ||
+    (selectedContract?.development_id ? (developmentById.get(selectedContract.development_id)?.owner_name ?? "") : "").trim();
+  const selectedOwnerWhats =
+    (selectedContract?.owner_whatsapp ?? "").trim() ||
+    (selectedContract?.property_id ? (propertyById.get(selectedContract.property_id)?.owner_whatsapp ?? "") : "").trim() ||
+    (selectedContract?.development_id ? (developmentById.get(selectedContract.development_id)?.owner_whatsapp ?? "") : "").trim();
+
+  async function exportPdf() {
+    if (!selectedContract) return;
+    const title = contractTitleFallback(selectedContract);
+    const body = selectedRenderedOrPreview || "";
+    const win = window.open("", "_blank");
+    if (!win) {
+      setErrorMessage("O navegador bloqueou a abertura da janela de exportação.");
+      return;
+    }
+    const html = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>${title}</title>
+    <style>
+      body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; padding: 24px; }
+      h1 { font-size: 18px; margin: 0 0 16px; }
+      pre { white-space: pre-wrap; font-size: 12px; line-height: 1.45; }
+    </style>
+  </head>
+  <body>
+    <h1>${title}</h1>
+    <pre>${escapeHtml(body)}</pre>
+    <script>window.focus(); window.print();</script>
+  </body>
+</html>`;
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+  }
+
+  async function sendWhatsApp() {
+    if (!selectedContract) return;
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    const lead = selectedContract.client_id ? leadById.get(selectedContract.client_id) ?? null : null;
+    const clientPhone = normalizeWhatsapp(lead?.phone ?? "");
+    const ownerPhone = normalizeWhatsapp(selectedOwnerWhats);
+
+    const title = contractTitleFallback(selectedContract);
+    const message = `*${title}*\n\n${selectedRenderedOrPreview || ""}`;
+
+    if (!clientPhone && !ownerPhone) {
+      setErrorMessage("Sem WhatsApp do cliente e sem WhatsApp do proprietário.");
+      return;
+    }
+
+    try {
+      const targets = [
+        clientPhone ? { label: "cliente", phone: clientPhone } : null,
+        ownerPhone ? { label: "proprietário", phone: ownerPhone } : null,
+      ].filter(Boolean) as Array<{ label: string; phone: string }>;
+
+      for (const t of targets) {
+        // eslint-disable-next-line no-await-in-loop
+        const res = await fetch("/api/whatsapp/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: t.phone, message, as_boss: true }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          throw new Error(data?.error ?? `Falha ao enviar WhatsApp para ${t.label}.`);
+        }
+      }
+
+      setSuccessMessage("WhatsApp enviado.");
+    } catch (e: any) {
+      setErrorMessage(e?.message ?? "Não foi possível enviar WhatsApp.");
+    }
+  }
+
   return (
     <div className="flex w-full flex-col gap-8">
       <header className="flex flex-col gap-2">
@@ -467,9 +676,6 @@ export default function ContractsPipelineClient() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Pipeline de Contratos</h1>
-            <p className="text-sm leading-relaxed text-slate-600">
-              Funil de status + geração de template com placeholders + trava jurídica (RG/CPF).
-            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
@@ -496,6 +702,12 @@ export default function ContractsPipelineClient() {
       {errorMessage ? (
         <div className="rounded-2xl bg-rose-50 px-5 py-4 text-sm text-rose-800 ring-1 ring-rose-200/70">
           {errorMessage}
+        </div>
+      ) : null}
+
+      {successMessage ? (
+        <div className="rounded-2xl bg-emerald-50 px-5 py-4 text-sm text-emerald-900 ring-1 ring-emerald-200/70">
+          {successMessage}
         </div>
       ) : null}
 
@@ -566,6 +778,24 @@ export default function ContractsPipelineClient() {
           </div>
           {selectedContract ? (
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void exportPdf()}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all hover:bg-slate-50"
+              >
+                <FileDown className="h-4 w-4" />
+                Gerar PDF (Exportar)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void sendWhatsApp()}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all hover:bg-slate-50"
+              >
+                <MessageCircle className="h-4 w-4" />
+                Enviar WhatsApp
+              </button>
+
               <button
                 type="button"
                 onClick={() => void generateRendered(selectedContract.id)}
@@ -663,11 +893,14 @@ export default function ContractsPipelineClient() {
               <div className="text-xs font-semibold tracking-wide text-slate-600">TEMPLATE (PREVIEW)</div>
               <div className="mt-3 grid grid-cols-1 gap-3">
                 <div className="rounded-xl bg-white p-4 text-xs text-slate-700 ring-1 ring-slate-200/70 whitespace-pre-wrap">
-                  {selectedPreview || "(vazio)"}
+                  {selectedRenderedOrPreview || "(vazio)"}
                 </div>
               </div>
               <div className="mt-3 text-[11px] font-semibold text-slate-500">
                 Placeholders suportados: {"{{nome_cliente}}"}, {"{{whatsapp_cliente}}"}, {"{{nome_corretor}}"}, {"{{titulo_imovel}}"}, {"{{local_imovel}}"}, {"{{nome_empreendimento}}"}, {"{{local_empreendimento}}"}
+              </div>
+              <div className="mt-2 text-[11px] font-semibold text-slate-500">
+                Proprietário: {"{{nome_proprietario}}"}, {"{{whatsapp_proprietario}}"}
               </div>
             </div>
           </div>
@@ -694,13 +927,22 @@ export default function ContractsPipelineClient() {
             <form onSubmit={createContract} className="px-6 py-6">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="flex flex-col gap-2 md:col-span-2">
-                  <span className="text-xs font-semibold tracking-wide text-slate-600">Título</span>
-                  <input
-                    value={newForm.title}
-                    onChange={(e) => setNewForm((s) => ({ ...s, title: e.target.value }))}
-                    className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none"
-                    placeholder="Ex: Contrato de Compra e Venda"
-                  />
+                  <span className="text-xs font-semibold tracking-wide text-slate-600">Modelo</span>
+                  <select
+                    value={newForm.model}
+                    onChange={(e) => {
+                      const model = e.target.value as ContractModelKey;
+                      const meta = contractModels.find((m) => m.key === model) ?? contractModels[0];
+                      setNewForm((s) => ({ ...s, model, template_body: meta.template }));
+                    }}
+                    className="h-11 rounded-xl bg-white px-3 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                  >
+                    {contractModels.map((m) => (
+                      <option key={m.key} value={m.key}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
                 </label>
 
                 <label className="flex flex-col gap-2">
@@ -745,7 +987,17 @@ export default function ContractsPipelineClient() {
                   <span className="text-xs font-semibold tracking-wide text-slate-600">Imóvel (opcional)</span>
                   <select
                     value={newForm.property_id}
-                    onChange={(e) => setNewForm((s) => ({ ...s, property_id: e.target.value, development_id: "" }))}
+                    onChange={(e) => {
+                      const propertyId = e.target.value;
+                      const p = propertyId ? propertyById.get(propertyId) ?? null : null;
+                      setNewForm((s) => ({
+                        ...s,
+                        property_id: propertyId,
+                        development_id: "",
+                        owner_name: (p?.owner_name ?? "").toString(),
+                        owner_whatsapp: (p?.owner_whatsapp ?? "").toString(),
+                      }));
+                    }}
                     className="h-11 rounded-xl bg-white px-3 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 outline-none"
                   >
                     <option value="">Nenhum</option>
@@ -761,7 +1013,17 @@ export default function ContractsPipelineClient() {
                   <span className="text-xs font-semibold tracking-wide text-slate-600">Empreendimento (opcional)</span>
                   <select
                     value={newForm.development_id}
-                    onChange={(e) => setNewForm((s) => ({ ...s, development_id: e.target.value, property_id: "" }))}
+                    onChange={(e) => {
+                      const developmentId = e.target.value;
+                      const d = developmentId ? developmentById.get(developmentId) ?? null : null;
+                      setNewForm((s) => ({
+                        ...s,
+                        development_id: developmentId,
+                        property_id: "",
+                        owner_name: (d?.owner_name ?? "").toString(),
+                        owner_whatsapp: (d?.owner_whatsapp ?? "").toString(),
+                      }));
+                    }}
                     className="h-11 rounded-xl bg-white px-3 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 outline-none"
                   >
                     <option value="">Nenhum</option>
@@ -771,6 +1033,26 @@ export default function ContractsPipelineClient() {
                       </option>
                     ))}
                   </select>
+                </label>
+
+                <label className="flex flex-col gap-2">
+                  <span className="text-xs font-semibold tracking-wide text-slate-600">Owner name</span>
+                  <input
+                    value={newForm.owner_name}
+                    onChange={(e) => setNewForm((s) => ({ ...s, owner_name: e.target.value }))}
+                    className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                    placeholder="Nome do proprietário"
+                  />
+                </label>
+
+                <label className="flex flex-col gap-2">
+                  <span className="text-xs font-semibold tracking-wide text-slate-600">Owner WhatsApp</span>
+                  <input
+                    value={newForm.owner_whatsapp}
+                    onChange={(e) => setNewForm((s) => ({ ...s, owner_whatsapp: e.target.value }))}
+                    className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                    placeholder="Ex: 55DDDNUMERO"
+                  />
                 </label>
 
                 <label className="flex flex-col gap-2 md:col-span-2">
