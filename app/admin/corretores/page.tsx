@@ -136,9 +136,22 @@ export default function CorretoresAdminPage() {
     try {
       const { error } = await supabase.from("profiles").update({ status: nextStatus }).eq("id", brokerId);
       if (error) {
+        console.error("[Corretores] Falha ao atualizar status", { brokerId, nextStatus, error });
         setErrorMessage(error.message);
         return;
       }
+
+      setRows((current) =>
+        current.map((r) =>
+          r.id === brokerId
+            ? {
+                ...r,
+                statusLabel: nextStatus,
+                isActive: nextStatus === "ativo",
+              }
+            : r,
+        ),
+      );
       await loadBaseData();
     } catch {
       setErrorMessage("Não foi possível atualizar o status do corretor agora.");
