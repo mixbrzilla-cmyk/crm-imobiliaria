@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import Image from "next/image";
+
 import { getSupabaseClient } from "@/lib/supabaseClient";
 
 type FormState = {
@@ -10,6 +12,7 @@ type FormState = {
   full_name: string;
   whatsapp: string;
   creci: string;
+  cnai: string;
 };
 
 export default function CadastroPage() {
@@ -19,6 +22,7 @@ export default function CadastroPage() {
     full_name: "",
     whatsapp: "",
     creci: "",
+    cnai: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -59,6 +63,8 @@ export default function CadastroPage() {
         return;
       }
 
+      const cnai = form.cnai.trim();
+
       const { error } = await (supabase as any).from("profiles").insert({
         id: userId,
         email: form.email.trim().toLowerCase(),
@@ -81,8 +87,19 @@ export default function CadastroPage() {
         return;
       }
 
+      if (cnai) {
+        try {
+          const up = await (supabase as any).from("profiles").update({ cnai }).eq("id", userId);
+          if (up?.error) {
+            // ignore
+          }
+        } catch {
+          // ignore
+        }
+      }
+
       setSuccessMessage("Cadastro enviado! Aguarde a aprovação do administrador");
-      setForm({ email: "", password: "", full_name: "", whatsapp: "", creci: "" });
+      setForm({ email: "", password: "", full_name: "", whatsapp: "", creci: "", cnai: "" });
     } catch {
       setErrorMessage("Não foi possível enviar seu cadastro. Tente novamente.");
     } finally {
@@ -91,80 +108,103 @@ export default function CadastroPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white px-6 py-12">
+    <div className="min-h-screen bg-slate-50 px-4 py-10 sm:px-6 sm:py-12">
       <div className="mx-auto flex w-full max-w-lg flex-col gap-8">
-        <header className="flex flex-col gap-2">
-          <h1 className="text-3xl font-semibold tracking-tight text-[#1e3a8a]">
-            Cadastro
-          </h1>
-          <p className="text-sm text-zinc-600">
-            Preencha seus dados para solicitar acesso ao portal.
-          </p>
+        <header className="flex flex-col items-center gap-4 text-center">
+          <div className="relative h-16 w-56 sm:h-20 sm:w-64">
+            <Image
+              src="/imobiliaria-moderna-logo.png"
+              alt="Imobiliária Moderna"
+              fill
+              className="object-contain"
+              priority
+            />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">Cadastro de Corretor</h1>
+            <p className="mt-2 text-sm text-slate-600">
+              Preencha seus dados para solicitar acesso ao portal.
+            </p>
+          </div>
         </header>
 
-        <form onSubmit={onSubmit} className="flex flex-col gap-5">
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-[#1e3a8a]">E-mail</span>
-            <input
-              className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-zinc-900 outline-none focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/20"
-              value={form.email}
-              onChange={(e) => setForm((s) => ({ ...s, email: e.target.value }))}
-              name="email"
-              type="email"
-              required
-              autoComplete="email"
-            />
-          </label>
+        <form onSubmit={onSubmit} className="rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200/70 sm:p-8">
+          <div className="grid grid-cols-1 gap-5">
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-semibold text-slate-700">E-mail</span>
+              <input
+                className="h-12 rounded-xl bg-white px-4 text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all focus:ring-2 focus:ring-[#1e3a8a]/25"
+                value={form.email}
+                onChange={(e) => setForm((s) => ({ ...s, email: e.target.value }))}
+                name="email"
+                type="email"
+                required
+                autoComplete="email"
+              />
+            </label>
 
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-[#1e3a8a]">Senha</span>
-            <input
-              className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-zinc-900 outline-none focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/20"
-              value={form.password}
-              onChange={(e) => setForm((s) => ({ ...s, password: e.target.value }))}
-              name="password"
-              type="password"
-              required
-              autoComplete="new-password"
-              minLength={6}
-            />
-          </label>
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-semibold text-slate-700">Senha</span>
+              <input
+                className="h-12 rounded-xl bg-white px-4 text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all focus:ring-2 focus:ring-[#1e3a8a]/25"
+                value={form.password}
+                onChange={(e) => setForm((s) => ({ ...s, password: e.target.value }))}
+                name="password"
+                type="password"
+                required
+                autoComplete="new-password"
+                minLength={6}
+              />
+            </label>
 
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-[#1e3a8a]">Nome completo</span>
-            <input
-              className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-zinc-900 outline-none focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/20"
-              value={form.full_name}
-              onChange={(e) => setForm((s) => ({ ...s, full_name: e.target.value }))}
-              name="full_name"
-              required
-              autoComplete="name"
-            />
-          </label>
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-semibold text-slate-700">Nome completo</span>
+              <input
+                className="h-12 rounded-xl bg-white px-4 text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all focus:ring-2 focus:ring-[#1e3a8a]/25"
+                value={form.full_name}
+                onChange={(e) => setForm((s) => ({ ...s, full_name: e.target.value }))}
+                name="full_name"
+                required
+                autoComplete="name"
+              />
+            </label>
 
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-[#1e3a8a]">WhatsApp</span>
-            <input
-              className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-zinc-900 outline-none focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/20"
-              value={form.whatsapp}
-              onChange={(e) => setForm((s) => ({ ...s, whatsapp: e.target.value }))}
-              name="whatsapp"
-              required
-              autoComplete="tel"
-              inputMode="tel"
-            />
-          </label>
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-semibold text-slate-700">WhatsApp</span>
+              <input
+                className="h-12 rounded-xl bg-white px-4 text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all focus:ring-2 focus:ring-[#1e3a8a]/25"
+                value={form.whatsapp}
+                onChange={(e) => setForm((s) => ({ ...s, whatsapp: e.target.value }))}
+                name="whatsapp"
+                required
+                autoComplete="tel"
+                inputMode="tel"
+              />
+            </label>
 
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-[#1e3a8a]">CRECI</span>
-            <input
-              className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-zinc-900 outline-none focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/20"
-              value={form.creci}
-              onChange={(e) => setForm((s) => ({ ...s, creci: e.target.value }))}
-              name="creci"
-              required
-            />
-          </label>
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-semibold text-slate-700">CRECI</span>
+              <input
+                className="h-12 rounded-xl bg-white px-4 text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all focus:ring-2 focus:ring-[#1e3a8a]/25"
+                value={form.creci}
+                onChange={(e) => setForm((s) => ({ ...s, creci: e.target.value }))}
+                name="creci"
+                required
+              />
+            </label>
+
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-semibold text-slate-700">CNAI (opcional)</span>
+              <input
+                className="h-12 rounded-xl bg-white px-4 text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all focus:ring-2 focus:ring-[#1e3a8a]/25"
+                value={form.cnai}
+                onChange={(e) => setForm((s) => ({ ...s, cnai: e.target.value }))}
+                name="cnai"
+                inputMode="numeric"
+                placeholder="Ex: 123456"
+              />
+            </label>
+          </div>
 
           {errorMessage ? (
             <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -181,7 +221,7 @@ export default function CadastroPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="inline-flex h-12 items-center justify-center rounded-lg bg-[#dc2626] px-5 text-base font-semibold text-white transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-6 inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#dc2626] px-5 text-base font-semibold text-white shadow-[0_10px_26px_-18px_rgba(220,38,38,0.75)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#c81e1e] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSubmitting ? "Enviando..." : "Enviar cadastro"}
           </button>
