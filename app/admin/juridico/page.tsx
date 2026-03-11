@@ -1104,7 +1104,7 @@ export default function JuridicoAdminPage() {
       </section>
 
       {activeModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8">
+        <div className="fixed inset-0 z-50 flex items-end justify-center px-4 py-4 sm:items-center sm:py-8">
           <button
             type="button"
             onClick={() => {
@@ -1118,9 +1118,11 @@ export default function JuridicoAdminPage() {
           <div
             role="dialog"
             aria-modal="true"
-            className="relative w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-slate-200/70"
+            className="relative flex w-full max-w-[95vw] overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-slate-200/70 sm:max-w-5xl"
+            style={{ maxHeight: "90vh" }}
           >
-            <div className="border-b border-slate-100 px-6 py-5">
+            <div className="w-full">
+            <div className="shrink-0 border-b border-slate-100 px-6 py-5">
               <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">
                 {activeModal === "case" ? "NOVO PROCESSO" : activeModal === "lawyer" ? "NOVO ADVOGADO" : "NOVA MINUTA"}
               </div>
@@ -1133,7 +1135,7 @@ export default function JuridicoAdminPage() {
               </div>
             </div>
 
-            <div className="px-6 py-6">
+            <div className="flex-1 overflow-y-auto px-6 py-6">
               {activeModal === "case" ? (
                 <form onSubmit={addCase} className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <label className="flex flex-col gap-2 md:col-span-2">
@@ -1377,6 +1379,7 @@ export default function JuridicoAdminPage() {
                   </div>
                 </form>
               )}
+            </div>
             </div>
           </div>
         </div>
