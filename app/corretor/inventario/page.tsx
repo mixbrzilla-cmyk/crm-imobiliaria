@@ -165,85 +165,75 @@ export default function CorretorInventarioPage() {
     const brokerId = authData.user.id;
 
     try {
-      const nextRows: CapturedRow[] = [];
-
-      const propsAttempts = [
-        (supabase as any)
-          .from("properties")
-          .select("*")
-          .eq(propertiesAssignColumn, brokerId)
-          .or("source_type.eq.broker_capture,source_type.is.null")
-          .order("created_at", { ascending: false })
-          .limit(200),
-        (supabase as any)
-          .from("properties")
-          .select("*")
-          .eq(propertiesAssignColumn, brokerId)
-          .or("source_type.eq.broker_capture,source_type.is.null")
-          .limit(200),
-        (supabase as any).from("properties").select("*").eq(propertiesAssignColumn, brokerId).limit(200),
+      const brokerColumns: Array<"assigned_broker_id" | "broker_id" | "corretor_id"> = [
+        "assigned_broker_id",
+        "broker_id",
+        "corretor_id",
       ];
 
-      let propsRes: any = null;
-      for (const q of propsAttempts) {
-        const res = await q;
-        if (!res?.error) {
-          propsRes = res;
-          break;
-        }
-        propsRes = res;
-        const msg = String(res.error?.message ?? "");
-        const code = (res.error as any)?.code;
-        const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
-        const isSourceTypeMissing = /column\s+\"?source_type\"?\s+does\s+not\s+exist|source_type\s+not\s+found/i.test(msg);
-        const isCreatedAtMissing = /created_at/i.test(msg);
-        if (!isSchemaMismatch && !isSourceTypeMissing && !isCreatedAtMissing) break;
-      }
+      const union = new Map<string, CapturedRow>();
 
-      if (propsRes?.data) {
-        for (const r of propsRes.data as Array<any>) {
-          nextRows.push({ id: String(r?.id ?? ""), source: "properties", data: r });
-        }
-      }
+      async function loadCapturedFromTable(table: "properties" | "developments") {
+        for (const col of brokerColumns) {
+          const attempts: Array<Promise<any>> = [
+            (supabase as any)
+              .from(table)
+              .select("*")
+              .eq(col, brokerId)
+              .or("source_type.eq.broker_capture,source_type.is.null")
+              .order("created_at", { ascending: false })
+              .limit(200),
+            (supabase as any)
+              .from(table)
+              .select("*")
+              .eq(col, brokerId)
+              .or("source_type.eq.broker_capture,source_type.is.null")
+              .limit(200),
+            (supabase as any).from(table).select("*").eq(col, brokerId).limit(200),
+          ];
 
-      const devsAttempts = [
-        (supabase as any)
-          .from("developments")
-          .select("*")
-          .eq(developmentsAssignColumn, brokerId)
-          .or("source_type.eq.broker_capture,source_type.is.null")
-          .order("created_at", { ascending: false })
-          .limit(200),
-        (supabase as any)
-          .from("developments")
-          .select("*")
-          .eq(developmentsAssignColumn, brokerId)
-          .or("source_type.eq.broker_capture,source_type.is.null")
-          .limit(200),
-        (supabase as any).from("developments").select("*").eq(developmentsAssignColumn, brokerId).limit(200),
-      ];
+          let last: any = null;
+          for (const q of attempts) {
+            const res = await q;
+            last = res;
+            if (!res?.error) break;
 
-      let devsRes: any = null;
-      for (const q of devsAttempts) {
-        const res = await q;
-        if (!res?.error) {
-          devsRes = res;
-          break;
-        }
-        devsRes = res;
-        const msg = String(res.error?.message ?? "");
-        const code = (res.error as any)?.code;
-        const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
-        const isSourceTypeMissing = /column\s+\"?source_type\"?\s+does\s+not\s+exist|source_type\s+not\s+found/i.test(msg);
-        const isCreatedAtMissing = /created_at/i.test(msg);
-        if (!isSchemaMismatch && !isSourceTypeMissing && !isCreatedAtMissing) break;
-      }
+            const msg = String(res.error?.message ?? "");
+            const code = (res.error as any)?.code;
+            const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
+            const isSourceTypeMissing = /column\s+\"?source_type\"?\s+does\s+not\s+exist|source_type\s+not\s+found/i.test(msg);
+            const isCreatedAtMissing = /created_at/i.test(msg);
+            const isAssignColMissing = new RegExp(`column\\s+\\"?${col}\\"?\\s+does\\s+not\\s+exist|${col}\\s+not\\s+found`, "i").test(
+              msg,
+            );
 
-      if (devsRes?.data) {
-        for (const r of devsRes.data as Array<any>) {
-          nextRows.push({ id: String(r?.id ?? ""), source: "developments", data: r });
+            if (isAssignColMissing) {
+              last = null;
+              break;
+            }
+
+            if (!isSchemaMismatch && !isSourceTypeMissing && !isCreatedAtMissing) break;
+          }
+
+          const data = (last?.data ?? []) as Array<any>;
+          for (const r of data) {
+            const id = String(r?.id ?? "");
+            if (!id) continue;
+            union.set(`${table}:${id}`, { id, source: table, data: r } as CapturedRow);
+          }
         }
       }
+
+      await loadCapturedFromTable("properties");
+      await loadCapturedFromTable("developments");
+
+      const nextRows = Array.from(union.values());
+
+      nextRows.sort((a, b) => {
+        const aT = a?.data?.created_at ? Date.parse(String(a.data.created_at)) : 0;
+        const bT = b?.data?.created_at ? Date.parse(String(b.data.created_at)) : 0;
+        return bT - aT;
+      });
 
       setCapturedRows(nextRows);
       setCapturedLoading(false);
