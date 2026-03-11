@@ -38,6 +38,7 @@ type DirecionamentoRow = {
   id: string;
   title: string | null;
   assigned_broker_id: string | null;
+  assigned_broker_profile_id?: string | null;
   created_at?: string | null;
 };
 
@@ -621,19 +622,33 @@ export default function AdminDashboardClient() {
 
           // Relatório de direcionamento (posse)
           // Query cirúrgica: properties (id, title, created_at, assigned_broker_id)
-          (supabase as any)
-            .from("properties")
-            .select("id, title, created_at, assigned_broker_id")
-            .not("assigned_broker_id", "is", null)
-            .limit(5000),
+          (async () => {
+            const base = (supabase as any).from("properties");
+
+            const wide = base
+              .select("id, title, created_at, assigned_broker_id, assigned_broker_profile_id")
+              .limit(5000);
+            const resWide = await wide;
+            if (!resWide?.error) return resWide;
+
+            const narrow = base.select("id, title, created_at, assigned_broker_id").limit(5000);
+            return await narrow;
+          })(),
 
           // Relatório de direcionamento (posse) - developments
           // Query cirúrgica: developments (id, name, created_at, assigned_broker_id)
-          (supabase as any)
-            .from("developments")
-            .select("id, name, created_at, assigned_broker_id")
-            .not("assigned_broker_id", "is", null)
-            .limit(5000),
+          (async () => {
+            const base = (supabase as any).from("developments");
+
+            const wide = base
+              .select("id, name, created_at, assigned_broker_id, assigned_broker_profile_id")
+              .limit(5000);
+            const resWide = await wide;
+            if (!resWide?.error) return resWide;
+
+            const narrow = base.select("id, name, created_at, assigned_broker_id").limit(5000);
+            return await narrow;
+          })(),
 
           // Jurídico (status do escritório)
           (() => {
@@ -727,14 +742,19 @@ export default function AdminDashboardClient() {
       const unionMap = new Map<string, DirecionamentoUnionRow>();
       const direcionamentoErrors: string[] = [];
 
+      let rawProps: any[] = [];
+      let rawDevs: any[] = [];
+
       if (direcionamentosRes.status === "fulfilled") {
         const res: any = direcionamentosRes.value;
         if (res?.error) {
           direcionamentoErrors.push(`properties: ${String(res.error?.message ?? res.error)}`);
         } else {
           const data = (res?.data ?? []) as Array<any>;
+          rawProps = data;
           for (const r of data) {
-            const assigned = (r as any)?.assigned_broker_id ?? null;
+            const assigned =
+              (r as any)?.assigned_broker_profile_id ?? (r as any)?.assigned_broker_id ?? null;
             if (!assigned) continue;
             const id = String(r?.id ?? "");
             if (!id) continue;
@@ -755,8 +775,10 @@ export default function AdminDashboardClient() {
           direcionamentoErrors.push(`developments: ${String(res.error?.message ?? res.error)}`);
         } else {
           const data = (res?.data ?? []) as Array<any>;
+          rawDevs = data;
           for (const r of data) {
-            const assigned = (r as any)?.assigned_broker_id ?? null;
+            const assigned =
+              (r as any)?.assigned_broker_profile_id ?? (r as any)?.assigned_broker_id ?? null;
             if (!assigned) continue;
             const id = String(r?.id ?? "");
             if (!id) continue;
@@ -769,6 +791,17 @@ export default function AdminDashboardClient() {
             });
           }
         }
+      }
+
+      try {
+        console.log("DADOS BRUTOS DO BANCO:", { props: rawProps, devs: rawDevs });
+        console.log("DADOS UNION DIRECIONAMENTO:", {
+          total: unionMap.size,
+          properties: Array.from(unionMap.keys()).filter((k) => k.startsWith("properties:")).length,
+          developments: Array.from(unionMap.keys()).filter((k) => k.startsWith("developments:")).length,
+        });
+      } catch {
+        // ignore
       }
 
       if (direcionamentoErrors.length > 0) {
@@ -792,7 +825,8 @@ export default function AdminDashboardClient() {
         const view = unionRows
           .map((r) => {
             const brokerId = r.assigned_broker_id;
-            const brokerName = (profilesById.get(brokerId)?.full_name ?? "").trim() || `ID: ${brokerId}`;
+            const brokerName =
+              (profilesById.get(brokerId)?.full_name ?? "").trim() || "Corretor Sem Nome";
             const propertyLabel = r.label;
             const directedAt = r.created_at ?? "";
             const directedTs = directedAt ? new Date(directedAt).getTime() : NaN;
