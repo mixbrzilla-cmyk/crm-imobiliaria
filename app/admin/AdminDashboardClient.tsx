@@ -625,78 +625,42 @@ export default function AdminDashboardClient() {
 
           // Relatório de direcionamento (posse)
           // Relatório de direcionamento (posse)
-          // (busca completa; prioridade: assigned_broker_id, depois broker_id, depois corretor_id)
+          // (busca completa; debug bruto: somente assigned_broker_id != null)
           (async () => {
-            const columns: Array<"assigned_broker_id" | "broker_id" | "corretor_id"> = [
-              "assigned_broker_id",
-              "broker_id",
-              "corretor_id",
-            ];
+            const col: "assigned_broker_id" = "assigned_broker_id";
 
-            const items: Array<{ col: (typeof columns)[number]; res: any }> = [];
-            for (const col of columns) {
-              const base = (supabase as any)
-                .from("properties")
-                .select(`id, title, neighborhood, city, ${col}, updated_at, created_at`)
-                .not(col, "is", null);
+            const base = (supabase as any)
+              .from("properties")
+              .select("*")
+              .not(col, "is", null);
 
-              const q = propertiesHasDeletedAt ? base.is("deleted_at", null) : base;
-              let res = await q.order("updated_at", { ascending: false }).limit(5000);
-              if (res?.error) {
-                res = await q.order("created_at", { ascending: false }).limit(5000);
-              }
+            const q = propertiesHasDeletedAt ? base.is("deleted_at", null) : base;
+            const res = await q.limit(5000);
 
-              const msg = String(res?.error?.message ?? "");
-              const code = (res?.error as any)?.code;
-              const isAssignColMissing = new RegExp(
-                `column\\s+\\"?${col}\\"?\\s+does\\s+not\\s+exist|${col}\\s+not\\s+found`,
-                "i",
-              ).test(msg);
-              const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
-              if (res?.error && (isAssignColMissing || isSchemaMismatch)) continue;
+            console.log("DADOS DO DASHBOARD:", { table: "properties", error: res?.error ?? null, data: res?.data ?? [] });
 
-              items.push({ col, res });
-            }
-
-            return { items };
+            return { items: [{ col, res }] };
           })(),
 
           // Relatório de direcionamento (posse) - developments
           (async () => {
-            const columns: Array<"assigned_broker_id" | "broker_id" | "corretor_id"> = [
-              "assigned_broker_id",
-              "broker_id",
-              "corretor_id",
-            ];
+            const col: "assigned_broker_id" = "assigned_broker_id";
 
-            const items: Array<{ col: (typeof columns)[number]; res: any }> = [];
-            for (const col of columns) {
-              const base = (supabase as any)
-                .from("developments")
-                .select(
-                  `id, name, title, neighborhood, bairro, localidade, city, cidade, ${col}, updated_at, created_at`,
-                )
-                .not(col, "is", null);
+            const base = (supabase as any)
+              .from("developments")
+              .select("*")
+              .not(col, "is", null);
 
-              const q = developmentsHasDeletedAt ? base.is("deleted_at", null) : base;
-              let res = await q.order("updated_at", { ascending: false }).limit(5000);
-              if (res?.error) {
-                res = await q.order("created_at", { ascending: false }).limit(5000);
-              }
+            const q = developmentsHasDeletedAt ? base.is("deleted_at", null) : base;
+            const res = await q.limit(5000);
 
-              const msg = String(res?.error?.message ?? "");
-              const code = (res?.error as any)?.code;
-              const isAssignColMissing = new RegExp(
-                `column\\s+\\"?${col}\\"?\\s+does\\s+not\\s+exist|${col}\\s+not\\s+found`,
-                "i",
-              ).test(msg);
-              const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
-              if (res?.error && (isAssignColMissing || isSchemaMismatch)) continue;
+            console.log("DADOS DO DASHBOARD:", {
+              table: "developments",
+              error: res?.error ?? null,
+              data: res?.data ?? [],
+            });
 
-              items.push({ col, res });
-            }
-
-            return { items };
+            return { items: [{ col, res }] };
           })(),
 
           // Jurídico (status do escritório)
