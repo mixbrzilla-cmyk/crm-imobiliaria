@@ -21,7 +21,33 @@ export default function AdminLayout({
 }>) {
   return (
     <div className="min-h-screen bg-[#F1F5F9]">
-      <aside className="fixed left-0 top-0 h-screen w-72 border-r border-white/10 bg-[#001f3f] px-6 py-7 text-slate-100">
+      <input id="admin-nav" type="checkbox" className="peer sr-only" />
+
+      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-slate-200/70 bg-white/90 px-4 py-3 backdrop-blur lg:hidden">
+        <label
+          htmlFor="admin-nav"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[#001f3f] text-white shadow-sm"
+          aria-label="Abrir menu"
+          title="Menu"
+        >
+          <span className="text-lg leading-none">≡</span>
+        </label>
+
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold text-slate-900">CRM Imobiliária Moderna</div>
+          <div className="truncate text-xs text-slate-500">Painel do Admin</div>
+        </div>
+
+        <div className="h-10 w-10" />
+      </header>
+
+      <label
+        htmlFor="admin-nav"
+        className="fixed inset-0 z-40 hidden bg-black/40 peer-checked:block lg:hidden"
+        aria-label="Fechar menu"
+      />
+
+      <aside className="fixed left-0 top-0 z-50 h-screen w-72 -translate-x-full border-r border-white/10 bg-[#001f3f] px-6 py-7 text-slate-100 transition-transform duration-300 peer-checked:translate-x-0 lg:translate-x-0">
         <div className="mb-10">
           <div className="text-[13px] font-semibold tracking-[0.18em] text-slate-200/90">
             PAINEL DE CONTROLE
@@ -127,7 +153,7 @@ export default function AdminLayout({
         </nav>
       </aside>
 
-      <main className="ml-72 min-h-screen bg-[#F1F5F9] px-10 py-10">{children}</main>
+      <main className="min-h-screen bg-[#F1F5F9] px-4 py-6 lg:ml-72 lg:px-10 lg:py-10">{children}</main>
     </div>
   );
 }

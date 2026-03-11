@@ -1288,7 +1288,7 @@ export default function AdminDashboardClient() {
         </p>
       </header>
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200/70 border-l-4 border-l-sky-500">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -1439,7 +1439,7 @@ export default function AdminDashboardClient() {
           </div>
         ) : null}
 
-        <div className="mt-5 max-h-[520px] overflow-auto rounded-xl ring-1 ring-slate-200/70">
+        <div className="mt-5 max-h-[520px] overflow-x-auto overflow-y-auto rounded-xl ring-1 ring-slate-200/70">
           <table className="min-w-full border-separate border-spacing-0">
             <thead>
               <tr className="bg-slate-50">
@@ -1493,7 +1493,7 @@ export default function AdminDashboardClient() {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200/70 border-l-4 border-l-sky-500">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -1540,7 +1540,7 @@ export default function AdminDashboardClient() {
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/70 border-l-4 border-l-violet-500">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -1647,7 +1647,7 @@ export default function AdminDashboardClient() {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
           <div className="text-sm font-medium text-slate-600">Obra: gastos (materiais)</div>
           <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
@@ -1673,7 +1673,7 @@ export default function AdminDashboardClient() {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         <div className="rounded-2xl bg-white p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70 lg:col-span-2">
           <div className="flex items-start justify-between gap-6">
             <div>
