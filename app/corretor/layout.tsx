@@ -124,7 +124,8 @@ export default function CorretorLayout({ children }: { children: React.ReactNode
 
   const nav = [
     { href: "/corretor/leads", label: "Leads p/ Qualificar" },
-    { href: "/corretor/inventario", label: "Meu Inventário" },
+    { href: "/corretor/inventario", label: "Meus Imóveis" },
+    { href: "/corretor/enviados", label: "Imóveis Enviados" },
     { href: "/corretor/whatsapp", label: "Central WhatsApp" },
   ];
 
