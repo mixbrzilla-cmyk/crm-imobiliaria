@@ -832,7 +832,7 @@ export default function InventarioImoveisPage() {
                             window.location.href = url;
                           }}
                           disabled={!ownerWhatsapp}
-                          className="inline-flex h-9 items-center justify-center rounded-xl bg-white px-3 text-xs font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="inline-flex h-9 items-center justify-center rounded-xl bg-white px-2.5 text-xs font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                           title="Iniciar conversa com o proprietário"
                         >
                           WhatsApp
@@ -840,7 +840,7 @@ export default function InventarioImoveisPage() {
                         <button
                           type="button"
                           onClick={() => editRow(r)}
-                          className="inline-flex h-9 items-center justify-center rounded-xl bg-white px-3 text-xs font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
+                          className="inline-flex h-9 items-center justify-center rounded-xl bg-white px-2.5 text-xs font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
                         >
                           Editar
                         </button>

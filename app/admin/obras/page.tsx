@@ -28,6 +28,7 @@ type ObraMaterialRow = {
   unit_price: number | null;
   quantity: number | null;
   unit?: string | null;
+  delivered_at?: string | null;
   created_at?: string;
 };
 
@@ -254,7 +255,7 @@ export default function ObrasAdminPage() {
     try {
       let res = await (supabase as any)
         .from("obra_materials")
-        .select("id, name, vendor, status, unit_price, quantity, unit, created_at")
+        .select("id, name, vendor, status, unit_price, quantity, unit, delivered_at, created_at")
         .order("created_at", { ascending: false });
 
       if (res.error) {
@@ -265,8 +266,21 @@ export default function ObrasAdminPage() {
         if (isColumnNotFound || isSchemaMismatch) {
           res = await (supabase as any)
             .from("obra_materials")
-            .select("id, name, vendor, status, unit_price, quantity, created_at")
+            .select("id, name, vendor, status, unit_price, quantity, delivered_at, created_at")
             .order("created_at", { ascending: false });
+        }
+
+        if (res.error) {
+          const msg2 = String((res.error as any)?.message ?? "");
+          const isDeliveredAtMissing = /delivered_at/i.test(msg2) && /does\s+not\s+exist|not\s+found/i.test(msg2);
+          const code2 = (res.error as any)?.code;
+          const isSchemaMismatch2 = code2 === "PGRST204" || code2 === "PGRST301";
+          if (isDeliveredAtMissing || isSchemaMismatch2) {
+            res = await (supabase as any)
+              .from("obra_materials")
+              .select("id, name, vendor, status, unit_price, quantity, created_at")
+              .order("created_at", { ascending: false });
+          }
         }
       }
 
@@ -618,14 +632,39 @@ export default function ObrasAdminPage() {
     setMaterials((current) => current.map((m) => (m.id === id ? { ...m, status } : m)));
 
     try {
-      const { error } = await (supabase as any)
-        .from("obra_materials")
-        .update({ status })
-        .eq("id", id);
+      const nowIso = new Date().toISOString();
+      const payloadBase: any = { status };
+      const payloadAttempts: Array<any> =
+        status === "entregue"
+          ? [{ ...payloadBase, delivered_at: nowIso }, payloadBase]
+          : [payloadBase];
 
-      if (error) {
-        setErrorMessage(error.message);
+      let lastError: any = null;
+      for (const payload of payloadAttempts) {
+        // eslint-disable-next-line no-await-in-loop
+        const { error } = await (supabase as any).from("obra_materials").update(payload).eq("id", id);
+        if (!error) {
+          lastError = null;
+          break;
+        }
+        lastError = error;
+        const msg = String((error as any)?.message ?? "");
+        const isDeliveredAtMissing = /delivered_at/i.test(msg) && /does\s+not\s+exist|not\s+found/i.test(msg);
+        const code = (error as any)?.code;
+        const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
+        if (!isDeliveredAtMissing && !isSchemaMismatch) break;
+      }
+
+      if (lastError) {
+        setErrorMessage(lastError.message);
         await loadMaterials();
+        return;
+      }
+
+      if (status === "entregue") {
+        setMaterials((current) =>
+          current.map((m) => (m.id === id ? { ...m, status, delivered_at: (m.delivered_at ?? nowIso) as any } : m)),
+        );
       }
     } catch {
       setErrorMessage("Não foi possível atualizar o status.");
@@ -990,7 +1029,7 @@ export default function ObrasAdminPage() {
                                 onClick={() => void updateMaterialStatus(m.id, "entregue")}
                                 className="inline-flex h-9 items-center justify-center rounded-xl bg-emerald-600 px-3 text-xs font-semibold text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.20)] transition-all duration-300 hover:bg-emerald-700"
                               >
-                                Entregue
+                                Marcar como Entregue
                               </button>
                             </div>
                           </td>

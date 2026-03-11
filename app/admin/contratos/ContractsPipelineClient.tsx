@@ -345,21 +345,33 @@ export default function ContractsPipelineClient() {
             "id, title, neighborhood, city",
             "id, title",
           ];
+          const orderAttempts: Array<null | { column: string; ascending: boolean }> = [
+            { column: "created_at", ascending: false },
+            null,
+          ];
           let last: any = null;
           for (const sel of attempts) {
-            // eslint-disable-next-line no-await-in-loop
-            const res = await (supabase as any)
-              .from("properties")
-              .select(sel)
-              .order("created_at", { ascending: false })
-              .limit(500);
-            if (!res?.error) return res;
-            last = res;
-            const msg = String(res?.error?.message ?? "");
-            const isColumnError = /column .* does not exist|not found/i.test(msg);
-            const code = (res?.error as any)?.code;
-            const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
-            if (!isColumnError && !isSchemaMismatch) break;
+            for (const ord of orderAttempts) {
+              // eslint-disable-next-line no-await-in-loop
+              const base = (supabase as any).from("properties").select(sel).limit(500);
+              // eslint-disable-next-line no-await-in-loop
+              const res = ord ? await base.order(ord.column, { ascending: ord.ascending }) : await base;
+              if (!res?.error) return res;
+
+              last = res;
+              const msg = String(res?.error?.message ?? "");
+              const isColumnError = /column .* does not exist|not found/i.test(msg);
+              const code = (res?.error as any)?.code;
+              const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
+
+              console.error(
+                "[Contracts] properties fetch attempt failed:",
+                { select: sel, order: ord ? ord.column : null, code, msg },
+                res?.error,
+              );
+
+              if (!isColumnError && !isSchemaMismatch) break;
+            }
           }
           return last;
         })(),
