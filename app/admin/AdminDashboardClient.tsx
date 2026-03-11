@@ -635,7 +635,7 @@ export default function AdminDashboardClient() {
 
           // Relatório de direcionamento (posse)
           // Relatório de direcionamento (posse)
-          // (busca completa; tenta assigned_broker_id e faz fallback para broker_id/corretor_id conforme schema)
+          // (busca completa; une assigned_broker_id + broker_id + corretor_id conforme schema)
           (async () => {
             const columns: Array<"assigned_broker_id" | "broker_id" | "corretor_id"> = [
               "assigned_broker_id",
@@ -643,6 +643,7 @@ export default function AdminDashboardClient() {
               "corretor_id",
             ];
 
+            const items: Array<{ col: (typeof columns)[number]; res: any }> = [];
             for (const col of columns) {
               const base = (supabase as any)
                 .from("properties")
@@ -659,10 +660,10 @@ export default function AdminDashboardClient() {
               ).test(msg);
               const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
               if (res?.error && (isAssignColMissing || isSchemaMismatch)) continue;
-              return { res, col };
+              items.push({ col, res });
             }
 
-            return { res: { data: [], error: null }, col: "corretor_id" as const };
+            return { items };
           })(),
 
           // Relatório de direcionamento (posse) - developments
@@ -673,6 +674,7 @@ export default function AdminDashboardClient() {
               "corretor_id",
             ];
 
+            const items: Array<{ col: (typeof columns)[number]; res: any }> = [];
             for (const col of columns) {
               const base = (supabase as any)
                 .from("developments")
@@ -693,10 +695,10 @@ export default function AdminDashboardClient() {
               ).test(msg);
               const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
               if (res?.error && (isAssignColMissing || isSchemaMismatch)) continue;
-              return { res, col };
+              items.push({ col, res });
             }
 
-            return { res: { data: [], error: null }, col: "corretor_id" as const };
+            return { items };
           })(),
 
           // Jurídico (status do escritório)
@@ -792,15 +794,19 @@ export default function AdminDashboardClient() {
 
       if (direcionamentosRes.status === "fulfilled") {
         const payload: any = direcionamentosRes.value;
-        if (payload?.res?.error) {
-          console.log("[Dashboard] Erro ao carregar direcionamentos properties:", payload.res.error);
-        } else {
-          const col = (payload?.col ?? propertiesBrokerColumn) as string;
-          const data = (payload?.res?.data ?? []) as Array<any>;
+        const items = (payload?.items ?? []) as Array<{ col: string; res: any }>;
+        for (const it of items) {
+          if (it?.res?.error) {
+            console.log("[Dashboard] Erro ao carregar direcionamentos properties:", it.res.error);
+            continue;
+          }
+          const col = String(it?.col ?? "");
+          const data = (it?.res?.data ?? []) as Array<any>;
           for (const r of data) {
-            const corretor_id = (r as any)?.[col] ?? null;
             const id = String(r?.id ?? "");
             if (!id) continue;
+            if (unionMap.has(`properties:${id}`)) continue;
+            const corretor_id = (r as any)?.[col] ?? null;
             unionMap.set(`properties:${id}`, {
               id,
               title: (r?.title ?? null) as string | null,
@@ -818,15 +824,19 @@ export default function AdminDashboardClient() {
 
       if (direcionamentosDevsRes.status === "fulfilled") {
         const payload: any = direcionamentosDevsRes.value;
-        if (payload?.res?.error) {
-          console.log("[Dashboard] Erro ao carregar direcionamentos developments:", payload.res.error);
-        } else {
-          const col = (payload?.col ?? developmentsBrokerColumn) as string;
-          const data = (payload?.res?.data ?? []) as Array<any>;
+        const items = (payload?.items ?? []) as Array<{ col: string; res: any }>;
+        for (const it of items) {
+          if (it?.res?.error) {
+            console.log("[Dashboard] Erro ao carregar direcionamentos developments:", it.res.error);
+            continue;
+          }
+          const col = String(it?.col ?? "");
+          const data = (it?.res?.data ?? []) as Array<any>;
           for (const r of data) {
-            const corretor_id = (r as any)?.[col] ?? null;
             const id = String(r?.id ?? "");
             if (!id) continue;
+            if (unionMap.has(`developments:${id}`)) continue;
+            const corretor_id = (r as any)?.[col] ?? null;
             unionMap.set(`developments:${id}`, {
               id,
               title: (String(r?.name ?? r?.title ?? "").trim() || null) as string | null,
