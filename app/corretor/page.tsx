@@ -66,7 +66,7 @@ export default function CorretorHomePage() {
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
-        <div className="text-sm font-semibold text-[#1e3a8a]">Portal do Corretor</div>
+        <div className="text-sm font-semibold text-[color:var(--imob-navy)]">Portal do Corretor</div>
         <div className="text-xs text-zinc-500">{profile?.full_name ?? ""}</div>
       </header>
 
@@ -85,28 +85,28 @@ export default function CorretorHomePage() {
               href="/corretor/leads"
               className="rounded-xl border border-zinc-200 bg-white p-6 transition-colors hover:bg-zinc-50"
             >
-              <div className="text-sm font-semibold text-[#1e3a8a]">Leads para Qualificar</div>
+              <div className="text-sm font-semibold text-[color:var(--imob-navy)]">Leads para Qualificar</div>
               <div className="mt-1 text-xs text-zinc-600">Fila enviada pela Imobiliária Moderna + acesso rápido ao WhatsApp.</div>
             </Link>
             <Link
               href="/corretor/inventario"
               className="rounded-xl border border-zinc-200 bg-white p-6 transition-colors hover:bg-zinc-50"
             >
-              <div className="text-sm font-semibold text-[#1e3a8a]">Meus Imóveis</div>
+              <div className="text-sm font-semibold text-[color:var(--imob-navy)]">Meus Imóveis</div>
               <div className="mt-1 text-xs text-zinc-600">Cadastre captações e mande para aprovação.</div>
             </Link>
             <Link
               href="/corretor/enviados"
-              className="rounded-xl border border-[#dc2626]/30 bg-[#dc2626]/5 p-6 transition-colors hover:bg-[#dc2626]/10"
+              className="rounded-xl border border-[color:var(--imob-red)]/30 bg-[color:var(--imob-red)]/5 p-6 transition-colors hover:bg-[color:var(--imob-red)]/10"
             >
-              <div className="text-sm font-semibold text-[#dc2626]">Imóveis Enviados pela Imobiliária Moderna</div>
+              <div className="text-sm font-semibold text-[color:var(--imob-red)]">Imóveis Enviados pela Imobiliária Moderna</div>
               <div className="mt-1 text-xs text-zinc-700">Atribuídos a você para atendimento (com WhatsApp do proprietário).</div>
             </Link>
             <Link
               href="/corretor/whatsapp"
               className="rounded-xl border border-zinc-200 bg-white p-6 transition-colors hover:bg-zinc-50"
             >
-              <div className="text-sm font-semibold text-[#1e3a8a]">Central WhatsApp</div>
+              <div className="text-sm font-semibold text-[color:var(--imob-navy)]">Central WhatsApp</div>
               <div className="mt-1 text-xs text-zinc-600">Conversas auditáveis no painel da Imobiliária Moderna.</div>
             </Link>
           </div>

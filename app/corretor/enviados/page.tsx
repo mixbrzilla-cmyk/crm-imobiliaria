@@ -227,7 +227,7 @@ export default function CorretorEnviadosPage() {
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
-        <div className="text-sm font-semibold text-[#dc2626]">Imóveis Enviados pela Imobiliária Moderna</div>
+        <div className="text-sm font-semibold text-[color:var(--imob-red)]">Imóveis Enviados pela Imobiliária Moderna</div>
         <div className="text-xs text-zinc-600">Itens atribuídos a você para atender (com WhatsApp do proprietário).</div>
       </header>
 
@@ -244,7 +244,7 @@ export default function CorretorEnviadosPage() {
           <button
             type="button"
             onClick={() => void load()}
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-[#001f3f] transition-all duration-300 hover:bg-zinc-50"
+            className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-[color:var(--imob-navy)] transition-all duration-300 hover:bg-zinc-50"
           >
             Atualizar
           </button>
@@ -283,7 +283,7 @@ export default function CorretorEnviadosPage() {
                       <div className="truncate text-base font-semibold text-zinc-900">{title}</div>
                       <div className="mt-1 truncate text-sm font-medium text-zinc-600">{loc || "Localização não informada"}</div>
                     </div>
-                    <div className="shrink-0 rounded-full bg-[#dc2626]/10 px-3 py-1 text-xs font-semibold text-[#dc2626]">
+                    <div className="shrink-0 rounded-full bg-[color:var(--imob-red)]/10 px-3 py-1 text-xs font-semibold text-[color:var(--imob-red)]">
                       {r.source === "properties" ? "Imóvel" : "Empreendimento"}
                     </div>
                   </div>

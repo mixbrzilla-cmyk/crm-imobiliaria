@@ -325,7 +325,7 @@ export default function CorretorWhatsAppPage() {
   return (
     <div className="flex w-full flex-col gap-6">
       <header className="flex flex-col gap-1">
-        <div className="text-sm font-semibold text-[#1e3a8a]">Central WhatsApp</div>
+        <div className="text-sm font-semibold text-[color:var(--imob-navy)]">Central WhatsApp</div>
         <div className="text-xs text-zinc-500">Converse com proprietários com auditoria da Imobiliária Moderna no Admin.</div>
       </header>
 
@@ -340,7 +340,7 @@ export default function CorretorWhatsAppPage() {
       <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-zinc-200">
         <div className="grid h-[calc(100vh-240px)] grid-cols-1 lg:grid-cols-12">
           <aside className="flex h-full flex-col border-b border-zinc-200 lg:col-span-4 lg:border-b-0 lg:border-r">
-            <div className="flex items-center justify-between gap-3 bg-[#1e3a8a] px-4 py-3 text-white">
+            <div className="flex items-center justify-between gap-3 bg-[color:var(--imob-navy)] px-4 py-3 text-white">
               <div className="flex items-center gap-3">
                 <div className="grid h-10 w-10 place-items-center rounded-full bg-white/10 text-sm font-semibold">C</div>
                 <div>
@@ -363,7 +363,7 @@ export default function CorretorWhatsAppPage() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Pesquisar"
-                  className="h-11 w-full rounded-2xl bg-zinc-50 pl-10 pr-4 text-sm text-zinc-900 ring-1 ring-zinc-200 outline-none focus:bg-white focus:ring-2 focus:ring-[#1e3a8a]/20"
+                  className="h-11 w-full rounded-2xl bg-zinc-50 pl-10 pr-4 text-sm text-zinc-900 ring-1 ring-zinc-200 outline-none focus:bg-white focus:ring-2 focus:ring-[color:var(--imob-navy)]/20"
                 />
               </div>
             </div>
@@ -387,7 +387,7 @@ export default function CorretorWhatsAppPage() {
                         (isActive ? "bg-zinc-100" : "hover:bg-zinc-50")
                       }
                     >
-                      <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#1e3a8a] text-sm font-semibold text-white">
+                      <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[color:var(--imob-navy)] text-sm font-semibold text-white">
                         {initials(displayName)}
                       </div>
                       <div className="min-w-0 flex-1">
@@ -471,14 +471,14 @@ export default function CorretorWhatsAppPage() {
                   onChange={(e) => setDraft(e.target.value)}
                   placeholder={selectedThreadId ? "Digite uma mensagem" : "Selecione uma conversa"}
                   disabled={!selectedThreadId || isSending}
-                  className="min-h-11 flex-1 resize-none rounded-2xl bg-zinc-50 px-4 py-3 text-sm text-zinc-900 ring-1 ring-zinc-200 outline-none focus:bg-white focus:ring-2 focus:ring-[#1e3a8a]/20 disabled:cursor-not-allowed disabled:bg-zinc-100"
+                  className="min-h-11 flex-1 resize-none rounded-2xl bg-zinc-50 px-4 py-3 text-sm text-zinc-900 ring-1 ring-zinc-200 outline-none focus:bg-white focus:ring-2 focus:ring-[color:var(--imob-navy)]/20 disabled:cursor-not-allowed disabled:bg-zinc-100"
                 />
 
                 <button
                   type="button"
                   onClick={() => void sendMessage()}
                   disabled={!selectedThreadId || isSending || !draft.trim()}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-[#1e3a8a] px-5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#1a2f74] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-[color:var(--imob-navy)] px-5 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <SendHorizonal className="h-4 w-4" />
                   Enviar

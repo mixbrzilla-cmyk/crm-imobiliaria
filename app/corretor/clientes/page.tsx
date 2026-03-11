@@ -239,21 +239,21 @@ export default function MeusClientesPage() {
       <div className="border-b border-zinc-200 bg-white">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-4">
           <div className="flex flex-col">
-            <div className="text-sm font-semibold text-[#1e3a8a]">Meus Clientes</div>
+            <div className="text-sm font-semibold text-[color:var(--imob-navy)]">Meus Clientes</div>
             <div className="text-xs text-zinc-500">Kanban operacional de atendimento</div>
           </div>
 
           <div className="flex items-center gap-3">
             <Link
               href="/corretor"
-              className="inline-flex h-10 items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 text-sm font-semibold text-[#1e3a8a] hover:bg-zinc-50"
+              className="inline-flex h-10 items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 text-sm font-semibold text-[color:var(--imob-navy)] hover:bg-zinc-50"
             >
               Voltar
             </Link>
             <button
               type="button"
               onClick={() => void load()}
-              className="inline-flex h-10 items-center justify-center rounded-lg bg-[#1e3a8a] px-4 text-sm font-semibold text-white hover:opacity-95"
+              className="inline-flex h-10 items-center justify-center rounded-lg bg-[color:var(--imob-navy)] px-4 text-sm font-semibold text-white hover:opacity-95"
             >
               Recarregar
             </button>
@@ -274,13 +274,13 @@ export default function MeusClientesPage() {
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
           <div className="rounded-xl border border-zinc-200 bg-white p-5">
-            <div className="text-sm font-semibold text-[#1e3a8a]">Novo lead</div>
+            <div className="text-sm font-semibold text-[color:var(--imob-navy)]">Novo lead</div>
 
             <form className="mt-4 flex flex-col gap-3" onSubmit={criarLead}>
               <label className="flex flex-col gap-2">
                 <span className="text-xs font-medium text-zinc-600">Nome</span>
                 <input
-                  className="h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/20"
+                  className="h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-[color:var(--imob-navy)] focus:ring-2 focus:ring-[color:var(--imob-navy)]/20"
                   value={form.full_name}
                   onChange={(e) => setForm((s) => ({ ...s, full_name: e.target.value }))}
                   required
@@ -290,7 +290,7 @@ export default function MeusClientesPage() {
               <label className="flex flex-col gap-2">
                 <span className="text-xs font-medium text-zinc-600">Telefone</span>
                 <input
-                  className="h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/20"
+                  className="h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-[color:var(--imob-navy)] focus:ring-2 focus:ring-[color:var(--imob-navy)]/20"
                   value={form.phone}
                   onChange={(e) => setForm((s) => ({ ...s, phone: e.target.value }))}
                   required
@@ -301,7 +301,7 @@ export default function MeusClientesPage() {
               <label className="flex flex-col gap-2">
                 <span className="text-xs font-medium text-zinc-600">Interesse</span>
                 <input
-                  className="h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/20"
+                  className="h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-[color:var(--imob-navy)] focus:ring-2 focus:ring-[color:var(--imob-navy)]/20"
                   value={form.interest}
                   onChange={(e) => setForm((s) => ({ ...s, interest: e.target.value }))}
                 />
@@ -310,7 +310,7 @@ export default function MeusClientesPage() {
               <button
                 type="submit"
                 disabled={isLoading || isCreating || !brokerId}
-                className="mt-2 inline-flex h-10 items-center justify-center rounded-lg bg-[#dc2626] px-4 text-sm font-semibold text-white hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-2 inline-flex h-10 items-center justify-center rounded-lg bg-[color:var(--imob-red)] px-4 text-sm font-semibold text-white hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isCreating ? "Cadastrando..." : "Cadastrar"}
               </button>
@@ -327,7 +327,7 @@ export default function MeusClientesPage() {
                 {STAGES.map((stage) => (
                   <div key={stage.key} className="rounded-xl border border-zinc-200 bg-white">
                     <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3">
-                      <div className="text-sm font-semibold text-[#1e3a8a]">{stage.label}</div>
+                      <div className="text-sm font-semibold text-[color:var(--imob-navy)]">{stage.label}</div>
                       <div className="text-xs text-zinc-500">{grouped[stage.key].length}</div>
                     </div>
 
@@ -360,7 +360,7 @@ export default function MeusClientesPage() {
                                 type="button"
                                 disabled={movingLeadId === lead.id}
                                 onClick={() => void moverLead(lead.id, target.key)}
-                                className="inline-flex h-9 items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 text-xs font-semibold text-[#1e3a8a] hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="inline-flex h-9 items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 text-xs font-semibold text-[color:var(--imob-navy)] hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
                               >
                                 {movingLeadId === lead.id ? "Movendo..." : `Mover p/ ${target.label}`}
                               </button>

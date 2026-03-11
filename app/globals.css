@@ -3,6 +3,8 @@
 :root {
   --background: #f1f5f9;
   --foreground: #001f3f;
+  --imob-navy: #1f2a5a;
+  --imob-red: #c1121f;
 }
 
 @theme inline {

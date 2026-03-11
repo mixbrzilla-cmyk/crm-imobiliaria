@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -148,11 +149,18 @@ export default function CorretorLayout({ children }: { children: React.ReactNode
       <div className="border-b border-zinc-200 bg-gradient-to-b from-white to-zinc-50/40">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#001f3f] text-sm font-extrabold tracking-tight text-white shadow-sm ring-1 ring-[#001f3f]/20">
-              IM
+            <div className="flex h-11 items-center">
+              <Image
+                src="/imobiliaria-moderna-logo.png"
+                alt="Imobiliária Moderna"
+                width={180}
+                height={44}
+                priority
+                className="h-10 w-auto"
+              />
             </div>
             <div className="flex flex-col">
-              <div className="text-sm font-extrabold tracking-tight text-[#001f3f]">Imobiliária Moderna</div>
+              <div className="text-sm font-extrabold tracking-tight text-[color:var(--imob-navy)]">Imobiliária Moderna</div>
               <div className="text-xs font-medium text-zinc-500">{profile?.full_name ?? "Corretor"}</div>
             </div>
           </div>
@@ -167,8 +175,8 @@ export default function CorretorLayout({ children }: { children: React.ReactNode
                   className={
                     "inline-flex h-10 items-center justify-center rounded-xl px-4 text-sm font-semibold transition-all duration-300 " +
                     (active
-                      ? "bg-[#001f3f] text-white shadow-sm"
-                      : "border border-zinc-200 bg-white/70 text-[#001f3f] hover:bg-white")
+                      ? "bg-[color:var(--imob-navy)] text-white shadow-sm"
+                      : "border border-zinc-200 bg-white/70 text-[color:var(--imob-navy)] hover:bg-white")
                   }
                 >
                   {item.label}
@@ -196,6 +204,12 @@ export default function CorretorLayout({ children }: { children: React.ReactNode
       </div>
 
       <div className="mx-auto w-full max-w-7xl px-6 py-8">{children}</div>
+
+      <div className="border-t border-zinc-200 bg-white/60">
+        <div className="mx-auto w-full max-w-7xl px-6 py-5">
+          <div className="text-xs text-zinc-500">Pará CJ379</div>
+        </div>
+      </div>
     </div>
   );
 }

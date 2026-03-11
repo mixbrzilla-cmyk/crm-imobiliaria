@@ -367,7 +367,7 @@ export default function CorretorInventarioPage() {
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
-        <div className="text-sm font-semibold text-[#1e3a8a]">Meu Inventário (Captação)</div>
+        <div className="text-sm font-semibold text-[color:var(--imob-navy)]">Meu Inventário (Captação)</div>
         <div className="text-xs text-zinc-500">
           Cadastre novos imóveis/empreendimentos no seu nome. A Imobiliária Moderna vê instantaneamente no Admin.
         </div>
@@ -391,7 +391,7 @@ export default function CorretorInventarioPage() {
             <label className="flex flex-col gap-2">
               <span className="text-xs font-medium text-zinc-600">Tipo</span>
               <select
-                className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/20"
+                className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none focus:border-[color:var(--imob-navy)] focus:ring-2 focus:ring-[color:var(--imob-navy)]/20"
                 value={form.mode}
                 onChange={(e) => setForm((s) => ({ ...s, mode: e.target.value as Mode }))}
               >
@@ -403,7 +403,7 @@ export default function CorretorInventarioPage() {
             <label className="flex flex-col gap-2">
               <span className="text-xs font-medium text-zinc-600">Título</span>
               <input
-                className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/20"
+                className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none focus:border-[color:var(--imob-navy)] focus:ring-2 focus:ring-[color:var(--imob-navy)]/20"
                 value={form.title}
                 onChange={(e) => setForm((s) => ({ ...s, title: e.target.value }))}
                 required
@@ -413,7 +413,7 @@ export default function CorretorInventarioPage() {
             <label className="flex flex-col gap-2">
               <span className="text-xs font-medium text-zinc-600">Cidade</span>
               <input
-                className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/20"
+                className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none focus:border-[color:var(--imob-navy)] focus:ring-2 focus:ring-[color:var(--imob-navy)]/20"
                 value={form.city}
                 onChange={(e) => setForm((s) => ({ ...s, city: e.target.value }))}
               />
@@ -422,7 +422,7 @@ export default function CorretorInventarioPage() {
             <label className="flex flex-col gap-2">
               <span className="text-xs font-medium text-zinc-600">Bairro / Localidade</span>
               <input
-                className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/20"
+                className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none focus:border-[color:var(--imob-navy)] focus:ring-2 focus:ring-[color:var(--imob-navy)]/20"
                 value={form.neighborhood}
                 onChange={(e) => setForm((s) => ({ ...s, neighborhood: e.target.value }))}
               />
@@ -432,7 +432,7 @@ export default function CorretorInventarioPage() {
               <label className="flex flex-col gap-2">
                 <span className="text-xs font-medium text-zinc-600">Valor (R$)</span>
                 <input
-                  className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/20"
+                  className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none focus:border-[color:var(--imob-navy)] focus:ring-2 focus:ring-[color:var(--imob-navy)]/20"
                   value={form.price}
                   onChange={(e) => setForm((s) => ({ ...s, price: e.target.value }))}
                   inputMode="decimal"
@@ -445,7 +445,7 @@ export default function CorretorInventarioPage() {
             <label className="flex flex-col gap-2">
               <span className="text-xs font-medium text-zinc-600">Nome do Proprietário</span>
               <input
-                className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/20"
+                className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none focus:border-[color:var(--imob-navy)] focus:ring-2 focus:ring-[color:var(--imob-navy)]/20"
                 value={form.owner_name}
                 onChange={(e) => setForm((s) => ({ ...s, owner_name: e.target.value }))}
               />
@@ -454,7 +454,7 @@ export default function CorretorInventarioPage() {
             <label className="flex flex-col gap-2">
               <span className="text-xs font-medium text-zinc-600">WhatsApp do Proprietário</span>
               <input
-                className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/20"
+                className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-sm text-zinc-900 outline-none focus:border-[color:var(--imob-navy)] focus:ring-2 focus:ring-[color:var(--imob-navy)]/20"
                 value={form.owner_whatsapp}
                 onChange={(e) => setForm((s) => ({ ...s, owner_whatsapp: e.target.value }))}
                 inputMode="tel"
@@ -465,7 +465,7 @@ export default function CorretorInventarioPage() {
               <button
                 type="submit"
                 disabled={isSaving}
-                className="inline-flex h-11 items-center justify-center rounded-lg bg-[#1e3a8a] px-5 text-sm font-semibold text-white hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 items-center justify-center rounded-lg bg-[color:var(--imob-navy)] px-5 text-sm font-semibold text-white hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isSaving ? "Enviando..." : "Enviar para aprovação"}
               </button>
@@ -483,7 +483,7 @@ export default function CorretorInventarioPage() {
           <button
             type="button"
             onClick={() => void loadCaptured()}
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-[#001f3f] transition-all duration-300 hover:bg-zinc-50"
+            className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-[color:var(--imob-navy)] transition-all duration-300 hover:bg-zinc-50"
           >
             Atualizar
           </button>
@@ -527,7 +527,7 @@ export default function CorretorInventarioPage() {
                       <div className="truncate text-base font-semibold text-zinc-900">{title || "Sem título"}</div>
                       <div className="mt-1 truncate text-sm font-medium text-zinc-600">{loc || "Localização não informada"}</div>
                     </div>
-                    <div className="shrink-0 rounded-full bg-[#001f3f]/10 px-3 py-1 text-xs font-semibold text-[#001f3f]">
+                    <div className="shrink-0 rounded-full bg-[color:var(--imob-navy)]/10 px-3 py-1 text-xs font-semibold text-[color:var(--imob-navy)]">
                       {r.source === "properties" ? "Imóvel" : "Empreendimento"}
                     </div>
                   </div>

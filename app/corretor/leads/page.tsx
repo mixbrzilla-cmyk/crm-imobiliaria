@@ -75,7 +75,7 @@ export default function CorretorLeadsPage() {
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
-        <div className="text-sm font-semibold text-[#1e3a8a]">Leads para Qualificar</div>
+        <div className="text-sm font-semibold text-[color:var(--imob-navy)]">Leads para Qualificar</div>
         <div className="text-xs text-zinc-500">Proprietários vindos de landing pages ou enviados pela Imobiliária Moderna.</div>
       </header>
 
@@ -88,7 +88,7 @@ export default function CorretorLeadsPage() {
           <div className="text-sm font-semibold text-zinc-900">Fila</div>
           <Link
             href="/corretor/whatsapp"
-            className="inline-flex h-10 items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 text-sm font-semibold text-[#1e3a8a] hover:bg-zinc-50"
+            className="inline-flex h-10 items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 text-sm font-semibold text-[color:var(--imob-navy)] hover:bg-zinc-50"
           >
             Abrir Central WhatsApp
           </Link>
@@ -128,7 +128,7 @@ export default function CorretorLeadsPage() {
                     </Link>
                     <Link
                       href="/corretor/inventario"
-                      className="inline-flex h-10 items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 text-sm font-semibold text-[#1e3a8a] hover:bg-zinc-50"
+                      className="inline-flex h-10 items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 text-sm font-semibold text-[color:var(--imob-navy)] hover:bg-zinc-50"
                     >
                       Cadastrar captação
                     </Link>

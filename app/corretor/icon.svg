@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Imobiliária Moderna">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1f2a5a"/>
+      <stop offset="1" stop-color="#2f3f86"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="#ffffff"/>
+  <path d="M72 198V80l56-30 56 30v118h-34V98l-22-12-22 12v100H72z" fill="url(#g)"/>
+  <path d="M72 80l28-15v42H72V80z" fill="#c1121f"/>
+</svg>
