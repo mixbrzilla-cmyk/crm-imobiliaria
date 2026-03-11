@@ -231,11 +231,10 @@ function formatDaysSinceLabel(days: number) {
   return `Há ${days} dias`;
 }
 
-function timeToneClass(ms: number) {
-  if (!Number.isFinite(ms) || ms < 0) return "text-slate-700";
-  const hours = ms / (60 * 60 * 1000);
-  if (hours >= 96) return "text-red-700";
-  if (hours >= 48) return "text-amber-700";
+function timeToneClassDays(days: number) {
+  if (!Number.isFinite(days) || days < 0) return "text-slate-700";
+  if (days >= 4) return "text-red-700";
+  if (days >= 2) return "text-amber-700";
   return "text-emerald-700";
 }
 
@@ -625,42 +624,33 @@ export default function AdminDashboardClient() {
 
           // Relatório de direcionamento (posse)
           // Relatório de direcionamento (posse)
-          // (busca completa; debug bruto: somente assigned_broker_id != null)
+          // (UNION) properties com assigned_broker_id != null
           (async () => {
             const col: "assigned_broker_id" = "assigned_broker_id";
-
             const base = (supabase as any)
               .from("properties")
-              .select("*")
+              .select(`id, title, neighborhood, city, ${col}, updated_at, created_at`)
               .not(col, "is", null);
 
             const q = propertiesHasDeletedAt ? base.is("deleted_at", null) : base;
             const res = await q.limit(5000);
 
-            console.log("DADOS DO DASHBOARD:", { table: "properties", error: res?.error ?? null, data: res?.data ?? [] });
-
-            return { items: [{ col, res }] };
+            return { col, res };
           })(),
 
           // Relatório de direcionamento (posse) - developments
+          // (UNION) developments com assigned_broker_id != null
           (async () => {
             const col: "assigned_broker_id" = "assigned_broker_id";
-
             const base = (supabase as any)
               .from("developments")
-              .select("*")
+              .select(`id, name, title, neighborhood, bairro, localidade, city, cidade, ${col}, updated_at, created_at`)
               .not(col, "is", null);
 
             const q = developmentsHasDeletedAt ? base.is("deleted_at", null) : base;
             const res = await q.limit(5000);
 
-            console.log("DADOS DO DASHBOARD:", {
-              table: "developments",
-              error: res?.error ?? null,
-              data: res?.data ?? [],
-            });
-
-            return { items: [{ col, res }] };
+            return { col, res };
           })(),
 
           // Jurídico (status do escritório)
@@ -756,25 +746,20 @@ export default function AdminDashboardClient() {
 
       if (direcionamentosRes.status === "fulfilled") {
         const payload: any = direcionamentosRes.value;
-        const items = (payload?.items ?? []) as Array<{ col: string; res: any }>;
-        for (const it of items) {
-          if (it?.res?.error) {
-            console.log("[Dashboard] Erro ao carregar direcionamentos properties:", it.res.error);
-            continue;
-          }
-          const col = String(it?.col ?? "");
-          const data = (it?.res?.data ?? []) as Array<any>;
+        if (payload?.res?.error) {
+          console.log("[Dashboard] Erro ao carregar direcionamentos properties:", payload.res.error);
+        } else {
+          const col = String(payload?.col ?? "assigned_broker_id");
+          const data = (payload?.res?.data ?? []) as Array<any>;
           for (const r of data) {
             const id = String(r?.id ?? "");
             if (!id) continue;
-            if (unionMap.has(`properties:${id}`)) continue;
-            const corretor_id = (r as any)?.[col] ?? null;
             unionMap.set(`properties:${id}`, {
               id,
               title: (r?.title ?? null) as string | null,
               neighborhood: (r?.neighborhood ?? null) as string | null,
               city: (r?.city ?? null) as string | null,
-              corretor_id: corretor_id ? String(corretor_id) : null,
+              corretor_id: (r as any)?.[col] ? String((r as any)[col]) : null,
               data_direcionamento: null,
               updated_at: (r?.updated_at ?? null) as string | null,
               created_at: (r?.created_at ?? null) as string | null,
@@ -786,25 +771,20 @@ export default function AdminDashboardClient() {
 
       if (direcionamentosDevsRes.status === "fulfilled") {
         const payload: any = direcionamentosDevsRes.value;
-        const items = (payload?.items ?? []) as Array<{ col: string; res: any }>;
-        for (const it of items) {
-          if (it?.res?.error) {
-            console.log("[Dashboard] Erro ao carregar direcionamentos developments:", it.res.error);
-            continue;
-          }
-          const col = String(it?.col ?? "");
-          const data = (it?.res?.data ?? []) as Array<any>;
+        if (payload?.res?.error) {
+          console.log("[Dashboard] Erro ao carregar direcionamentos developments:", payload.res.error);
+        } else {
+          const col = String(payload?.col ?? "assigned_broker_id");
+          const data = (payload?.res?.data ?? []) as Array<any>;
           for (const r of data) {
             const id = String(r?.id ?? "");
             if (!id) continue;
-            if (unionMap.has(`developments:${id}`)) continue;
-            const corretor_id = (r as any)?.[col] ?? null;
             unionMap.set(`developments:${id}`, {
               id,
               title: (String(r?.name ?? r?.title ?? "").trim() || null) as string | null,
               neighborhood: (r?.localidade ?? r?.bairro ?? r?.neighborhood ?? null) as string | null,
               city: (r?.city ?? r?.cidade ?? null) as string | null,
-              corretor_id: corretor_id ? String(corretor_id) : null,
+              corretor_id: (r as any)?.[col] ? String((r as any)[col]) : null,
               data_direcionamento: null,
               updated_at: (r?.updated_at ?? null) as string | null,
               created_at: (r?.created_at ?? null) as string | null,
@@ -1477,7 +1457,7 @@ export default function AdminDashboardClient() {
                     <td
                       className={
                         "px-4 py-3 text-sm font-semibold " +
-                        (r.directedAtIso ? timeToneClass(nowTick - r.directedTs) : "text-slate-900")
+                        (r.directedAtIso ? timeToneClassDays(r.daysSince) : "text-slate-900")
                       }
                     >
                       {r.directedAtIso ? formatDaysSinceLabel(r.daysSince) : "-"}
