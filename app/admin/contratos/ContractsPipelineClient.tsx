@@ -339,11 +339,30 @@ export default function ContractsPipelineClient() {
           .select("id, full_name")
           .eq("role", "broker")
           .order("full_name", { ascending: true }),
-        supabase
-          .from("properties")
-          .select("id, title, neighborhood, city, owner_name, owner_whatsapp")
-          .order("created_at", { ascending: false })
-          .limit(500),
+        (async () => {
+          const attempts = [
+            "id, title, neighborhood, city, owner_name, owner_whatsapp",
+            "id, title, neighborhood, city",
+            "id, title",
+          ];
+          let last: any = null;
+          for (const sel of attempts) {
+            // eslint-disable-next-line no-await-in-loop
+            const res = await (supabase as any)
+              .from("properties")
+              .select(sel)
+              .order("created_at", { ascending: false })
+              .limit(500);
+            if (!res?.error) return res;
+            last = res;
+            const msg = String(res?.error?.message ?? "");
+            const isColumnError = /column .* does not exist|not found/i.test(msg);
+            const code = (res?.error as any)?.code;
+            const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
+            if (!isColumnError && !isSchemaMismatch) break;
+          }
+          return last;
+        })(),
         (async () => {
           const attempts = [
             "id, name, city, localidade, owner_name, owner_whatsapp",
@@ -415,12 +434,27 @@ export default function ContractsPipelineClient() {
       if (brokersRes.status === "fulfilled" && !brokersRes.value.error) {
         setBrokers((brokersRes.value.data ?? []) as BrokerProfile[]);
       }
-      if (propsRes.status === "fulfilled" && !propsRes.value.error) {
-        setProperties((propsRes.value.data ?? []) as PropertyMini[]);
+
+      if (propsRes.status === "fulfilled") {
+        const r: any = propsRes.value;
+        if (r?.error) {
+          console.error("[Contracts] Erro ao carregar properties:", r.error);
+          setProperties([]);
+        } else {
+          const rows = (r.data ?? []) as PropertyMini[];
+          setProperties(rows);
+          if (rows.length === 0) {
+            console.error("[Contracts] properties veio vazio. (sem erro)");
+          }
+        }
       }
+
       if (devsRes.status === "fulfilled") {
         const r: any = devsRes.value;
-        if (!r.error) {
+        if (r.error) {
+          console.error("[Contracts] Erro ao carregar developments:", r.error);
+          setDevelopments([]);
+        } else {
           const raw = (r.data ?? []) as Array<any>;
           setDevelopments(
             raw.map((d) => ({
@@ -432,6 +466,9 @@ export default function ContractsPipelineClient() {
               owner_whatsapp: (d.owner_whatsapp ?? null) as string | null,
             })),
           );
+          if (raw.length === 0) {
+            console.error("[Contracts] developments veio vazio. (sem erro)");
+          }
         }
       }
 
