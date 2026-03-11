@@ -93,6 +93,16 @@ type ObraWorkerEntryRow = {
   hours: number | null;
 };
 
+type MarketingExpenseRow = {
+  id: string;
+  amount: number | null;
+};
+
+type VehicleExpenseRow = {
+  id: string;
+  amount: number | null;
+};
+
 type LegalCaseRow = {
   id: string;
   due_diligence_json?: any;
@@ -282,6 +292,9 @@ export default function AdminDashboardClient() {
   const [obraPendingDeliveries, setObraPendingDeliveries] = useState<number>(0);
   const [obraLaborTotal, setObraLaborTotal] = useState<number>(0);
 
+  const [marketingExpensesTotal, setMarketingExpensesTotal] = useState<number>(0);
+  const [vehicleExpensesTotal, setVehicleExpensesTotal] = useState<number>(0);
+
   const [leadsTodayCount, setLeadsTodayCount] = useState<number>(0);
   const [leadsWeekCount, setLeadsWeekCount] = useState<number>(0);
   const [leadsWeekTrend, setLeadsWeekTrend] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
@@ -369,6 +382,8 @@ export default function AdminDashboardClient() {
       setObraMaterialsTotal(0);
       setObraPendingDeliveries(0);
       setObraLaborTotal(0);
+      setMarketingExpensesTotal(0);
+      setVehicleExpensesTotal(0);
       return;
     }
 
@@ -463,6 +478,8 @@ export default function AdminDashboardClient() {
         obraMaterialsRes,
         obraWorkersRes,
         obraWorkerEntriesRes,
+        marketingExpensesRes,
+        vehicleExpensesRes,
         whatsRes,
         devIdsRes,
         inventarioIdsRes,
@@ -543,6 +560,10 @@ export default function AdminDashboardClient() {
             .from("obra_worker_entries")
             .select("id, worker_id, entry_type, hours")
             .limit(2000),
+
+          (supabase as any).from("marketing_expenses").select("id, amount").limit(5000),
+
+          (supabase as any).from("vehicle_expenses").select("id, amount").limit(5000),
 
           // WhatsApp activity today (schema optional)
           supabase
@@ -945,7 +966,27 @@ export default function AdminDashboardClient() {
         laborExpense = 0;
       }
 
-      const net = gross - commission - materialsExpense - laborExpense;
+      let marketingExpense = 0;
+      try {
+        if (marketingExpensesRes.status === "fulfilled" && !marketingExpensesRes.value.error) {
+          const rows = (marketingExpensesRes.value.data ?? []) as MarketingExpenseRow[];
+          marketingExpense = rows.reduce((acc, r) => acc + (r.amount ?? 0), 0);
+        }
+      } catch {
+        marketingExpense = 0;
+      }
+
+      let vehicleExpense = 0;
+      try {
+        if (vehicleExpensesRes.status === "fulfilled" && !vehicleExpensesRes.value.error) {
+          const rows = (vehicleExpensesRes.value.data ?? []) as VehicleExpenseRow[];
+          vehicleExpense = rows.reduce((acc, r) => acc + (r.amount ?? 0), 0);
+        }
+      } catch {
+        vehicleExpense = 0;
+      }
+
+      const net = gross - commission - materialsExpense - laborExpense - marketingExpense - vehicleExpense;
 
       setGrossPropertiesValue(propsGross);
       setGrossDevelopmentsValue(devGross);
@@ -956,6 +997,8 @@ export default function AdminDashboardClient() {
       setObraMaterialsTotal(materialsExpense);
       setObraPendingDeliveries(pendingDeliveries);
       setObraLaborTotal(laborExpense);
+      setMarketingExpensesTotal(marketingExpense);
+      setVehicleExpensesTotal(vehicleExpense);
 
       try {
         const propRow: any =
@@ -1048,6 +1091,8 @@ export default function AdminDashboardClient() {
       setObraMaterialsTotal(0);
       setObraPendingDeliveries(0);
       setObraLaborTotal(0);
+      setMarketingExpensesTotal(0);
+      setVehicleExpensesTotal(0);
       setTrafficBySource({
         meta: 0,
         google: 0,
@@ -1170,7 +1215,7 @@ export default function AdminDashboardClient() {
                 Total {formatCurrencyBRL(grossInventoryValue)} • Comissão (5%) {formatCurrencyBRL(commissionValue)}
               </div>
               <div className="mt-2 text-[11px] font-semibold text-emerald-800/80">
-                Gastos: Materiais {formatCurrencyBRL(obraMaterialsTotal)} • Medição {formatCurrencyBRL(obraLaborTotal)}
+                Gastos: Materiais {formatCurrencyBRL(obraMaterialsTotal)} • Medição {formatCurrencyBRL(obraLaborTotal)} • Marketing {formatCurrencyBRL(marketingExpensesTotal)} • Veículo {formatCurrencyBRL(vehicleExpensesTotal)}
               </div>
               <div className="mt-2 text-[11px] font-semibold text-emerald-800/80">
                 Inventário: {formatCurrencyBRL(grossPropertiesValue)} • Empreendimentos: {formatCurrencyBRL(grossDevelopmentsValue)}

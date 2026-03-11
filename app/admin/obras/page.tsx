@@ -80,6 +80,43 @@ type EntryForm = {
   notes: string;
 };
 
+type ExpenseCategory =
+  | "placas"
+  | "letreiros"
+  | "outdoors"
+  | "adesivos"
+  | "placa_aluga_vende"
+  | "combustivel"
+  | "reparos"
+  | "alinhamento"
+  | "mecanica"
+  | "outros";
+
+type MarketingExpenseRow = {
+  id: string;
+  spent_at: string;
+  category: string;
+  description: string | null;
+  amount: number | null;
+  created_at?: string;
+};
+
+type VehicleExpenseRow = {
+  id: string;
+  spent_at: string;
+  category: string;
+  description: string | null;
+  amount: number | null;
+  created_at?: string;
+};
+
+type ExpenseForm = {
+  spent_at: string;
+  category: ExpenseCategory;
+  description: string;
+  amount: string;
+};
+
 function parseNumber(input: string) {
   const normalized = input.replace(/[^0-9.,-]/g, "").replace(",", ".").trim();
   if (!normalized) return null;
@@ -120,7 +157,7 @@ function sectorCls(sector: EntryForm["sector"]) {
 export default function ObrasAdminPage() {
   const supabase = useMemo(() => getSupabaseClient(), []);
 
-  const [tab, setTab] = useState<"materiais" | "medicao">("materiais");
+  const [tab, setTab] = useState<"materiais" | "medicao" | "marketing" | "veiculo">("materiais");
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -145,6 +182,39 @@ export default function ObrasAdminPage() {
   const [isWorkersLoading, setIsWorkersLoading] = useState(false);
   const [isWorkerSaving, setIsWorkerSaving] = useState(false);
   const [isEntrySaving, setIsEntrySaving] = useState(false);
+
+  const [supportsMarketingTable, setSupportsMarketingTable] = useState(true);
+  const [supportsVehicleTable, setSupportsVehicleTable] = useState(true);
+
+  const [marketingExpenses, setMarketingExpenses] = useState<MarketingExpenseRow[]>([]);
+  const [vehicleExpenses, setVehicleExpenses] = useState<VehicleExpenseRow[]>([]);
+
+  const [isMarketingLoading, setIsMarketingLoading] = useState(false);
+  const [isVehicleLoading, setIsVehicleLoading] = useState(false);
+  const [isMarketingSaving, setIsMarketingSaving] = useState(false);
+  const [isVehicleSaving, setIsVehicleSaving] = useState(false);
+
+  const todayIso = useMemo(() => {
+    const d = new Date();
+    const yyyy = String(d.getFullYear());
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }, []);
+
+  const [marketingForm, setMarketingForm] = useState<ExpenseForm>({
+    spent_at: todayIso,
+    category: "placas",
+    description: "",
+    amount: "",
+  });
+
+  const [vehicleForm, setVehicleForm] = useState<ExpenseForm>({
+    spent_at: todayIso,
+    category: "combustivel",
+    description: "",
+    amount: "",
+  });
 
   const [workerForm, setWorkerForm] = useState<WorkerForm>({
     full_name: "",
@@ -279,6 +349,180 @@ export default function ObrasAdminPage() {
     if (tab !== "medicao") return;
     void loadWorkersAndEntries();
   }, [loadWorkersAndEntries, tab]);
+
+  const loadMarketingExpenses = useCallback(async () => {
+    setErrorMessage(null);
+    if (!supabase) {
+      setMarketingExpenses([]);
+      return;
+    }
+
+    setIsMarketingLoading(true);
+    try {
+      const res = await (supabase as any)
+        .from("marketing_expenses")
+        .select("id, spent_at, category, description, amount, created_at")
+        .order("spent_at", { ascending: false })
+        .limit(500);
+
+      if (res.error) {
+        const code = (res.error as any)?.code;
+        if (code === "42P01" || code === "PGRST204" || code === "PGRST301") {
+          setSupportsMarketingTable(false);
+          setMarketingExpenses([]);
+        } else {
+          setErrorMessage(res.error.message);
+          setMarketingExpenses([]);
+        }
+      } else {
+        setSupportsMarketingTable(true);
+        setMarketingExpenses((res.data ?? []) as MarketingExpenseRow[]);
+      }
+    } catch {
+      setSupportsMarketingTable(false);
+      setMarketingExpenses([]);
+    } finally {
+      setIsMarketingLoading(false);
+    }
+  }, [supabase]);
+
+  const loadVehicleExpenses = useCallback(async () => {
+    setErrorMessage(null);
+    if (!supabase) {
+      setVehicleExpenses([]);
+      return;
+    }
+
+    setIsVehicleLoading(true);
+    try {
+      const res = await (supabase as any)
+        .from("vehicle_expenses")
+        .select("id, spent_at, category, description, amount, created_at")
+        .order("spent_at", { ascending: false })
+        .limit(500);
+
+      if (res.error) {
+        const code = (res.error as any)?.code;
+        if (code === "42P01" || code === "PGRST204" || code === "PGRST301") {
+          setSupportsVehicleTable(false);
+          setVehicleExpenses([]);
+        } else {
+          setErrorMessage(res.error.message);
+          setVehicleExpenses([]);
+        }
+      } else {
+        setSupportsVehicleTable(true);
+        setVehicleExpenses((res.data ?? []) as VehicleExpenseRow[]);
+      }
+    } catch {
+      setSupportsVehicleTable(false);
+      setVehicleExpenses([]);
+    } finally {
+      setIsVehicleLoading(false);
+    }
+  }, [supabase]);
+
+  useEffect(() => {
+    if (tab !== "marketing") return;
+    void loadMarketingExpenses();
+  }, [loadMarketingExpenses, tab]);
+
+  useEffect(() => {
+    if (tab !== "veiculo") return;
+    void loadVehicleExpenses();
+  }, [loadVehicleExpenses, tab]);
+
+  function expenseCategoryLabel(cat: ExpenseCategory) {
+    if (cat === "placas") return "Placas";
+    if (cat === "letreiros") return "Letreiros";
+    if (cat === "outdoors") return "Outdoors";
+    if (cat === "adesivos") return "Adesivos";
+    if (cat === "placa_aluga_vende") return "Placa Aluga/Vende";
+    if (cat === "combustivel") return "Combustível";
+    if (cat === "reparos") return "Reparos";
+    if (cat === "alinhamento") return "Alinhamento";
+    if (cat === "mecanica") return "Mecânica";
+    return "Outros";
+  }
+
+  function expenseBuckets(rows: Array<{ category: string; amount: number | null }>) {
+    const map = new Map<string, number>();
+    for (const r of rows) {
+      const k = String(r.category ?? "outros").trim() || "outros";
+      map.set(k, (map.get(k) ?? 0) + (r.amount ?? 0));
+    }
+    const items = Array.from(map.entries())
+      .map(([k, v]) => ({ k, v }))
+      .sort((a, b) => b.v - a.v);
+    const max = Math.max(1, ...items.map((i) => i.v));
+    return { items, max };
+  }
+
+  async function addMarketingExpense(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setErrorMessage(null);
+    if (!supabase) return;
+
+    setIsMarketingSaving(true);
+    try {
+      const payload = {
+        id: crypto.randomUUID(),
+        spent_at: marketingForm.spent_at,
+        category: marketingForm.category,
+        description: marketingForm.description.trim() || null,
+        amount: parseBRLInputToNumber(marketingForm.amount),
+      };
+      const res = await (supabase as any).from("marketing_expenses").insert(payload);
+      if (res.error) {
+        const code = (res.error as any)?.code;
+        if (code === "42P01" || code === "PGRST204" || code === "PGRST301") {
+          setSupportsMarketingTable(false);
+        } else {
+          setErrorMessage(res.error.message);
+        }
+        return;
+      }
+      setMarketingForm((s) => ({ ...s, description: "", amount: "" }));
+      await loadMarketingExpenses();
+    } catch {
+      setErrorMessage("Não foi possível salvar o gasto de marketing.");
+    } finally {
+      setIsMarketingSaving(false);
+    }
+  }
+
+  async function addVehicleExpense(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setErrorMessage(null);
+    if (!supabase) return;
+
+    setIsVehicleSaving(true);
+    try {
+      const payload = {
+        id: crypto.randomUUID(),
+        spent_at: vehicleForm.spent_at,
+        category: vehicleForm.category,
+        description: vehicleForm.description.trim() || null,
+        amount: parseBRLInputToNumber(vehicleForm.amount),
+      };
+      const res = await (supabase as any).from("vehicle_expenses").insert(payload);
+      if (res.error) {
+        const code = (res.error as any)?.code;
+        if (code === "42P01" || code === "PGRST204" || code === "PGRST301") {
+          setSupportsVehicleTable(false);
+        } else {
+          setErrorMessage(res.error.message);
+        }
+        return;
+      }
+      setVehicleForm((s) => ({ ...s, description: "", amount: "" }));
+      await loadVehicleExpenses();
+    } catch {
+      setErrorMessage("Não foi possível salvar o gasto de veículo.");
+    } finally {
+      setIsVehicleSaving(false);
+    }
+  }
 
   async function addMaterial(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -591,7 +835,7 @@ export default function ObrasAdminPage() {
       </section>
 
       <section className="rounded-2xl bg-white p-3 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70">
-        <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-50 p-2 ring-1 ring-slate-200/70">
+        <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-50 p-2 ring-1 ring-slate-200/70 md:grid-cols-4">
           <button
             type="button"
             onClick={() => setTab("materiais")}
@@ -617,6 +861,32 @@ export default function ObrasAdminPage() {
           >
             <Users className="h-4 w-4" />
             Medição
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("marketing")}
+            className={
+              "flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition-all duration-300 " +
+              (tab === "marketing"
+                ? "bg-white text-slate-900 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70"
+                : "text-slate-600 hover:bg-white/70")
+            }
+          >
+            <ClipboardList className="h-4 w-4" />
+            Marketing
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("veiculo")}
+            className={
+              "flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition-all duration-300 " +
+              (tab === "veiculo"
+                ? "bg-white text-slate-900 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10)] ring-1 ring-slate-200/70"
+                : "text-slate-600 hover:bg-white/70")
+            }
+          >
+            <HardHat className="h-4 w-4" />
+            Veículo
           </button>
         </div>
       </section>
@@ -739,7 +1009,7 @@ export default function ObrasAdminPage() {
             </div>
           </div>
         </section>
-      ) : (
+      ) : tab === "medicao" ? (
         <section className="w-full">
           <div className="rounded-2xl bg-white p-6 shadow-md ring-1 ring-slate-200/70">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -874,6 +1144,282 @@ export default function ObrasAdminPage() {
                 <span className="font-semibold text-slate-900">Regra:</span> Hora-homem salva as horas. Diária e Falta salvam sem horas.
               </div>
             </div>
+          </div>
+        </section>
+      ) : tab === "marketing" ? (
+        <section className="w-full">
+          <div className="rounded-2xl bg-white p-6 shadow-md ring-1 ring-slate-200/70">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div className="text-sm font-semibold text-slate-900">Gastos de Marketing</div>
+                <div className="mt-1 text-xs text-slate-500">Placas, letreiros, outdoors e materiais de divulgação.</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => void loadMarketingExpenses()}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-semibold text-slate-900 shadow-sm ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50"
+              >
+                <RefreshCw className={"h-4 w-4 " + (isMarketingLoading ? "animate-spin" : "")} />
+                Atualizar
+              </button>
+            </div>
+
+            {!supportsMarketingTable ? (
+              <div className="mt-4 rounded-2xl bg-amber-50 px-5 py-4 text-sm text-amber-900 ring-1 ring-amber-200/70">
+                Infra pendente: crie a tabela <span className="font-semibold">marketing_expenses</span> no Supabase.
+              </div>
+            ) : null}
+
+            <form onSubmit={addMarketingExpense} className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-4">
+              <label className="flex flex-col gap-2">
+                <span className="text-xs font-semibold tracking-wide text-slate-600">Data</span>
+                <input
+                  type="date"
+                  value={marketingForm.spent_at}
+                  onChange={(e) => setMarketingForm((s) => ({ ...s, spent_at: e.target.value }))}
+                  className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                />
+              </label>
+              <label className="flex flex-col gap-2">
+                <span className="text-xs font-semibold tracking-wide text-slate-600">Categoria</span>
+                <select
+                  value={marketingForm.category}
+                  onChange={(e) => setMarketingForm((s) => ({ ...s, category: e.target.value as ExpenseCategory }))}
+                  className="h-11 rounded-xl bg-white px-3 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                >
+                  {(["placas", "letreiros", "outdoors", "adesivos", "placa_aluga_vende", "outros"] as ExpenseCategory[]).map((c) => (
+                    <option key={c} value={c}>
+                      {expenseCategoryLabel(c)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-2 md:col-span-1">
+                <span className="text-xs font-semibold tracking-wide text-slate-600">Valor</span>
+                <input
+                  value={marketingForm.amount}
+                  onChange={(e) => setMarketingForm((s) => ({ ...s, amount: formatBRLInput(e.target.value) }))}
+                  className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                  placeholder="R$ 0,00"
+                  inputMode="decimal"
+                  required
+                />
+              </label>
+              <div className="flex items-end">
+                <button
+                  type="submit"
+                  disabled={!supportsMarketingTable || isMarketingSaving}
+                  className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-[#001f3f] px-4 text-xs font-semibold text-white shadow-sm transition-all duration-300 hover:bg-[#001a33] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isMarketingSaving ? "Salvando..." : "Adicionar"}
+                </button>
+              </div>
+              <label className="flex flex-col gap-2 md:col-span-4">
+                <span className="text-xs font-semibold tracking-wide text-slate-600">Descrição (opcional)</span>
+                <input
+                  value={marketingForm.description}
+                  onChange={(e) => setMarketingForm((s) => ({ ...s, description: e.target.value }))}
+                  className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                  placeholder="Ex: 10 placas para vitrine"
+                />
+              </label>
+            </form>
+
+            {supportsMarketingTable ? (
+              <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div className="rounded-2xl bg-slate-50 p-5 ring-1 ring-slate-200/70">
+                  <div className="text-sm font-semibold text-slate-900">Gastos por categoria</div>
+                  <div className="mt-4 flex flex-col gap-2">
+                    {expenseBuckets(marketingExpenses).items.slice(0, 8).map((i) => (
+                      <div key={i.k} className="flex items-center gap-3">
+                        <div className="w-32 truncate text-xs font-semibold text-slate-700">{expenseCategoryLabel(i.k as any)}</div>
+                        <div className="flex-1">
+                          <div className="h-3 w-full rounded-full bg-white ring-1 ring-slate-200/70">
+                            <div
+                              className="h-3 rounded-full bg-slate-900/70"
+                              style={{ width: `${Math.max(8, Math.round((i.v / expenseBuckets(marketingExpenses).max) * 100))}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div className="w-28 text-right text-xs font-semibold text-slate-900">{formatCurrencyBRL(i.v)}</div>
+                      </div>
+                    ))}
+                    {marketingExpenses.length === 0 ? (
+                      <div className="text-sm text-slate-600">Nenhum gasto lançado.</div>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto rounded-2xl bg-white ring-1 ring-slate-200/70">
+                  <table className="min-w-full border-separate border-spacing-0">
+                    <thead>
+                      <tr className="bg-slate-50">
+                        <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Data</th>
+                        <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Categoria</th>
+                        <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Descrição</th>
+                        <th className="px-5 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">Valor</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {marketingExpenses.length > 0 ? (
+                        marketingExpenses.map((r) => (
+                          <tr key={r.id} className="border-t border-slate-100">
+                            <td className="px-5 py-4 text-sm text-slate-700">{r.spent_at}</td>
+                            <td className="px-5 py-4 text-sm font-semibold text-slate-900">{expenseCategoryLabel(r.category as any)}</td>
+                            <td className="px-5 py-4 text-sm text-slate-600">{r.description ?? "-"}</td>
+                            <td className="px-5 py-4 text-right text-sm font-semibold text-slate-900">{formatCurrencyBRL(r.amount ?? 0)}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td className="px-5 py-8 text-sm text-slate-600" colSpan={4}>
+                            Nenhum gasto lançado.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </section>
+      ) : (
+        <section className="w-full">
+          <div className="rounded-2xl bg-white p-6 shadow-md ring-1 ring-slate-200/70">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div className="text-sm font-semibold text-slate-900">Gastos de Veículo</div>
+                <div className="mt-1 text-xs text-slate-500">Combustível, reparos, alinhamento, mecânica e afins.</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => void loadVehicleExpenses()}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-semibold text-slate-900 shadow-sm ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50"
+              >
+                <RefreshCw className={"h-4 w-4 " + (isVehicleLoading ? "animate-spin" : "")} />
+                Atualizar
+              </button>
+            </div>
+
+            {!supportsVehicleTable ? (
+              <div className="mt-4 rounded-2xl bg-amber-50 px-5 py-4 text-sm text-amber-900 ring-1 ring-amber-200/70">
+                Infra pendente: crie a tabela <span className="font-semibold">vehicle_expenses</span> no Supabase.
+              </div>
+            ) : null}
+
+            <form onSubmit={addVehicleExpense} className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-4">
+              <label className="flex flex-col gap-2">
+                <span className="text-xs font-semibold tracking-wide text-slate-600">Data</span>
+                <input
+                  type="date"
+                  value={vehicleForm.spent_at}
+                  onChange={(e) => setVehicleForm((s) => ({ ...s, spent_at: e.target.value }))}
+                  className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                />
+              </label>
+              <label className="flex flex-col gap-2">
+                <span className="text-xs font-semibold tracking-wide text-slate-600">Categoria</span>
+                <select
+                  value={vehicleForm.category}
+                  onChange={(e) => setVehicleForm((s) => ({ ...s, category: e.target.value as ExpenseCategory }))}
+                  className="h-11 rounded-xl bg-white px-3 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                >
+                  {(["combustivel", "reparos", "alinhamento", "mecanica", "outros"] as ExpenseCategory[]).map((c) => (
+                    <option key={c} value={c}>
+                      {expenseCategoryLabel(c)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-2 md:col-span-1">
+                <span className="text-xs font-semibold tracking-wide text-slate-600">Valor</span>
+                <input
+                  value={vehicleForm.amount}
+                  onChange={(e) => setVehicleForm((s) => ({ ...s, amount: formatBRLInput(e.target.value) }))}
+                  className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                  placeholder="R$ 0,00"
+                  inputMode="decimal"
+                  required
+                />
+              </label>
+              <div className="flex items-end">
+                <button
+                  type="submit"
+                  disabled={!supportsVehicleTable || isVehicleSaving}
+                  className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-[#001f3f] px-4 text-xs font-semibold text-white shadow-sm transition-all duration-300 hover:bg-[#001a33] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isVehicleSaving ? "Salvando..." : "Adicionar"}
+                </button>
+              </div>
+              <label className="flex flex-col gap-2 md:col-span-4">
+                <span className="text-xs font-semibold tracking-wide text-slate-600">Descrição (opcional)</span>
+                <input
+                  value={vehicleForm.description}
+                  onChange={(e) => setVehicleForm((s) => ({ ...s, description: e.target.value }))}
+                  className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                  placeholder="Ex: Abastecimento + troca de óleo"
+                />
+              </label>
+            </form>
+
+            {supportsVehicleTable ? (
+              <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div className="rounded-2xl bg-slate-50 p-5 ring-1 ring-slate-200/70">
+                  <div className="text-sm font-semibold text-slate-900">Gastos por categoria</div>
+                  <div className="mt-4 flex flex-col gap-2">
+                    {expenseBuckets(vehicleExpenses).items.slice(0, 8).map((i) => (
+                      <div key={i.k} className="flex items-center gap-3">
+                        <div className="w-32 truncate text-xs font-semibold text-slate-700">{expenseCategoryLabel(i.k as any)}</div>
+                        <div className="flex-1">
+                          <div className="h-3 w-full rounded-full bg-white ring-1 ring-slate-200/70">
+                            <div
+                              className="h-3 rounded-full bg-slate-900/70"
+                              style={{ width: `${Math.max(8, Math.round((i.v / expenseBuckets(vehicleExpenses).max) * 100))}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div className="w-28 text-right text-xs font-semibold text-slate-900">{formatCurrencyBRL(i.v)}</div>
+                      </div>
+                    ))}
+                    {vehicleExpenses.length === 0 ? (
+                      <div className="text-sm text-slate-600">Nenhum gasto lançado.</div>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto rounded-2xl bg-white ring-1 ring-slate-200/70">
+                  <table className="min-w-full border-separate border-spacing-0">
+                    <thead>
+                      <tr className="bg-slate-50">
+                        <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Data</th>
+                        <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Categoria</th>
+                        <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Descrição</th>
+                        <th className="px-5 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">Valor</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {vehicleExpenses.length > 0 ? (
+                        vehicleExpenses.map((r) => (
+                          <tr key={r.id} className="border-t border-slate-100">
+                            <td className="px-5 py-4 text-sm text-slate-700">{r.spent_at}</td>
+                            <td className="px-5 py-4 text-sm font-semibold text-slate-900">{expenseCategoryLabel(r.category as any)}</td>
+                            <td className="px-5 py-4 text-sm text-slate-600">{r.description ?? "-"}</td>
+                            <td className="px-5 py-4 text-right text-sm font-semibold text-slate-900">{formatCurrencyBRL(r.amount ?? 0)}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td className="px-5 py-8 text-sm text-slate-600" colSpan={4}>
+                            Nenhum gasto lançado.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
           </div>
         </section>
       )}
