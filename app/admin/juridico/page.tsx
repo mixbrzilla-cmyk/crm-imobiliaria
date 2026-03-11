@@ -619,12 +619,12 @@ export default function JuridicoAdminPage() {
       <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex w-full flex-col gap-4 md:flex-row md:items-start">
-            <div className="w-full rounded-2xl bg-slate-50 p-5 shadow-lg ring-1 ring-slate-200/70 md:min-w-[520px]">
+            <div className="w-full rounded-2xl bg-slate-50 p-4 shadow-lg ring-1 ring-slate-200/70 sm:p-5 md:min-w-[520px]">
               <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">STATUS DO ESCRITÓRIO</div>
               <div className="mt-2 text-sm font-semibold text-slate-900">
                 {officeStatusLabel({ red: dueDiligenceSummary.red, yellow: dueDiligenceSummary.yellow, green: dueDiligenceSummary.green })}
               </div>
-              <div className="mt-4 grid grid-cols-3 gap-3">
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200/70">
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-xs font-semibold text-slate-600">Verde</div>
@@ -709,7 +709,7 @@ export default function JuridicoAdminPage() {
 
       <section className="w-full">
         <div className="rounded-2xl bg-white p-6 shadow-lg ring-1 ring-slate-200/70">
-            <div className="h-1 w-full rounded-full bg-[#2b6cff]" />
+            <div className="h-px w-full rounded-full bg-slate-200" />
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="text-sm font-semibold text-slate-900">
