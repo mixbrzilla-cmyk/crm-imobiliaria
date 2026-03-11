@@ -643,8 +643,7 @@ export default function AdminDashboardClient() {
             for (const col of cols) {
               const base = (supabase as any)
                 .from("properties")
-                .select(`id, name, city, ${col}, created_at`)
-                .not(col, "is", null);
+                .select(`id, name, city, ${col}, created_at`);
 
               const q = propertiesHasDeletedAt ? base.is("deleted_at", null) : base;
               const res = await q.limit(5000);
@@ -662,8 +661,7 @@ export default function AdminDashboardClient() {
             for (const col of cols) {
               const base = (supabase as any)
                 .from("developments")
-                .select(`id, name, localidade, city, cidade, ${col}, created_at`)
-                .not(col, "is", null);
+                .select(`id, name, localidade, city, cidade, ${col}, created_at`);
 
               const q = developmentsHasDeletedAt ? base.is("deleted_at", null) : base;
               const res = await q.limit(5000);
@@ -762,6 +760,16 @@ export default function AdminDashboardClient() {
       setAssignedImoveisCount(assignedCount);
       setUnassignedImoveisCount(unassignedCount);
 
+      try {
+        const propsPayload: any = direcionamentosRes.status === "fulfilled" ? direcionamentosRes.value : null;
+        const devsPayload: any = direcionamentosDevsRes.status === "fulfilled" ? direcionamentosDevsRes.value : null;
+        const props = (propsPayload?.items ?? []).flatMap((it: any) => it?.res?.data ?? []);
+        const devs = (devsPayload?.items ?? []).flatMap((it: any) => it?.res?.data ?? []);
+        console.log("DADOS BRUTOS DO BANCO:", { props, devs });
+      } catch {
+        // ignore
+      }
+
       const unionMap = new Map<string, DirecionamentoUnionRow>();
 
       if (direcionamentosRes.status === "fulfilled") {
@@ -775,6 +783,8 @@ export default function AdminDashboardClient() {
           const col = String(it?.col ?? "assigned_broker_id");
           const data = (it?.res?.data ?? []) as Array<any>;
           for (const r of data) {
+            const assigned = (r as any)?.[col] ?? null;
+            if (!assigned) continue;
             const id = String(r?.id ?? "");
             if (!id) continue;
             if (unionMap.has(`properties:${id}`)) continue;
@@ -783,7 +793,7 @@ export default function AdminDashboardClient() {
               name: (r?.name ?? null) as string | null,
               neighborhood: null,
               city: (r?.city ?? null) as string | null,
-              corretor_id: (r as any)?.[col] ? String((r as any)[col]) : null,
+              corretor_id: String(assigned),
               data_direcionamento: null,
               created_at: (r?.created_at ?? null) as string | null,
               source: "properties",
@@ -803,6 +813,8 @@ export default function AdminDashboardClient() {
           const col = String(it?.col ?? "assigned_broker_id");
           const data = (it?.res?.data ?? []) as Array<any>;
           for (const r of data) {
+            const assigned = (r as any)?.[col] ?? null;
+            if (!assigned) continue;
             const id = String(r?.id ?? "");
             if (!id) continue;
             if (unionMap.has(`developments:${id}`)) continue;
@@ -811,7 +823,7 @@ export default function AdminDashboardClient() {
               name: (String(r?.name ?? "").trim() || null) as string | null,
               neighborhood: (r?.localidade ?? null) as string | null,
               city: (r?.city ?? r?.cidade ?? null) as string | null,
-              corretor_id: (r as any)?.[col] ? String((r as any)[col]) : null,
+              corretor_id: String(assigned),
               data_direcionamento: null,
               created_at: (r?.created_at ?? null) as string | null,
               source: "developments",
@@ -840,7 +852,7 @@ export default function AdminDashboardClient() {
           .filter((r) => Boolean(r.corretor_id))
           .map((r) => {
             const brokerId = r.corretor_id ?? "";
-            const brokerName = (profilesById.get(brokerId)?.full_name ?? "").trim() || brokerId;
+            const brokerName = (profilesById.get(brokerId)?.full_name ?? "").trim() || `ID: ${brokerId}`;
             const loc = [r.neighborhood, r.city].filter(Boolean).join(" • ");
             const propertyLabel = (r.name ?? "").trim() || loc || r.id;
             const directedAt = r.created_at ?? "";
