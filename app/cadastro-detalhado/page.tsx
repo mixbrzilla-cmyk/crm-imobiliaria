@@ -38,6 +38,44 @@ function parseMoneyToNumberBR(input: string) {
   return num;
 }
 
+function formatCpfBR(input: string) {
+  const v = onlyDigits(input).slice(0, 11);
+  const p1 = v.slice(0, 3);
+  const p2 = v.slice(3, 6);
+  const p3 = v.slice(6, 9);
+  const p4 = v.slice(9, 11);
+  let out = p1;
+  if (p2) out += `.${p2}`;
+  if (p3) out += `.${p3}`;
+  if (p4) out += `-${p4}`;
+  return out;
+}
+
+function formatPhoneBR(input: string) {
+  const d = onlyDigits(input).slice(0, 11);
+  const dd = d.slice(0, 2);
+  const rest = d.slice(2);
+  const isMobile = rest.length >= 9;
+  const p1 = isMobile ? rest.slice(0, 5) : rest.slice(0, 4);
+  const p2 = isMobile ? rest.slice(5, 9) : rest.slice(4, 8);
+  let out = "";
+  if (dd) out += `(${dd}`;
+  if (dd.length === 2) out += ") ";
+  if (p1) out += p1;
+  if (p2) out += `-${p2}`;
+  return out;
+}
+
+function formatCurrencyBRL(input: string) {
+  const d = onlyDigits(input);
+  if (!d) return "";
+  const normalized = d.padStart(3, "0");
+  const cents = normalized.slice(-2);
+  const ints = normalized.slice(0, -2);
+  const intWithSep = ints.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `R$ ${intWithSep},${cents}`;
+}
+
 function toIntOrNull(input: string) {
   const raw = String(input ?? "").trim();
   if (!raw) return null;
@@ -317,7 +355,7 @@ export default function CadastroDetalhadoPage() {
     if (!show) return null;
 
     return (
-      <div className="mt-3 flex items-center gap-3 text-xs font-semibold text-slate-600">
+      <div className="mt-3 flex items-center justify-center gap-3 text-xs font-semibold text-slate-600">
         <div className="inline-flex items-center gap-2 rounded-full bg-white/60 px-3 py-1.5 ring-1 ring-white/50 backdrop-blur">
           <ShieldCheck className="h-4 w-4" style={{ color: PRIMARY }} />
           <span>Escudo Digital</span>
@@ -396,7 +434,7 @@ export default function CadastroDetalhadoPage() {
                 background: `linear-gradient(180deg, ${PRIMARY} 0%, #1B2A62 100%)`,
               }}
             >
-              <div className="px-7 pt-7">
+              <div className="px-10 pt-9">
                 <div className="flex items-center gap-3">
                   <div className="relative h-12 w-12 overflow-hidden rounded-2xl bg-white/10 ring-1 ring-white/15">
                     <Image
@@ -417,49 +455,51 @@ export default function CadastroDetalhadoPage() {
                 </div>
               </div>
 
-              <div className="mt-8 flex-1 px-7">
-                <div className="space-y-3">
-                  {steps.map((s, idx) => {
-                    const isActive = idx === step;
-                    const isDone = idx < step;
-                    return (
-                      <div key={s.key} className="flex items-center gap-3">
-                        <div
-                          className={
-                            "flex h-9 w-9 items-center justify-center rounded-full text-sm font-extrabold transition-all " +
-                            (isActive
-                              ? "bg-white"
-                              : "border border-white/45 bg-white/0 text-white/85")
-                          }
-                          style={
-                            isActive
-                              ? {
-                                  color: PRIMARY,
-                                  boxShadow: "0 0 0 6px rgba(255,255,255,0.10), 0 18px 38px -30px rgba(0,0,0,0.7)",
-                                }
-                              : isDone
-                                ? { opacity: 0.95 }
-                                : { opacity: 0.55 }
-                          }
-                        >
-                          {idx + 1}
+              <div className="flex-1 px-10">
+                <div className="flex h-full flex-col justify-center">
+                  <div className="space-y-3">
+                    {steps.map((s, idx) => {
+                      const isActive = idx === step;
+                      const isDone = idx < step;
+                      return (
+                        <div key={s.key} className="flex items-center gap-3">
+                          <div
+                            className={
+                              "flex h-9 w-9 items-center justify-center rounded-full text-sm font-extrabold transition-all " +
+                              (isActive
+                                ? "bg-white"
+                                : "border border-white/45 bg-white/0 text-white/85")
+                            }
+                            style={
+                              isActive
+                                ? {
+                                    color: PRIMARY,
+                                    boxShadow: "0 0 0 6px rgba(255,255,255,0.10), 0 18px 38px -30px rgba(0,0,0,0.7)",
+                                  }
+                                : isDone
+                                  ? { opacity: 0.95 }
+                                  : { opacity: 0.55 }
+                            }
+                          >
+                            {idx + 1}
+                          </div>
+                          <div className={"text-sm font-semibold " + (isActive ? "text-white" : "text-white/70")}>{s.title}</div>
                         </div>
-                        <div className={"text-sm font-semibold " + (isActive ? "text-white" : "text-white/70")}>{s.title}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="px-7 pb-7">
-                <div className="grid grid-cols-1 gap-2 rounded-2xl bg-white/10 px-4 py-3 ring-1 ring-white/15">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-white/90">
-                    <ShieldCheck className="h-4 w-4" style={{ color: "rgba(255,255,255,0.92)" }} />
-                    <span>Segurança: dados criptografados.</span>
+                      );
+                    })}
                   </div>
-                  <div className="flex items-center gap-2 text-xs font-semibold text-white/90">
-                    <Home className="h-4 w-4" style={{ color: "rgba(255,255,255,0.92)" }} />
-                    <span>Sonhos: filtros personalizados.</span>
+
+                  <div className="mt-10">
+                    <div className="grid grid-cols-1 gap-2 rounded-2xl bg-white/10 px-4 py-3 ring-1 ring-white/15">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-white/90">
+                        <ShieldCheck className="h-4 w-4" style={{ color: "rgba(255,255,255,0.92)" }} />
+                        <span>Segurança: dados criptografados.</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs font-semibold text-white/90">
+                        <Home className="h-4 w-4" style={{ color: "rgba(255,255,255,0.92)" }} />
+                        <span>Sonhos: filtros personalizados.</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -531,7 +571,12 @@ export default function CadastroDetalhadoPage() {
                               <span className="text-xs font-semibold tracking-wide text-slate-700">Telefone (WhatsApp)</span>
                               <input
                                 value={state.telefone}
-                                onChange={(e) => setState((s) => ({ ...s, telefone: e.target.value }))}
+                                onChange={(e) =>
+                                  setState((s) => ({
+                                    ...s,
+                                    telefone: formatPhoneBR(e.target.value),
+                                  }))
+                                }
                                 className={INPUT_BASE_CLASS}
                                 style={{
                                   boxShadow: "0 12px 26px -24px rgba(15,23,42,0.35)",
@@ -563,7 +608,12 @@ export default function CadastroDetalhadoPage() {
                                 />
                                 <input
                                   value={state.cpf}
-                                  onChange={(e) => setState((s) => ({ ...s, cpf: e.target.value }))}
+                                  onChange={(e) =>
+                                    setState((s) => ({
+                                      ...s,
+                                      cpf: formatCpfBR(e.target.value),
+                                    }))
+                                  }
                                   className={INPUT_BASE_CLASS_WITH_ICON}
                                   style={{
                                     boxShadow: "0 12px 26px -24px rgba(15,23,42,0.35)",
@@ -688,7 +738,12 @@ export default function CadastroDetalhadoPage() {
                                 <span className="text-xs font-semibold tracking-wide text-slate-700">Valor máximo (opcional)</span>
                                 <input
                                   value={state.valorMax}
-                                  onChange={(e) => setState((s) => ({ ...s, valorMax: e.target.value }))}
+                                  onChange={(e) =>
+                                    setState((s) => ({
+                                      ...s,
+                                      valorMax: formatCurrencyBRL(e.target.value),
+                                    }))
+                                  }
                                   className={INPUT_BASE_CLASS}
                                   style={{
                                     boxShadow: "0 12px 26px -24px rgba(15,23,42,0.35)",

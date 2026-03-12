@@ -28,6 +28,17 @@ function isMissingColumnError(err: any, columnName: string) {
   return haystack.includes(`'${columnName.toLowerCase()}'`) && haystack.includes("column");
 }
 
+function getMissingColumnFromError(err: any) {
+  const known = ["address", "cpf", "intent", "value_max"] as const;
+  for (const c of known) {
+    if (isMissingColumnError(err, c)) return c;
+  }
+  const msg = String(err?.message ?? "");
+  const match = msg.match(/Could not find the '([^']+)' column/i);
+  if (match?.[1]) return match[1];
+  return null;
+}
+
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders() });
 }
@@ -88,25 +99,14 @@ export async function POST(req: Request) {
     cpf,
     address,
     intent,
+    value_max: typeof valor_max === "number" && Number.isFinite(valor_max) ? valor_max : null,
   };
 
   try {
-    const insertAttempts: Array<{ tryPayload: any; dropped: string[] }> = [{ tryPayload: payload, dropped: [] }];
-    const last = insertAttempts[0];
-
-    if (payload.address != null) insertAttempts.push({ tryPayload: { ...last.tryPayload, address: undefined }, dropped: [...last.dropped, "address"] });
-    if (payload.cpf != null)
-      insertAttempts.push({ tryPayload: { ...last.tryPayload, cpf: undefined }, dropped: [...last.dropped, "cpf"] });
-    if (payload.intent != null)
-      insertAttempts.push({ tryPayload: { ...last.tryPayload, intent: undefined }, dropped: [...last.dropped, "intent"] });
+    const tryPayload: any = { ...payload };
 
     let lastError: any = null;
-    for (const attempt of insertAttempts) {
-      const tryPayload = { ...attempt.tryPayload };
-      Object.keys(tryPayload).forEach((k) => {
-        if (tryPayload[k] === undefined) delete tryPayload[k];
-      });
-
+    for (let i = 0; i < 5; i++) {
       const { error } = await (supabase as any).from("leads").insert(tryPayload);
       if (!error) {
         lastError = null;
@@ -114,14 +114,14 @@ export async function POST(req: Request) {
       }
 
       lastError = error;
+      const missing = getMissingColumnFromError(error);
       const msg = String(error?.message ?? "");
-      const looksLikeSchemaMismatch =
-        /could not find the .* column/i.test(msg) ||
-        isMissingColumnError(error, "address") ||
-        isMissingColumnError(error, "cpf") ||
-        isMissingColumnError(error, "intent");
+      const looksLikeSchemaMismatch = /could not find the .* column/i.test(msg) || Boolean(missing);
 
       if (!looksLikeSchemaMismatch) break;
+      if (!missing) break;
+
+      delete tryPayload[missing];
     }
 
     if (lastError) {
