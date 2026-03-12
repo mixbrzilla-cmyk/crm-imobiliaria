@@ -56,7 +56,7 @@ export default function ClienteLoginPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="mx-auto w-full max-w-lg px-6 py-10">
-        <div className="rounded-3xl bg-gradient-to-b from-white to-slate-50/70 p-6 shadow-xl ring-1 ring-slate-200/70">
+        <div className="rounded-3xl bg-[radial-gradient(circle_at_top,white,rgba(241,245,249,0.7))] p-6 shadow-2xl ring-1 ring-slate-200/70">
           <div className="flex items-center gap-3">
             <img
               src="https://imobmoderna.com.br/wp-content/uploads/2026/03/Sem-Titulo-2-1024x1024-1.png"
@@ -83,8 +83,8 @@ export default function ClienteLoginPage() {
                 className={
                   "inline-flex h-11 items-center justify-center rounded-xl px-4 text-sm font-semibold ring-1 transition-all duration-300 " +
                   (mode === "cpf"
-                    ? "bg-slate-900 text-white ring-slate-900/10"
-                    : "bg-white text-slate-800 ring-slate-200/70 hover:bg-slate-50")
+                    ? "bg-[#001f3f] text-white ring-black/10"
+                    : "bg-white text-slate-800 ring-[#001f3f]/20 hover:bg-slate-50")
                 }
               >
                 CPF
@@ -95,8 +95,8 @@ export default function ClienteLoginPage() {
                 className={
                   "inline-flex h-11 items-center justify-center rounded-xl px-4 text-sm font-semibold ring-1 transition-all duration-300 " +
                   (mode === "email"
-                    ? "bg-slate-900 text-white ring-slate-900/10"
-                    : "bg-white text-slate-800 ring-slate-200/70 hover:bg-slate-50")
+                    ? "bg-[#001f3f] text-white ring-black/10"
+                    : "bg-white text-slate-800 ring-[#001f3f]/20 hover:bg-slate-50")
                 }
               >
                 E-mail
@@ -144,7 +144,7 @@ export default function ClienteLoginPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white shadow-[0_10px_24px_-18px_rgba(16,185,129,0.55)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#001f3f] px-5 text-sm font-semibold text-white shadow-[0_12px_26px_-18px_rgba(15,23,42,0.55)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#0b2e5a] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isLoading ? (
                 "Entrando..."
