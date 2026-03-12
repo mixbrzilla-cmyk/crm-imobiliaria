@@ -32,6 +32,14 @@ type Preferences = {
   bairro: string | null;
 };
 
+type BrokerProfile = {
+  id: string;
+  full_name: string | null;
+  creci: string | null;
+  avatar_url: string | null;
+  regions: string[] | null;
+};
+
 export async function GET() {
   const supabase = getServiceSupabase();
   if (!supabase) {
@@ -60,7 +68,7 @@ export async function GET() {
 
   const leadRes = await (supabase as any)
     .from("leads")
-    .select("id, full_name, phone, email, cpf, address, intent, stage")
+    .select("id, full_name, phone, email, cpf, address, intent, stage, assigned_broker_profile_id")
     .eq("id", leadId)
     .maybeSingle();
 
@@ -70,6 +78,21 @@ export async function GET() {
 
   if (!leadRes.data) {
     return NextResponse.json({ error: "Lead não encontrado" }, { status: 404 });
+  }
+
+  let broker: BrokerProfile | null = null;
+  try {
+    const brokerId = String((leadRes.data as any)?.assigned_broker_profile_id ?? "");
+    if (brokerId) {
+      const brokerRes = await (supabase as any)
+        .from("profiles")
+        .select("id, full_name, creci, avatar_url, regions")
+        .eq("id", brokerId)
+        .maybeSingle();
+      if (!brokerRes.error) broker = (brokerRes.data ?? null) as any;
+    }
+  } catch {
+    broker = null;
   }
 
   let prefs: Preferences | null = null;
@@ -114,6 +137,7 @@ export async function GET() {
     {
       lead: leadRes.data,
       preferences: prefs,
+      broker,
       suggestions,
     },
     { status: 200 },
