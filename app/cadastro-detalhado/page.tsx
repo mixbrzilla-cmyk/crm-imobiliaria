@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Coffee, Home, Lock, ShieldCheck, User } from "lucide-react";
+import { Lock, ShieldCheck, Home } from "lucide-react";
 
 import { getSupabaseClient } from "@/lib/supabaseClient";
 
@@ -66,9 +66,6 @@ export default function CadastroDetalhadoPage() {
   const ACCENT = "#C1121F";
   const ROYAL_DARK = "#050815";
   const ROYAL_MID = "#07152F";
-
-  const VIP_BG_IMAGE =
-    "https://images.unsplash.com/photo-1506368249639-73a05d6f6488?auto=format&fit=crop&w=1600&q=80";
 
   const INPUT_BASE_CLASS =
     "h-11 rounded-2xl bg-white px-4 text-sm font-medium text-slate-950 outline-none transition-all duration-200 border border-slate-200";
@@ -333,12 +330,6 @@ export default function CadastroDetalhadoPage() {
     );
   }, [PRIMARY, stepMeta?.key]);
 
-  const microCardIcon = useMemo(() => {
-    if (stepMeta?.key === "prefs") return "home";
-    if (stepMeta?.key === "endereco") return "home";
-    return "coffee";
-  }, [stepMeta?.key]);
-
   return (
     <div
       className="relative min-h-screen overflow-hidden"
@@ -385,459 +376,479 @@ export default function CadastroDetalhadoPage() {
         />
       </motion.div>
 
-      <div className="mx-auto w-full max-w-xl px-6 py-10">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute left-1/2 top-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl"
-          style={{
-            background: `radial-gradient(circle at 50% 50%, ${PRIMARY}26, transparent 62%)`,
-            opacity: 0.9,
-          }}
-        />
+      <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
         <motion.div
-          className="rounded-3xl p-6 ring-1"
+          className="relative overflow-hidden rounded-[24px] ring-1"
           style={{
             backgroundColor: "rgba(255,255,255,0.92)",
-            borderColor: "rgba(15,23,42,0.08)",
-            boxShadow: "0 26px 70px -56px rgba(2,6,23,0.9)",
+            borderColor: "rgba(15,23,42,0.10)",
+            boxShadow: "0 32px 80px -64px rgba(2,6,23,0.95)",
             backdropFilter: "blur(16px)",
           }}
           initial={{ opacity: 0, y: 18, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.65, ease: "easeOut" }}
         >
-          <div className="flex items-center justify-center">
-            <div className="relative h-16 w-16 overflow-hidden rounded-full ring-2 ring-white/70 shadow-[0_18px_40px_-28px_rgba(47,59,119,0.65)]">
-              <Image
-                src="/imobiliaria-moderna-logo.png"
-                alt="Imobiliária Moderna"
-                fill
-                sizes="64px"
-                className="object-cover"
-                priority
-              />
-            </div>
-          </div>
-
-          <div className="relative flex items-start justify-center text-center">
-            <div>
-              <div className="mt-6 text-xs font-semibold tracking-[0.22em] text-slate-500">CADASTRO</div>
-              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
-                Imobiliária{" "}
-                <span className="font-extrabold" style={{ color: PRIMARY }}>
-                  MODERNA
-                </span>
-              </h1>
-              <div className="mt-1 text-sm text-slate-600">Experiência de descoberta imobiliária</div>
-            </div>
-
-            <div className="absolute right-0 top-6 inline-flex items-center gap-2 text-xs font-semibold tabular-nums text-slate-600">
-              <span>{progress}%</span>
-            </div>
-          </div>
-
-          <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-white/40 ring-1 ring-white/55 backdrop-blur">
+          <div className="grid grid-cols-1 md:grid-cols-[0.36fr_0.64fr]">
             <div
-              className="h-full"
+              className="hidden md:flex flex-col"
               style={{
-                width: `${progress}%`,
-                background: `linear-gradient(90deg, ${ACCENT}, ${ACCENT}B3)`,
-                boxShadow: `0 0 18px ${ACCENT}66`,
+                background: `linear-gradient(180deg, ${PRIMARY} 0%, #1B2A62 100%)`,
               }}
-            />
-          </div>
-
-          <div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl bg-white/55 px-3 py-2 text-[11px] font-semibold text-slate-700 ring-1 ring-white/60 backdrop-blur">
-            <div className="flex items-center justify-center gap-2">
-              <ShieldCheck className="h-4 w-4" style={{ color: PRIMARY }} />
-              <span>
-                Segurança: <span className="font-medium text-slate-600">Dados criptografados.</span>
-              </span>
-            </div>
-            <div className="flex items-center justify-center gap-2">
-              <Home className="h-4 w-4" style={{ color: PRIMARY }} />
-              <span>
-                Sonhos: <span className="font-medium text-slate-600">Filtros personalizados.</span>
-              </span>
-            </div>
-            <div className="flex items-center justify-center gap-2">
-              <User className="h-4 w-4" style={{ color: PRIMARY }} />
-              <span>
-                Painel: <span className="font-medium text-slate-600">Acesso exclusivo.</span>
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-6">
-            <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">
-              ETAPA {step + 1} / {steps.length}
-            </div>
-            <div className="mt-2 text-lg font-semibold" style={{ color: PRIMARY }}>
-              {stepMeta?.title}
-            </div>
-            <div className="mt-2 text-sm font-semibold text-slate-900">{stepMeta?.question}</div>
-            {trustRow}
-          </div>
-
-          <div className="mt-5">
-            <div className="grid grid-cols-1 gap-4">
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.div
-                  key={String(stepMeta?.key)}
-                  initial={{ opacity: 0, x: 22 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -22 }}
-                  transition={{ duration: 0.35, ease: "easeOut" }}
-                  className="flex flex-col gap-4"
-                >
-                  {step === 0 ? (
-                    <div className="flex flex-col gap-4">
-                      <label className="flex flex-col gap-2">
-                        <span className="text-xs font-semibold tracking-wide text-slate-700">Nome</span>
-                        <input
-                          value={state.nome}
-                          onChange={(e) => setState((s) => ({ ...s, nome: e.target.value }))}
-                          className={INPUT_BASE_CLASS}
-                          style={{
-                            boxShadow: "0 12px 26px -24px rgba(15,23,42,0.35)",
-                          }}
-                          onFocus={(e) => {
-                            e.currentTarget.style.borderColor = PRIMARY;
-                            e.currentTarget.style.boxShadow = `0 0 0 3px ${PRIMARY}1F, 0 0 0 1px ${PRIMARY}99, 0 12px 26px -24px rgba(15,23,42,0.35)`;
-                          }}
-                          onBlur={(e) => {
-                            e.currentTarget.style.borderColor = "rgb(226 232 240)";
-                            e.currentTarget.style.boxShadow = "0 12px 26px -24px rgba(15,23,42,0.35)";
-                          }}
-                          placeholder="Seu nome"
-                          required
-                        />
-                      </label>
-
-                      <label className="flex flex-col gap-2">
-                        <span className="text-xs font-semibold tracking-wide text-slate-700">Telefone (WhatsApp)</span>
-                        <input
-                          value={state.telefone}
-                          onChange={(e) => setState((s) => ({ ...s, telefone: e.target.value }))}
-                          className={INPUT_BASE_CLASS}
-                          style={{
-                            boxShadow: "0 12px 26px -24px rgba(15,23,42,0.35)",
-                          }}
-                          onFocus={(e) => {
-                            e.currentTarget.style.borderColor = PRIMARY;
-                            e.currentTarget.style.boxShadow = `0 0 0 3px ${PRIMARY}1F, 0 0 0 1px ${PRIMARY}99, 0 12px 26px -24px rgba(15,23,42,0.35)`;
-                          }}
-                          onBlur={(e) => {
-                            e.currentTarget.style.borderColor = "rgb(226 232 240)";
-                            e.currentTarget.style.boxShadow = "0 12px 26px -24px rgba(15,23,42,0.35)";
-                          }}
-                          placeholder="(11) 9xxxx-xxxx"
-                          inputMode="tel"
-                          required
-                        />
-                      </label>
-                    </div>
-                  ) : null}
-
-                  {step === 1 ? (
-                    <div className="flex flex-col gap-4">
-                      <label className="flex flex-col gap-2">
-                        <span className="text-xs font-semibold tracking-wide text-slate-700">CPF</span>
-                        <div className="relative">
-                          <Lock
-                            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
-                            style={{ color: PRIMARY }}
-                          />
-                          <input
-                            value={state.cpf}
-                            onChange={(e) => setState((s) => ({ ...s, cpf: e.target.value }))}
-                            className={INPUT_BASE_CLASS_WITH_ICON}
-                            style={{
-                              boxShadow: "0 12px 26px -24px rgba(15,23,42,0.35)",
-                            }}
-                            onFocus={(e) => {
-                              e.currentTarget.style.borderColor = PRIMARY;
-                              e.currentTarget.style.boxShadow = `0 0 0 3px ${PRIMARY}1F, 0 0 0 1px ${PRIMARY}99, 0 12px 26px -24px rgba(15,23,42,0.35)`;
-                            }}
-                            onBlur={(e) => {
-                              e.currentTarget.style.borderColor = "rgb(226 232 240)";
-                              e.currentTarget.style.boxShadow = "0 12px 26px -24px rgba(15,23,42,0.35)";
-                            }}
-                            placeholder="000.000.000-00"
-                            inputMode="numeric"
-                            required
-                          />
-                        </div>
-                      </label>
-                    </div>
-                  ) : null}
-
-                  {step === 2 ? (
-                    <div className="flex flex-col gap-4">
-                      <label className="flex flex-col gap-2">
-                        <span className="text-xs font-semibold tracking-wide text-slate-700">Endereço</span>
-                        <input
-                          value={state.endereco}
-                          onChange={(e) => setState((s) => ({ ...s, endereco: e.target.value }))}
-                          className={INPUT_BASE_CLASS}
-                          style={{
-                            boxShadow: "0 12px 26px -24px rgba(15,23,42,0.35)",
-                          }}
-                          onFocus={(e) => {
-                            e.currentTarget.style.borderColor = PRIMARY;
-                            e.currentTarget.style.boxShadow = `0 0 0 3px ${PRIMARY}1F, 0 0 0 1px ${PRIMARY}99, 0 12px 26px -24px rgba(15,23,42,0.35)`;
-                          }}
-                          onBlur={(e) => {
-                            e.currentTarget.style.borderColor = "rgb(226 232 240)";
-                            e.currentTarget.style.boxShadow = "0 12px 26px -24px rgba(15,23,42,0.35)";
-                          }}
-                          placeholder="Rua, número, bairro"
-                          required
-                        />
-                      </label>
-                    </div>
-                  ) : null}
-
-                  {step === 3 ? (
-                    <div className="grid grid-cols-2 gap-3">
-                      <motion.button
-                        type="button"
-                        onClick={() => setState((s) => ({ ...s, intent: "comprar" }))}
-                        animate={
-                          state.intent === "comprar"
-                            ? {
-                                boxShadow: `0 0 0 1px ${PRIMARY}55, 0 0 22px ${PRIMARY}55, 0 0 26px ${ACCENT}22`,
-                                scale: [1, 1.02, 1],
-                              }
-                            : { boxShadow: "0 0 0 1px rgba(255,255,255,0.55)", scale: 1 }
-                        }
-                        transition={{ duration: 0.9, repeat: state.intent === "comprar" ? Infinity : 0 }}
-                        className={
-                          "inline-flex h-14 items-center justify-center rounded-2xl px-4 text-sm font-semibold ring-1 transition-all duration-300 " +
-                          (state.intent === "comprar"
-                            ? "text-white"
-                            : "bg-white/65 text-slate-800 ring-white/55 hover:bg-white/75")
-                        }
-                        style={state.intent === "comprar" ? { backgroundColor: PRIMARY, borderColor: PRIMARY } : undefined}
-                      >
-                        Comprar
-                      </motion.button>
-                      <motion.button
-                        type="button"
-                        onClick={() => setState((s) => ({ ...s, intent: "alugar" }))}
-                        animate={
-                          state.intent === "alugar"
-                            ? {
-                                boxShadow: `0 0 0 1px ${PRIMARY}55, 0 0 22px ${PRIMARY}55, 0 0 26px ${ACCENT}22`,
-                                scale: [1, 1.02, 1],
-                              }
-                            : { boxShadow: "0 0 0 1px rgba(255,255,255,0.55)", scale: 1 }
-                        }
-                        transition={{ duration: 0.9, repeat: state.intent === "alugar" ? Infinity : 0 }}
-                        className={
-                          "inline-flex h-14 items-center justify-center rounded-2xl px-4 text-sm font-semibold ring-1 transition-all duration-300 " +
-                          (state.intent === "alugar"
-                            ? "text-white"
-                            : "bg-white/65 text-slate-800 ring-white/55 hover:bg-white/75")
-                        }
-                        style={state.intent === "alugar" ? { backgroundColor: PRIMARY, borderColor: PRIMARY } : undefined}
-                      >
-                        Alugar
-                      </motion.button>
-                    </div>
-                  ) : null}
-
-                  {step === 4 ? (
-                    <div className="flex flex-col gap-4">
-                      <label className="flex flex-col gap-2">
-                        <span className="text-xs font-semibold tracking-wide text-slate-700">Bairros (opcional)</span>
-                        <input
-                          value={state.bairros}
-                          onChange={(e) => setState((s) => ({ ...s, bairros: e.target.value }))}
-                          className={INPUT_BASE_CLASS}
-                          style={{
-                            boxShadow: "0 12px 26px -24px rgba(15,23,42,0.35)",
-                          }}
-                          onFocus={(e) => {
-                            e.currentTarget.style.borderColor = PRIMARY;
-                            e.currentTarget.style.boxShadow = `0 0 0 3px ${PRIMARY}1F, 0 0 0 1px ${PRIMARY}99, 0 12px 26px -24px rgba(15,23,42,0.35)`;
-                          }}
-                          onBlur={(e) => {
-                            e.currentTarget.style.borderColor = "rgb(226 232 240)";
-                            e.currentTarget.style.boxShadow = "0 12px 26px -24px rgba(15,23,42,0.35)";
-                          }}
-                          placeholder="Ex: Centro, Jardins"
-                        />
-                      </label>
-
-                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <label className="flex flex-col gap-2">
-                          <span className="text-xs font-semibold tracking-wide text-slate-700">Valor máximo (opcional)</span>
-                          <input
-                            value={state.valorMax}
-                            onChange={(e) => setState((s) => ({ ...s, valorMax: e.target.value }))}
-                            className={INPUT_BASE_CLASS}
-                            style={{
-                              boxShadow: "0 12px 26px -24px rgba(15,23,42,0.35)",
-                            }}
-                            onFocus={(e) => {
-                              e.currentTarget.style.borderColor = PRIMARY;
-                              e.currentTarget.style.boxShadow = `0 0 0 3px ${PRIMARY}1F, 0 0 0 1px ${PRIMARY}99, 0 12px 26px -24px rgba(15,23,42,0.35)`;
-                            }}
-                            onBlur={(e) => {
-                              e.currentTarget.style.borderColor = "rgb(226 232 240)";
-                              e.currentTarget.style.boxShadow = "0 12px 26px -24px rgba(15,23,42,0.35)";
-                            }}
-                            placeholder="450000"
-                            inputMode="numeric"
-                          />
-                        </label>
-
-                        <label className="flex flex-col gap-2">
-                          <span className="text-xs font-semibold tracking-wide text-slate-700">Quartos (opcional)</span>
-                          <input
-                            value={state.quartos}
-                            onChange={(e) => setState((s) => ({ ...s, quartos: e.target.value }))}
-                            className={INPUT_BASE_CLASS}
-                            style={{
-                              boxShadow: "0 12px 26px -24px rgba(15,23,42,0.35)",
-                            }}
-                            onFocus={(e) => {
-                              e.currentTarget.style.borderColor = PRIMARY;
-                              e.currentTarget.style.boxShadow = `0 0 0 3px ${PRIMARY}1F, 0 0 0 1px ${PRIMARY}99, 0 12px 26px -24px rgba(15,23,42,0.35)`;
-                            }}
-                            onBlur={(e) => {
-                              e.currentTarget.style.borderColor = "rgb(226 232 240)";
-                              e.currentTarget.style.boxShadow = "0 12px 26px -24px rgba(15,23,42,0.35)";
-                            }}
-                            placeholder="2"
-                            inputMode="numeric"
-                          />
-                        </label>
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {step === 5 ? (
-                    <div className="flex flex-col gap-4">
-                      <label className="flex flex-col gap-2">
-                        <span className="text-xs font-semibold tracking-wide text-slate-700">Senha</span>
-                        <div className="relative">
-                          <Lock
-                            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
-                            style={{ color: PRIMARY }}
-                          />
-                          <input
-                            value={state.senha}
-                            onChange={(e) => setState((s) => ({ ...s, senha: e.target.value }))}
-                            className={INPUT_BASE_CLASS_WITH_ICON}
-                            style={{
-                              boxShadow: "0 12px 26px -24px rgba(15,23,42,0.35)",
-                            }}
-                            onFocus={(e) => {
-                              e.currentTarget.style.borderColor = PRIMARY;
-                              e.currentTarget.style.boxShadow = `0 0 0 3px ${PRIMARY}1F, 0 0 0 1px ${PRIMARY}99, 0 12px 26px -24px rgba(15,23,42,0.35)`;
-                            }}
-                            onBlur={(e) => {
-                              e.currentTarget.style.borderColor = "rgb(226 232 240)";
-                              e.currentTarget.style.boxShadow = "0 12px 26px -24px rgba(15,23,42,0.35)";
-                            }}
-                            placeholder="Mínimo 6 caracteres"
-                            type="password"
-                            required
-                          />
-                        </div>
-                      </label>
-
-                      <div className="rounded-2xl bg-white/55 px-4 py-3 text-xs font-semibold text-slate-700 ring-1 ring-white/55 backdrop-blur">
-                        Sua conta é criada com segurança e você entra direto no seu portal.
-                      </div>
-                    </div>
-                  ) : null}
-                </motion.div>
-              </AnimatePresence>
-
-              <div
-                className="relative overflow-hidden rounded-2xl px-4 py-3 text-sm font-medium shadow-[0_12px_40px_-28px_rgba(2,6,23,0.45)]"
-                style={{
-                  backgroundImage: `url(${VIP_BG_IMAGE})`,
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
-                }}
-              >
-                <div
-                  aria-hidden="true"
-                  className="absolute inset-0"
-                  style={{
-                    background:
-                      "linear-gradient(90deg, rgba(2,6,23,0.70) 0%, rgba(2,6,23,0.45) 55%, rgba(2,6,23,0.28) 100%)",
-                  }}
-                />
-                <div aria-hidden="true" className="absolute inset-0 backdrop-blur-[2px]" />
-
-                <div className="relative flex items-start gap-3 text-white">
-                  <div
-                    className="mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-xl"
-                    style={{ backgroundColor: "rgba(255,255,255,0.14)" }}
-                  >
-                    <Coffee className="h-4.5 w-4.5" />
+            >
+              <div className="px-7 pt-7">
+                <div className="flex items-center gap-3">
+                  <div className="relative h-12 w-12 overflow-hidden rounded-2xl bg-white/10 ring-1 ring-white/15">
+                    <Image
+                      src="/imobiliaria-moderna-logo.png"
+                      alt="Imobiliária Moderna"
+                      fill
+                      sizes="48px"
+                      className="object-cover"
+                      priority
+                    />
                   </div>
-                  <div className="leading-relaxed" style={{ textShadow: "0 10px 24px rgba(2,6,23,0.55)" }}>
-                    {stepMeta?.micro}
+                  <div className="text-white">
+                    <div className="text-xs font-semibold tracking-[0.22em] text-white/80">CADASTRO</div>
+                    <div className="mt-1 text-base font-semibold tracking-tight">
+                      Imobiliária <span className="font-extrabold">MODERNA</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-center gap-2 text-center text-[11px] font-semibold tracking-wide text-slate-200">
-                <ShieldCheck className="h-4 w-4" style={{ color: PRIMARY }} />
-                <span>Ambiente Criptografado - Protocolo de Segurança Imobiliária Moderna</span>
+              <div className="mt-8 flex-1 px-7">
+                <div className="space-y-3">
+                  {steps.map((s, idx) => {
+                    const isActive = idx === step;
+                    const isDone = idx < step;
+                    return (
+                      <div key={s.key} className="flex items-center gap-3">
+                        <div
+                          className={
+                            "flex h-9 w-9 items-center justify-center rounded-full text-sm font-extrabold transition-all " +
+                            (isActive
+                              ? "bg-white"
+                              : "border border-white/45 bg-white/0 text-white/85")
+                          }
+                          style={
+                            isActive
+                              ? {
+                                  color: PRIMARY,
+                                  boxShadow: "0 0 0 6px rgba(255,255,255,0.10), 0 18px 38px -30px rgba(0,0,0,0.7)",
+                                }
+                              : isDone
+                                ? { opacity: 0.95 }
+                                : { opacity: 0.55 }
+                          }
+                        >
+                          {idx + 1}
+                        </div>
+                        <div className={"text-sm font-semibold " + (isActive ? "text-white" : "text-white/70")}>{s.title}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="px-7 pb-7">
+                <div className="grid grid-cols-1 gap-2 rounded-2xl bg-white/10 px-4 py-3 ring-1 ring-white/15">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-white/90">
+                    <ShieldCheck className="h-4 w-4" style={{ color: "rgba(255,255,255,0.92)" }} />
+                    <span>Segurança: dados criptografados.</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs font-semibold text-white/90">
+                    <Home className="h-4 w-4" style={{ color: "rgba(255,255,255,0.92)" }} />
+                    <span>Sonhos: filtros personalizados.</span>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
 
-          {errorMessage ? (
-            <div className="mt-5 rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 ring-1 ring-red-200/70">
-              {errorMessage}
+            <div className="bg-white">
+              <div className="md:hidden border-b border-slate-100 px-5 py-4">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">PASSO {step + 1} DE {steps.length}</div>
+                  <div className="text-xs font-semibold tabular-nums text-slate-600">{progress}%</div>
+                </div>
+                <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className="h-full"
+                    style={{
+                      width: `${progress}%`,
+                      background: `linear-gradient(90deg, ${ACCENT}, ${ACCENT}B3)`,
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="px-5 pb-24 pt-6 md:px-10 md:pb-10 md:pt-10">
+                <div className="mx-auto flex min-h-[420px] max-w-xl flex-col justify-center">
+                  <div className="text-center">
+                    <div className="text-xs font-semibold tracking-[0.18em] text-slate-500 md:hidden">CADASTRO</div>
+                    <div className="mt-1 text-sm font-semibold" style={{ color: PRIMARY }}>
+                      {stepMeta?.title}
+                    </div>
+                    <h2 className="mt-3 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{stepMeta?.question}</h2>
+                    {trustRow}
+                  </div>
+
+                  <div className="mt-7">
+                    <AnimatePresence mode="wait" initial={false}>
+                      <motion.div
+                        key={String(stepMeta?.key)}
+                        initial={{ opacity: 0, x: 22 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -22 }}
+                        transition={{ duration: 0.35, ease: "easeOut" }}
+                        className="flex flex-col gap-4"
+                      >
+                        {step === 0 ? (
+                          <div className="flex flex-col gap-4">
+                            <label className="flex flex-col gap-2">
+                              <span className="text-xs font-semibold tracking-wide text-slate-700">Nome</span>
+                              <input
+                                value={state.nome}
+                                onChange={(e) => setState((s) => ({ ...s, nome: e.target.value }))}
+                                className={INPUT_BASE_CLASS}
+                                style={{
+                                  boxShadow: "0 12px 26px -24px rgba(15,23,42,0.35)",
+                                }}
+                                onFocus={(e) => {
+                                  e.currentTarget.style.borderColor = PRIMARY;
+                                  e.currentTarget.style.boxShadow = `0 0 0 3px ${PRIMARY}1F, 0 0 0 1px ${PRIMARY}99, 0 12px 26px -24px rgba(15,23,42,0.35)`;
+                                }}
+                                onBlur={(e) => {
+                                  e.currentTarget.style.borderColor = "rgb(226 232 240)";
+                                  e.currentTarget.style.boxShadow = "0 12px 26px -24px rgba(15,23,42,0.35)";
+                                }}
+                                placeholder="Seu nome"
+                                required
+                              />
+                            </label>
+
+                            <label className="flex flex-col gap-2">
+                              <span className="text-xs font-semibold tracking-wide text-slate-700">Telefone (WhatsApp)</span>
+                              <input
+                                value={state.telefone}
+                                onChange={(e) => setState((s) => ({ ...s, telefone: e.target.value }))}
+                                className={INPUT_BASE_CLASS}
+                                style={{
+                                  boxShadow: "0 12px 26px -24px rgba(15,23,42,0.35)",
+                                }}
+                                onFocus={(e) => {
+                                  e.currentTarget.style.borderColor = PRIMARY;
+                                  e.currentTarget.style.boxShadow = `0 0 0 3px ${PRIMARY}1F, 0 0 0 1px ${PRIMARY}99, 0 12px 26px -24px rgba(15,23,42,0.35)`;
+                                }}
+                                onBlur={(e) => {
+                                  e.currentTarget.style.borderColor = "rgb(226 232 240)";
+                                  e.currentTarget.style.boxShadow = "0 12px 26px -24px rgba(15,23,42,0.35)";
+                                }}
+                                placeholder="(11) 9xxxx-xxxx"
+                                inputMode="tel"
+                                required
+                              />
+                            </label>
+                          </div>
+                        ) : null}
+
+                        {step === 1 ? (
+                          <div className="flex flex-col gap-4">
+                            <label className="flex flex-col gap-2">
+                              <span className="text-xs font-semibold tracking-wide text-slate-700">CPF</span>
+                              <div className="relative">
+                                <Lock
+                                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                                  style={{ color: ACCENT }}
+                                />
+                                <input
+                                  value={state.cpf}
+                                  onChange={(e) => setState((s) => ({ ...s, cpf: e.target.value }))}
+                                  className={INPUT_BASE_CLASS_WITH_ICON}
+                                  style={{
+                                    boxShadow: "0 12px 26px -24px rgba(15,23,42,0.35)",
+                                  }}
+                                  onFocus={(e) => {
+                                    e.currentTarget.style.borderColor = PRIMARY;
+                                    e.currentTarget.style.boxShadow = `0 0 0 3px ${PRIMARY}1F, 0 0 0 1px ${PRIMARY}99, 0 12px 26px -24px rgba(15,23,42,0.35)`;
+                                  }}
+                                  onBlur={(e) => {
+                                    e.currentTarget.style.borderColor = "rgb(226 232 240)";
+                                    e.currentTarget.style.boxShadow = "0 12px 26px -24px rgba(15,23,42,0.35)";
+                                  }}
+                                  placeholder="000.000.000-00"
+                                  inputMode="numeric"
+                                  required
+                                />
+                              </div>
+                            </label>
+                          </div>
+                        ) : null}
+
+                        {step === 2 ? (
+                          <div className="flex flex-col gap-4">
+                            <label className="flex flex-col gap-2">
+                              <span className="text-xs font-semibold tracking-wide text-slate-700">Endereço</span>
+                              <input
+                                value={state.endereco}
+                                onChange={(e) => setState((s) => ({ ...s, endereco: e.target.value }))}
+                                className={INPUT_BASE_CLASS}
+                                style={{
+                                  boxShadow: "0 12px 26px -24px rgba(15,23,42,0.35)",
+                                }}
+                                onFocus={(e) => {
+                                  e.currentTarget.style.borderColor = PRIMARY;
+                                  e.currentTarget.style.boxShadow = `0 0 0 3px ${PRIMARY}1F, 0 0 0 1px ${PRIMARY}99, 0 12px 26px -24px rgba(15,23,42,0.35)`;
+                                }}
+                                onBlur={(e) => {
+                                  e.currentTarget.style.borderColor = "rgb(226 232 240)";
+                                  e.currentTarget.style.boxShadow = "0 12px 26px -24px rgba(15,23,42,0.35)";
+                                }}
+                                placeholder="Rua, número, bairro"
+                                required
+                              />
+                            </label>
+                          </div>
+                        ) : null}
+
+                        {step === 3 ? (
+                          <div className="grid grid-cols-2 gap-3">
+                            <motion.button
+                              type="button"
+                              onClick={() => setState((s) => ({ ...s, intent: "comprar" }))}
+                              animate={
+                                state.intent === "comprar"
+                                  ? {
+                                      boxShadow: `0 0 0 1px ${PRIMARY}55, 0 0 22px ${PRIMARY}33`,
+                                      scale: [1, 1.01, 1],
+                                    }
+                                  : { boxShadow: "0 0 0 1px rgba(148,163,184,0.35)", scale: 1 }
+                              }
+                              transition={{ duration: 0.9, repeat: state.intent === "comprar" ? Infinity : 0 }}
+                              className={
+                                "inline-flex h-14 items-center justify-center rounded-2xl px-4 text-sm font-semibold ring-1 transition-all duration-200 " +
+                                (state.intent === "comprar"
+                                  ? "text-white"
+                                  : "bg-white text-slate-800 ring-slate-200 hover:bg-slate-50")
+                              }
+                              style={state.intent === "comprar" ? { backgroundColor: PRIMARY, borderColor: PRIMARY } : undefined}
+                            >
+                              Comprar
+                            </motion.button>
+                            <motion.button
+                              type="button"
+                              onClick={() => setState((s) => ({ ...s, intent: "alugar" }))}
+                              animate={
+                                state.intent === "alugar"
+                                  ? {
+                                      boxShadow: `0 0 0 1px ${PRIMARY}55, 0 0 22px ${PRIMARY}33`,
+                                      scale: [1, 1.01, 1],
+                                    }
+                                  : { boxShadow: "0 0 0 1px rgba(148,163,184,0.35)", scale: 1 }
+                              }
+                              transition={{ duration: 0.9, repeat: state.intent === "alugar" ? Infinity : 0 }}
+                              className={
+                                "inline-flex h-14 items-center justify-center rounded-2xl px-4 text-sm font-semibold ring-1 transition-all duration-200 " +
+                                (state.intent === "alugar"
+                                  ? "text-white"
+                                  : "bg-white text-slate-800 ring-slate-200 hover:bg-slate-50")
+                              }
+                              style={state.intent === "alugar" ? { backgroundColor: PRIMARY, borderColor: PRIMARY } : undefined}
+                            >
+                              Alugar
+                            </motion.button>
+                          </div>
+                        ) : null}
+
+                        {step === 4 ? (
+                          <div className="flex flex-col gap-4">
+                            <label className="flex flex-col gap-2">
+                              <span className="text-xs font-semibold tracking-wide text-slate-700">Bairros (opcional)</span>
+                              <input
+                                value={state.bairros}
+                                onChange={(e) => setState((s) => ({ ...s, bairros: e.target.value }))}
+                                className={INPUT_BASE_CLASS}
+                                style={{
+                                  boxShadow: "0 12px 26px -24px rgba(15,23,42,0.35)",
+                                }}
+                                onFocus={(e) => {
+                                  e.currentTarget.style.borderColor = PRIMARY;
+                                  e.currentTarget.style.boxShadow = `0 0 0 3px ${PRIMARY}1F, 0 0 0 1px ${PRIMARY}99, 0 12px 26px -24px rgba(15,23,42,0.35)`;
+                                }}
+                                onBlur={(e) => {
+                                  e.currentTarget.style.borderColor = "rgb(226 232 240)";
+                                  e.currentTarget.style.boxShadow = "0 12px 26px -24px rgba(15,23,42,0.35)";
+                                }}
+                                placeholder="Ex: Centro, Jardins"
+                              />
+                            </label>
+
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                              <label className="flex flex-col gap-2">
+                                <span className="text-xs font-semibold tracking-wide text-slate-700">Valor máximo (opcional)</span>
+                                <input
+                                  value={state.valorMax}
+                                  onChange={(e) => setState((s) => ({ ...s, valorMax: e.target.value }))}
+                                  className={INPUT_BASE_CLASS}
+                                  style={{
+                                    boxShadow: "0 12px 26px -24px rgba(15,23,42,0.35)",
+                                  }}
+                                  onFocus={(e) => {
+                                    e.currentTarget.style.borderColor = PRIMARY;
+                                    e.currentTarget.style.boxShadow = `0 0 0 3px ${PRIMARY}1F, 0 0 0 1px ${PRIMARY}99, 0 12px 26px -24px rgba(15,23,42,0.35)`;
+                                  }}
+                                  onBlur={(e) => {
+                                    e.currentTarget.style.borderColor = "rgb(226 232 240)";
+                                    e.currentTarget.style.boxShadow = "0 12px 26px -24px rgba(15,23,42,0.35)";
+                                  }}
+                                  placeholder="450000"
+                                  inputMode="numeric"
+                                />
+                              </label>
+
+                              <label className="flex flex-col gap-2">
+                                <span className="text-xs font-semibold tracking-wide text-slate-700">Quartos (opcional)</span>
+                                <input
+                                  value={state.quartos}
+                                  onChange={(e) => setState((s) => ({ ...s, quartos: e.target.value }))}
+                                  className={INPUT_BASE_CLASS}
+                                  style={{
+                                    boxShadow: "0 12px 26px -24px rgba(15,23,42,0.35)",
+                                  }}
+                                  onFocus={(e) => {
+                                    e.currentTarget.style.borderColor = PRIMARY;
+                                    e.currentTarget.style.boxShadow = `0 0 0 3px ${PRIMARY}1F, 0 0 0 1px ${PRIMARY}99, 0 12px 26px -24px rgba(15,23,42,0.35)`;
+                                  }}
+                                  onBlur={(e) => {
+                                    e.currentTarget.style.borderColor = "rgb(226 232 240)";
+                                    e.currentTarget.style.boxShadow = "0 12px 26px -24px rgba(15,23,42,0.35)";
+                                  }}
+                                  placeholder="2"
+                                  inputMode="numeric"
+                                />
+                              </label>
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {step === 5 ? (
+                          <div className="flex flex-col gap-4">
+                            <label className="flex flex-col gap-2">
+                              <span className="text-xs font-semibold tracking-wide text-slate-700">Senha</span>
+                              <div className="relative">
+                                <Lock
+                                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                                  style={{ color: ACCENT }}
+                                />
+                                <input
+                                  value={state.senha}
+                                  onChange={(e) => setState((s) => ({ ...s, senha: e.target.value }))}
+                                  className={INPUT_BASE_CLASS_WITH_ICON}
+                                  style={{
+                                    boxShadow: "0 12px 26px -24px rgba(15,23,42,0.35)",
+                                  }}
+                                  onFocus={(e) => {
+                                    e.currentTarget.style.borderColor = PRIMARY;
+                                    e.currentTarget.style.boxShadow = `0 0 0 3px ${PRIMARY}1F, 0 0 0 1px ${PRIMARY}99, 0 12px 26px -24px rgba(15,23,42,0.35)`;
+                                  }}
+                                  onBlur={(e) => {
+                                    e.currentTarget.style.borderColor = "rgb(226 232 240)";
+                                    e.currentTarget.style.boxShadow = "0 12px 26px -24px rgba(15,23,42,0.35)";
+                                  }}
+                                  placeholder="Mínimo 6 caracteres"
+                                  type="password"
+                                  required
+                                />
+                              </div>
+                            </label>
+
+                            <div className="rounded-2xl bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
+                              Sua conta é criada com segurança e você entra direto no seu portal.
+                            </div>
+                          </div>
+                        ) : null}
+                      </motion.div>
+                    </AnimatePresence>
+
+                    {errorMessage ? (
+                      <div className="mt-5 rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 ring-1 ring-red-200/70">
+                        {errorMessage}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+
+              <div className="md:hidden fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
+                <div className="mx-auto flex w-full max-w-xl items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={back}
+                    disabled={step === 0 || isSubmitting}
+                    className="inline-flex h-11 flex-1 items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Voltar
+                  </button>
+
+                  {canFinish ? (
+                    <button
+                      type="button"
+                      onClick={() => void finish()}
+                      disabled={isSubmitting}
+                      className="inline-flex h-11 flex-[1.4] items-center justify-center rounded-xl px-5 text-sm font-semibold text-white shadow-[0_14px_34px_-26px_rgba(47,59,119,0.55)] transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60"
+                      style={{ backgroundColor: PRIMARY }}
+                    >
+                      {isSubmitting ? "Finalizando..." : "Criar meu acesso"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={next}
+                      disabled={isSubmitting}
+                      className="inline-flex h-11 flex-[1.4] items-center justify-center rounded-xl px-5 text-sm font-semibold text-white shadow-[0_14px_34px_-26px_rgba(47,59,119,0.55)] transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60"
+                      style={{ backgroundColor: PRIMARY }}
+                    >
+                      Próximo
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="hidden md:block px-10 pb-10">
+                <div className="mx-auto flex w-full max-w-xl items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={back}
+                    disabled={step === 0 || isSubmitting}
+                    className="inline-flex h-11 flex-1 items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 transition-all duration-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Voltar
+                  </button>
+
+                  {canFinish ? (
+                    <button
+                      type="button"
+                      onClick={() => void finish()}
+                      disabled={isSubmitting}
+                      className="inline-flex h-11 flex-[1.4] items-center justify-center rounded-xl px-5 text-sm font-semibold text-white shadow-[0_14px_34px_-26px_rgba(47,59,119,0.55)] transition-all duration-200 hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-60"
+                      style={{ backgroundColor: PRIMARY }}
+                    >
+                      {isSubmitting ? "Finalizando..." : "Criar meu acesso"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={next}
+                      disabled={isSubmitting}
+                      className="inline-flex h-11 flex-[1.4] items-center justify-center rounded-xl px-5 text-sm font-semibold text-white shadow-[0_14px_34px_-26px_rgba(47,59,119,0.55)] transition-all duration-200 hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-60"
+                      style={{ backgroundColor: PRIMARY }}
+                    >
+                      Próximo
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
-          ) : null}
-
-          <div className="mt-6 flex items-center gap-3">
-            <button
-              type="button"
-              onClick={back}
-              disabled={step === 0 || isSubmitting}
-              className="inline-flex h-11 flex-1 items-center justify-center rounded-xl bg-transparent px-5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 transition-all duration-200 hover:bg-white/60 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Voltar
-            </button>
-
-            {canFinish ? (
-              <button
-                type="button"
-                onClick={() => void finish()}
-                disabled={isSubmitting}
-                className="inline-flex h-11 flex-[1.4] items-center justify-center rounded-xl px-5 text-sm font-semibold text-white shadow-[0_14px_34px_-26px_rgba(47,59,119,0.55)] transition-all duration-200 hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-60"
-                style={{ backgroundColor: PRIMARY }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = ACCENT;
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = PRIMARY;
-                }}
-              >
-                {isSubmitting ? "Finalizando..." : "Criar meu acesso"}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={next}
-                disabled={isSubmitting}
-                className="inline-flex h-11 flex-[1.4] items-center justify-center rounded-xl px-5 text-sm font-semibold text-white shadow-[0_14px_34px_-26px_rgba(47,59,119,0.55)] transition-all duration-200 hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-60"
-                style={{ backgroundColor: PRIMARY }}
-              >
-                Próximo
-              </button>
-            )}
           </div>
         </motion.div>
       </div>
