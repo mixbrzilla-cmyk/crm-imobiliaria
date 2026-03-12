@@ -20,6 +20,14 @@ function corsHeaders() {
   } as Record<string, string>;
 }
 
+function isMissingColumnError(err: any, columnName: string) {
+  const msg = String(err?.message ?? "");
+  const details = String(err?.details ?? "");
+  const hint = String(err?.hint ?? "");
+  const haystack = `${msg} ${details} ${hint}`.toLowerCase();
+  return haystack.includes(`'${columnName.toLowerCase()}'`) && haystack.includes("column");
+}
+
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders() });
 }
@@ -83,15 +91,47 @@ export async function POST(req: Request) {
   };
 
   try {
-    const { error } = await (supabase as any).from("leads").insert(payload);
-    if (error) {
+    const insertAttempts: Array<{ tryPayload: any; dropped: string[] }> = [{ tryPayload: payload, dropped: [] }];
+    const last = insertAttempts[0];
+
+    if (payload.address != null) insertAttempts.push({ tryPayload: { ...last.tryPayload, address: undefined }, dropped: [...last.dropped, "address"] });
+    if (payload.cpf != null)
+      insertAttempts.push({ tryPayload: { ...last.tryPayload, cpf: undefined }, dropped: [...last.dropped, "cpf"] });
+    if (payload.intent != null)
+      insertAttempts.push({ tryPayload: { ...last.tryPayload, intent: undefined }, dropped: [...last.dropped, "intent"] });
+
+    let lastError: any = null;
+    for (const attempt of insertAttempts) {
+      const tryPayload = { ...attempt.tryPayload };
+      Object.keys(tryPayload).forEach((k) => {
+        if (tryPayload[k] === undefined) delete tryPayload[k];
+      });
+
+      const { error } = await (supabase as any).from("leads").insert(tryPayload);
+      if (!error) {
+        lastError = null;
+        break;
+      }
+
+      lastError = error;
+      const msg = String(error?.message ?? "");
+      const looksLikeSchemaMismatch =
+        /could not find the .* column/i.test(msg) ||
+        isMissingColumnError(error, "address") ||
+        isMissingColumnError(error, "cpf") ||
+        isMissingColumnError(error, "intent");
+
+      if (!looksLikeSchemaMismatch) break;
+    }
+
+    if (lastError) {
       return NextResponse.json(
         {
           ok: false,
-          error: error.message,
-          code: (error as any)?.code ?? null,
-          details: (error as any)?.details ?? null,
-          hint: (error as any)?.hint ?? null,
+          error: lastError.message,
+          code: (lastError as any)?.code ?? null,
+          details: (lastError as any)?.details ?? null,
+          hint: (lastError as any)?.hint ?? null,
         },
         { status: 400, headers: corsHeaders() },
       );
