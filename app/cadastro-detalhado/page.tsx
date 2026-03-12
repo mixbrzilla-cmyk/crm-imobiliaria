@@ -32,7 +32,24 @@ function sanitizePhone(v: string) {
 function parseMoneyToNumberBR(input: string) {
   const raw = String(input ?? "").trim();
   if (!raw) return null;
-  const normalized = raw.replace(/\./g, "").replace(",", ".");
+
+  const cleaned = raw
+    .replace(/\s+/g, "")
+    .replace(/R\$?/gi, "")
+    .replace(/[^0-9.,-]/g, "");
+
+  if (!cleaned) return null;
+
+  const hasDot = cleaned.includes(".");
+  const hasComma = cleaned.includes(",");
+
+  let normalized = cleaned;
+  if (hasDot && hasComma) {
+    normalized = normalized.replace(/\./g, "").replace(",", ".");
+  } else if (hasComma) {
+    normalized = normalized.replace(",", ".");
+  }
+
   const num = Number(normalized);
   if (!Number.isFinite(num)) return null;
   return num;
@@ -435,7 +452,7 @@ export default function CadastroDetalhadoPage() {
               }}
             >
               <div className="px-10 pt-9">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center gap-3 text-center">
                   <div className="relative h-12 w-12 overflow-hidden rounded-2xl bg-white/10 ring-1 ring-white/15">
                     <Image
                       src="/imobiliaria-moderna-logo.png"
@@ -457,7 +474,7 @@ export default function CadastroDetalhadoPage() {
 
               <div className="flex-1 px-10">
                 <div className="flex h-full flex-col justify-center">
-                  <div className="space-y-3">
+                  <div className="mx-auto w-full max-w-[260px] space-y-3">
                     {steps.map((s, idx) => {
                       const isActive = idx === step;
                       const isDone = idx < step;
@@ -490,7 +507,7 @@ export default function CadastroDetalhadoPage() {
                   </div>
 
                   <div className="mt-10">
-                    <div className="grid grid-cols-1 gap-2 rounded-2xl bg-white/10 px-4 py-3 ring-1 ring-white/15">
+                    <div className="mx-auto grid w-full max-w-[300px] grid-cols-1 gap-2 rounded-2xl bg-white/10 px-4 py-3 ring-1 ring-white/15">
                       <div className="flex items-center gap-2 text-xs font-semibold text-white/90">
                         <ShieldCheck className="h-4 w-4" style={{ color: "rgba(255,255,255,0.92)" }} />
                         <span>Segurança: dados criptografados.</span>
