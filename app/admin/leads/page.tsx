@@ -7,6 +7,7 @@ import {
   ArrowRight,
   DollarSign,
   Globe,
+  MapPin,
   MessageCircle,
   Phone,
   Plus,
@@ -230,6 +231,7 @@ function sourceLabel(source: string | null) {
   const s = String(source ?? "").trim();
   if (!s) return "";
   if (s.toLowerCase() === "elementor") return "";
+  if (s.toLowerCase().includes("teste")) return "";
   return s;
 }
 
@@ -997,7 +999,7 @@ export default function LeadsAdminPage() {
                     const valueMax = parseMoneyToNumberBR(cardLead.value_max);
                     const sourceText = sourceLabel(cardLead.source);
 
-                    const digits = sanitizePhone(lead.phone);
+                    const digits = sanitizePhone(cardLead.phone);
                     const waDigits = digits.startsWith("55") ? digits : digits ? `55${digits}` : "";
                     const waHref = waDigits ? `https://wa.me/${waDigits}` : "";
                     const telHref = digits ? `tel:${digits}` : "";
@@ -1029,10 +1031,10 @@ export default function LeadsAdminPage() {
                           </button>
 
                           <div className="flex shrink-0 flex-col items-end gap-2">
-                            {typeof lead.estimated_value === "number" ? (
+                            {typeof cardLead.estimated_value === "number" ? (
                               <div className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-800 ring-1 ring-slate-200/70">
                                 <DollarSign className="h-3.5 w-3.5 text-slate-400" />
-                                {formatCurrencyBRL(lead.estimated_value)}
+                                {formatCurrencyBRL(cardLead.estimated_value)}
                               </div>
                             ) : null}
 
@@ -1040,7 +1042,7 @@ export default function LeadsAdminPage() {
                               <span
                                 className={
                                   "inline-flex items-center justify-center rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 " +
-                                  sourceBadgeCls(lead.source)
+                                  sourceBadgeCls(cardLead.source)
                                 }
                               >
                                 {sourceText.slice(0, 14)}
@@ -1057,8 +1059,9 @@ export default function LeadsAdminPage() {
                               </span>
                             ) : null}
                             {bairro ? (
-                              <span className="inline-flex items-center justify-center rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200/70">
-                                {bairro}
+                              <span className="inline-flex items-center justify-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200/70">
+                                <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                                <span className="truncate">Local: {bairro}</span>
                               </span>
                             ) : null}
                             {valueMax != null ? (
@@ -1079,6 +1082,13 @@ export default function LeadsAdminPage() {
                           )}
 
                           <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => void openLeadModal({ ...cardLead })}
+                              className="inline-flex h-9 items-center justify-center rounded-xl bg-white px-3 text-[12px] font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50"
+                            >
+                              Ver Detalhes
+                            </button>
                             <a
                               href={waHref}
                               target="_blank"
@@ -1086,7 +1096,7 @@ export default function LeadsAdminPage() {
                               className={
                                 "inline-flex h-9 w-9 items-center justify-center rounded-xl ring-1 transition-all duration-300 " +
                                 (waHref
-                                  ? "bg-emerald-50 text-emerald-700 ring-emerald-200/70 hover:-translate-y-[1px]"
+                                  ? "bg-green-500 text-white ring-green-600/20 hover:-translate-y-[1px] hover:bg-green-600"
                                   : "bg-slate-50 text-slate-300 ring-slate-200/70 pointer-events-none")
                               }
                               aria-label="Abrir WhatsApp"
