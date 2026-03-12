@@ -263,6 +263,8 @@ export default function JuridicoAdminPage() {
 
   const [tab, setTab] = useState<"processos" | "advogados" | "minutas">("processos");
 
+  const [riskFilter, setRiskFilter] = useState<"all" | RiskLevel>("all");
+
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [lawyers, setLawyers] = useState<LawyerRow[]>([]);
@@ -311,6 +313,13 @@ export default function JuridicoAdminPage() {
     doc_type: "contrato",
     url: "",
   });
+
+  const [editingFeesCaseId, setEditingFeesCaseId] = useState<string | null>(null);
+  const [editingFees, setEditingFees] = useState<FeesState>({ mode: "pro_labore", amount_brl: "", due_date: "" });
+
+  const [timelineModal, setTimelineModal] = useState<null | { caseId: string; step: TimelineStep }>(null);
+  const [timelineDate, setTimelineDate] = useState<string>("");
+  const [timelineResponsible, setTimelineResponsible] = useState<string>("");
 
   const loadAll = useCallback(async () => {
     setErrorMessage(null);
@@ -405,6 +414,137 @@ export default function JuridicoAdminPage() {
   useEffect(() => {
     void loadAll();
   }, [loadAll]);
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    let t: any = null;
+    const channel = (supabase as any)
+      .channel("admin-juridico-live")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "legal_cases" },
+        () => {
+          if (t) return;
+          t = setTimeout(() => {
+            t = null;
+            void loadAll();
+          }, 400);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      if (t) clearTimeout(t);
+      try {
+        (supabase as any).removeChannel(channel);
+      } catch {
+        return;
+      }
+    };
+  }, [supabase, loadAll]);
+
+  async function updateCaseJson(caseId: string, patch: Partial<CaseRow>) {
+    setErrorMessage(null);
+    if (!supabase) {
+      setErrorMessage(
+        "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+      );
+      return false;
+    }
+
+    setCases((current) => current.map((c) => (c.id === caseId ? ({ ...c, ...(patch as any) } as any) : c)));
+
+    const { error } = await (supabase as any).from("legal_cases").update(patch).eq("id", caseId);
+    if (error) {
+      setErrorMessage(error.message);
+      await loadAll();
+      return false;
+    }
+    return true;
+  }
+
+  async function toggleCert(caseId: string, key: keyof DueDiligenceState) {
+    const row = cases.find((c) => c.id === caseId);
+    if (!row) return;
+    const current = parseDueDiligence((row as any)?.due_diligence_json);
+    const next: DueDiligenceState = { ...current };
+    const cur = current[key];
+    next[key] = cur === "pendente" ? "negativa" : cur === "negativa" ? "positiva" : "pendente";
+    await updateCaseJson(caseId, { due_diligence_json: next } as any);
+  }
+
+  async function openTimeline(caseId: string, step: TimelineStep) {
+    const row = cases.find((c) => c.id === caseId);
+    const signatureStatus = String((row as any)?.signature_status ?? "pendente").toLowerCase() === "assinado" ? "assinado" : "pendente";
+    const workflow = parseTimeline((row as any)?.workflow_json, {
+      tribunal_link: String((row as any)?.tribunal_link ?? row?.meeting_link ?? ""),
+      signature_status: signatureStatus as any,
+    });
+    const existing = workflow.find((w) => w.step === step) ?? null;
+    setTimelineDate(existing?.date ?? "");
+    setTimelineResponsible("");
+    setTimelineModal({ caseId, step });
+  }
+
+  async function saveTimelineEvent() {
+    if (!timelineModal) return;
+    const caseId = timelineModal.caseId;
+    const step = timelineModal.step;
+    const row = cases.find((c) => c.id === caseId);
+    if (!row) return;
+
+    const existing = Array.isArray((row as any)?.workflow_json) ? ([...(row as any).workflow_json] as any[]) : [];
+    const description = timelineResponsible.trim() ? `Responsável: ${timelineResponsible.trim()}` : "";
+    const tribunalLink = String((row as any)?.tribunal_link ?? row.meeting_link ?? "").trim();
+    const signatureStatus = String((row as any)?.signature_status ?? "pendente").toLowerCase() === "assinado" ? "assinado" : "pendente";
+
+    const payloadEv: any = {
+      id: crypto.randomUUID(),
+      step,
+      date: timelineDate,
+      description,
+      tribunal_link: tribunalLink,
+      signature_status: signatureStatus,
+    };
+
+    const nextWorkflow = [payloadEv, ...existing].slice(0, 24);
+    const ok = await updateCaseJson(caseId, { workflow_json: nextWorkflow } as any);
+    if (ok) setTimelineModal(null);
+  }
+
+  async function startEditFees(caseId: string) {
+    const row = cases.find((c) => c.id === caseId);
+    if (!row) return;
+    setEditingFeesCaseId(caseId);
+    setEditingFees(parseFees((row as any)?.fees_json));
+  }
+
+  async function saveFees(caseId: string) {
+    const ok = await updateCaseJson(caseId, { fees_json: editingFees } as any);
+    if (ok) setEditingFeesCaseId(null);
+  }
+
+  async function deleteCase(caseId: string) {
+    setErrorMessage(null);
+    if (!supabase) {
+      setErrorMessage(
+        "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+      );
+      return;
+    }
+
+    const caseTitle = (cases.find((c) => c.id === caseId)?.title ?? "").trim() || caseId;
+    const ok = window.confirm(`Excluir o processo "${caseTitle}"?`);
+    if (!ok) return;
+
+    const { error } = await (supabase as any).from("legal_cases").delete().eq("id", caseId);
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+    await loadAll();
+  }
 
   async function addLawyer(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -582,6 +722,14 @@ export default function JuridicoAdminPage() {
     return { total, red, yellow, green };
   }, [cases]);
 
+  const filteredCases = useMemo(() => {
+    if (riskFilter === "all") return cases;
+    return cases.filter((c) => {
+      const due = parseDueDiligence((c as any)?.due_diligence_json);
+      return computeRiskLevel({ due }) === riskFilter;
+    });
+  }, [cases, riskFilter]);
+
   const templateDocs = useMemo(() => {
     return docs.filter((d) => d.doc_type === "contrato" && !d.case_id);
   }, [docs]);
@@ -625,30 +773,51 @@ export default function JuridicoAdminPage() {
                 {officeStatusLabel({ red: dueDiligenceSummary.red, yellow: dueDiligenceSummary.yellow, green: dueDiligenceSummary.green })}
               </div>
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200/70">
+                <button
+                  type="button"
+                  onClick={() => setRiskFilter((cur) => (cur === "verde" ? "all" : "verde"))}
+                  className={
+                    "rounded-2xl bg-white p-4 text-left ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] " +
+                    (riskFilter === "verde" ? "ring-emerald-300" : "")
+                  }
+                >
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-xs font-semibold text-slate-600">Verde</div>
                     <span className="h-3 w-3 rounded-full bg-emerald-500" />
                   </div>
                   <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{dueDiligenceSummary.green}</div>
                   <div className="mt-1 text-xs text-slate-500">Negativas</div>
-                </div>
-                <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200/70">
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRiskFilter((cur) => (cur === "amarelo" ? "all" : "amarelo"))}
+                  className={
+                    "rounded-2xl bg-white p-4 text-left ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] " +
+                    (riskFilter === "amarelo" ? "ring-amber-300" : "")
+                  }
+                >
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-xs font-semibold text-slate-600">Amarelo</div>
                     <span className="h-3 w-3 rounded-full bg-amber-500" />
                   </div>
                   <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{dueDiligenceSummary.yellow}</div>
                   <div className="mt-1 text-xs text-slate-500">Pendentes</div>
-                </div>
-                <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200/70">
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRiskFilter((cur) => (cur === "vermelho" ? "all" : "vermelho"))}
+                  className={
+                    "rounded-2xl bg-white p-4 text-left ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] " +
+                    (riskFilter === "vermelho" ? "ring-red-300" : "")
+                  }
+                >
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-xs font-semibold text-slate-600">Vermelho</div>
                     <span className="h-3 w-3 rounded-full bg-red-500" />
                   </div>
                   <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{dueDiligenceSummary.red}</div>
                   <div className="mt-1 text-xs text-slate-500">Positivas</div>
-                </div>
+                </button>
               </div>
               <div className="mt-3 text-xs font-semibold text-slate-500">Total: {dueDiligenceSummary.total} processos</div>
             </div>
@@ -835,8 +1004,8 @@ export default function JuridicoAdminPage() {
                     Nenhuma minuta cadastrada.
                   </div>
                 )
-              ) : cases.length > 0 ? (
-                cases.map((c) => {
+              ) : filteredCases.length > 0 ? (
+                filteredCases.map((c) => {
                   const badge = deadlineBadge(c.due_date);
                   const lawyer = c.lawyer_id ? lawyerById.get(c.lawyer_id) : null;
                   const BadgeIcon = badge?.icon ?? null;
@@ -906,11 +1075,29 @@ export default function JuridicoAdminPage() {
                           <div className="text-[11px] font-semibold text-slate-500">[Inicial] → [Citação] → [Audiência]</div>
                         </div>
                         <div className="mt-3 flex flex-wrap items-center gap-2">
-                          <span className={"rounded-full px-3 py-1 text-xs font-semibold " + mini.initial}>Inicial</span>
+                          <button
+                            type="button"
+                            onClick={() => void openTimeline(c.id, "peticao")}
+                            className={"rounded-full px-3 py-1 text-xs font-semibold transition-all duration-300 hover:-translate-y-[1px] " + mini.initial}
+                          >
+                            Inicial
+                          </button>
                           <span className="text-xs font-bold text-slate-400">→</span>
-                          <span className={"rounded-full px-3 py-1 text-xs font-semibold " + mini.citacao}>Citação</span>
+                          <button
+                            type="button"
+                            onClick={() => void openTimeline(c.id, "citacao")}
+                            className={"rounded-full px-3 py-1 text-xs font-semibold transition-all duration-300 hover:-translate-y-[1px] " + mini.citacao}
+                          >
+                            Citação
+                          </button>
                           <span className="text-xs font-bold text-slate-400">→</span>
-                          <span className={"rounded-full px-3 py-1 text-xs font-semibold " + mini.audiencia}>Audiência</span>
+                          <button
+                            type="button"
+                            onClick={() => void openTimeline(c.id, "audiencia")}
+                            className={"rounded-full px-3 py-1 text-xs font-semibold transition-all duration-300 hover:-translate-y-[1px] " + mini.audiencia}
+                          >
+                            Audiência
+                          </button>
                         </div>
                       </div>
 
@@ -945,9 +1132,13 @@ export default function JuridicoAdminPage() {
                               return (
                                 <div key={x.label} className="flex items-center justify-between gap-3">
                                   <div className="text-xs font-semibold text-slate-700">{x.label}</div>
-                                  <div className={"rounded-full px-3 py-1 text-xs font-semibold " + cls}>
+                                  <button
+                                    type="button"
+                                    onClick={() => void toggleCert(c.id, x.label === "Cível" ? "cert_civel" : x.label === "Trabalhista" ? "cert_trabalhista" : "cert_protesto")}
+                                    className={"rounded-full px-3 py-1 text-xs font-semibold transition-all duration-300 hover:-translate-y-[1px] " + cls}
+                                  >
                                     {x.value === "negativa" ? "Negativa" : x.value === "positiva" ? "Positiva" : "Pendente"}
-                                  </div>
+                                  </button>
                                 </div>
                               );
                             })}
@@ -965,6 +1156,13 @@ export default function JuridicoAdminPage() {
                                 Valor: {fees.amount_brl ? `R$ ${fees.amount_brl}` : "-"}
                               </div>
                             </div>
+                            <button
+                              type="button"
+                              onClick={() => void startEditFees(c.id)}
+                              className="inline-flex h-9 items-center justify-center rounded-xl bg-white px-3 text-xs font-semibold text-slate-700 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-100"
+                            >
+                              Editar
+                            </button>
                             {feesBadge ? (
                               <div className={"inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold " + feesBadge.cls}>
                                 <Calendar className="h-4 w-4" />
@@ -976,6 +1174,56 @@ export default function JuridicoAdminPage() {
                             <div className="text-xs font-semibold text-slate-600">Vencimento</div>
                             <div className="text-xs font-semibold text-slate-800">{fees.due_date || "-"}</div>
                           </div>
+
+                          {editingFeesCaseId === c.id ? (
+                            <div className="mt-4 grid grid-cols-1 gap-3">
+                              <label className="flex flex-col gap-2">
+                                <span className="text-[11px] font-semibold tracking-wide text-slate-600">Modalidade</span>
+                                <select
+                                  value={editingFees.mode}
+                                  onChange={(e) => setEditingFees((s) => ({ ...s, mode: e.target.value as any }))}
+                                  className="h-10 rounded-xl bg-white px-3 text-xs text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                                >
+                                  <option value="pro_labore">Pro-labore</option>
+                                  <option value="exito">Êxito</option>
+                                </select>
+                              </label>
+                              <label className="flex flex-col gap-2">
+                                <span className="text-[11px] font-semibold tracking-wide text-slate-600">Valor (R$)</span>
+                                <input
+                                  value={editingFees.amount_brl}
+                                  onChange={(e) => setEditingFees((s) => ({ ...s, amount_brl: e.target.value }))}
+                                  className="h-10 rounded-xl bg-white px-3 text-xs text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                                  placeholder="Ex: 3000"
+                                />
+                              </label>
+                              <label className="flex flex-col gap-2">
+                                <span className="text-[11px] font-semibold tracking-wide text-slate-600">Vencimento</span>
+                                <input
+                                  type="date"
+                                  value={editingFees.due_date}
+                                  onChange={(e) => setEditingFees((s) => ({ ...s, due_date: e.target.value }))}
+                                  className="h-10 rounded-xl bg-white px-3 text-xs text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                                />
+                              </label>
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingFeesCaseId(null)}
+                                  className="inline-flex h-10 items-center justify-center rounded-xl bg-white px-4 text-xs font-semibold text-slate-700 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-100"
+                                >
+                                  Cancelar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void saveFees(c.id)}
+                                  className="inline-flex h-10 items-center justify-center rounded-xl bg-[#001f3f] px-4 text-xs font-semibold text-white shadow-sm transition-all duration-300 hover:bg-[#001a33]"
+                                >
+                                  Salvar
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
                         </div>
                       </div>
 
@@ -1059,6 +1307,13 @@ export default function JuridicoAdminPage() {
                       </div>
 
                       <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void deleteCase(c.id)}
+                          className="inline-flex h-9 items-center justify-center rounded-xl bg-rose-600 px-3 text-xs font-semibold text-white shadow-sm transition-all duration-300 hover:bg-rose-700"
+                        >
+                          Excluir Processo
+                        </button>
                         {c.meeting_link ? (
                           <a
                             href={c.meeting_link}
@@ -1102,6 +1357,65 @@ export default function JuridicoAdminPage() {
             </div>
         </div>
       </section>
+
+      {timelineModal ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center px-4 py-4 sm:items-center sm:py-8">
+          <button
+            type="button"
+            onClick={() => setTimelineModal(null)}
+            className="absolute inset-0 bg-slate-900/40"
+            aria-label="Fechar"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="relative w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-slate-200/70"
+          >
+            <div className="border-b border-slate-100 px-6 py-5">
+              <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">AÇÃO NA TIMELINE</div>
+              <div className="mt-2 text-lg font-semibold tracking-tight text-slate-900">{stepLabel(timelineModal.step)}</div>
+            </div>
+            <div className="px-6 py-6">
+              <div className="grid grid-cols-1 gap-4">
+                <label className="flex flex-col gap-2">
+                  <span className="text-xs font-semibold tracking-wide text-slate-600">Data</span>
+                  <input
+                    type="date"
+                    value={timelineDate}
+                    onChange={(e) => setTimelineDate(e.target.value)}
+                    className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                  />
+                </label>
+                <label className="flex flex-col gap-2">
+                  <span className="text-xs font-semibold tracking-wide text-slate-600">Responsável</span>
+                  <input
+                    value={timelineResponsible}
+                    onChange={(e) => setTimelineResponsible(e.target.value)}
+                    className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                    placeholder="Ex: Dr. Fulano / Assistente / Boss"
+                  />
+                </label>
+              </div>
+              <div className="mt-6 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTimelineModal(null)}
+                  className="inline-flex h-11 items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-100"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void saveTimelineEvent()}
+                  className="inline-flex h-11 items-center justify-center rounded-xl bg-[#2b6cff] px-5 text-sm font-semibold text-white shadow-sm transition-all duration-300 hover:bg-[#255fe6]"
+                >
+                  Salvar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {activeModal ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center px-4 py-4 sm:items-center sm:py-8">
