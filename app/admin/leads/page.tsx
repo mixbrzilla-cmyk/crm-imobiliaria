@@ -235,6 +235,13 @@ function sourceLabel(source: string | null) {
   return s;
 }
 
+function personLabel(name: string | null | undefined) {
+  const s = String(name ?? "").trim();
+  if (!s) return "";
+  if (s.toLowerCase().includes("teste")) return "";
+  return s;
+}
+
 export default function LeadsAdminPage() {
   const supabase = useMemo(() => getSupabaseClient(), []);
 
@@ -266,6 +273,7 @@ export default function LeadsAdminPage() {
 
   const [suggestions, setSuggestions] = useState<PropertySuggestionRow[]>([]);
   const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
+  const [suggestionsNote, setSuggestionsNote] = useState<string | null>(null);
   const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(false);
 
   const [dispatchBrokerId, setDispatchBrokerId] = useState<string>("");
@@ -706,13 +714,24 @@ export default function LeadsAdminPage() {
     setLeadHistory([]);
     setErrorMessage(null);
 
-    setPreferences(null);
+    const tipoFromIntent = lead.intent === "comprar" ? "Compra" : lead.intent === "alugar" ? "Aluguel" : null;
+    const bairroFromAddress = lead.address ? inferBairroFromAddress(String(lead.address)) : "";
+    const valorFromLead = parseMoneyToNumberBR(lead.value_max);
+
+    setPreferences({
+      lead_id: lead.id,
+      tipo_imovel: tipoFromIntent,
+      bairro: bairroFromAddress || null,
+      valor_max: typeof valorFromLead === "number" && Number.isFinite(valorFromLead) ? valorFromLead : null,
+      quartos: null,
+    });
     setPreferencesError(null);
     setIsPreferencesLoading(false);
     setLeadBrain(null);
 
     setSuggestions([]);
     setSuggestionsError(null);
+    setSuggestionsNote(null);
     setIsSuggestionsLoading(false);
 
     if (!supabase) return;
@@ -738,7 +757,7 @@ export default function LeadsAdminPage() {
       setIsHistoryLoading(false);
     }
 
-    void loadPreferences(lead.id);
+    void loadPreferences(lead);
     void loadLeadBrain(lead.id);
   }
 
@@ -767,8 +786,10 @@ export default function LeadsAdminPage() {
     }
   }
 
-  async function loadPreferences(leadId: string) {
+  async function loadPreferences(lead: LeadRow) {
     if (!supabase) return;
+
+    const leadId = lead.id;
 
     setIsPreferencesLoading(true);
     setPreferencesError(null);
@@ -788,15 +809,35 @@ export default function LeadsAdminPage() {
       }
 
       const row = (data ?? null) as CustomerPreferencesRow | null;
-      setPreferences(
-        row ?? {
-          lead_id: leadId,
-          tipo_imovel: null,
-          valor_max: null,
-          quartos: null,
-          bairro: null,
-        },
-      );
+
+      const tipoFromIntent = lead.intent === "comprar" ? "Compra" : lead.intent === "alugar" ? "Aluguel" : null;
+      const bairroFromAddress = lead.address ? inferBairroFromAddress(String(lead.address)) : "";
+      const valorFromLead = parseMoneyToNumberBR(lead.value_max);
+
+      setPreferences((current) => {
+        const base: CustomerPreferencesRow =
+          current && current.lead_id === leadId
+            ? current
+            : {
+                lead_id: leadId,
+                tipo_imovel: tipoFromIntent,
+                valor_max: typeof valorFromLead === "number" && Number.isFinite(valorFromLead) ? valorFromLead : null,
+                quartos: null,
+                bairro: bairroFromAddress || null,
+              };
+
+        if (row) {
+          return {
+            ...base,
+            ...row,
+            tipo_imovel: row.tipo_imovel ?? base.tipo_imovel,
+            bairro: row.bairro ?? base.bairro,
+            valor_max: row.valor_max ?? base.valor_max,
+          };
+        }
+
+        return base;
+      });
       setIsPreferencesLoading(false);
       void loadSuggestions(leadId, row);
     } catch (e: any) {
@@ -845,14 +886,21 @@ export default function LeadsAdminPage() {
 
     setIsSuggestionsLoading(true);
     setSuggestionsError(null);
+    setSuggestionsNote(null);
     setSuggestions([]);
 
     try {
-      let q = (supabase as any)
+      const intent =
+        leadBrain?.lead_id === leadId
+          ? leadBrain.intent
+          : selectedLead?.id === leadId
+            ? (selectedLead.intent ?? null)
+            : null;
+
+      const baseQuery = (supabase as any)
         .from("properties")
         .select("id, title, property_type, purpose, price, neighborhood, city, bedrooms, status")
         .eq("status", "disponivel")
-        .order("created_at", { ascending: false })
         .limit(24);
 
       const tipo = String(prefs?.tipo_imovel ?? "").trim();
@@ -860,10 +908,15 @@ export default function LeadsAdminPage() {
       const quartos = typeof prefs?.quartos === "number" ? prefs!.quartos : null;
       const valorMax = typeof prefs?.valor_max === "number" ? prefs!.valor_max : null;
 
+      let q = baseQuery.order("created_at", { ascending: false });
+
       if (tipo) q = q.ilike("property_type", `%${tipo}%`);
       if (bairro) q = q.ilike("neighborhood", `%${bairro}%`);
       if (quartos != null) q = q.gte("bedrooms", quartos);
       if (valorMax != null) q = q.lte("price", valorMax);
+
+      if (intent === "comprar") q = q.ilike("purpose", "%vend%");
+      if (intent === "alugar") q = q.ilike("purpose", "%alug%");
 
       const { data, error } = await q;
       if (error) {
@@ -873,7 +926,29 @@ export default function LeadsAdminPage() {
         return;
       }
 
-      setSuggestions((data ?? []) as PropertySuggestionRow[]);
+      const exact = (data ?? []) as PropertySuggestionRow[];
+      if (exact.length > 0) {
+        setSuggestions(exact);
+        setIsSuggestionsLoading(false);
+        return;
+      }
+
+      setSuggestionsNote("Nenhum imóvel exatamente neste perfil, mostrando os mais próximos.");
+
+      let fallback = baseQuery.order("price", { ascending: true });
+      if (intent === "comprar") fallback = fallback.ilike("purpose", "%vend%");
+      if (intent === "alugar") fallback = fallback.ilike("purpose", "%alug%");
+      if (quartos != null) fallback = fallback.gte("bedrooms", quartos);
+
+      const fb = await fallback;
+      if (fb?.error) {
+        setSuggestions([]);
+        setSuggestionsError(fb.error.message);
+        setIsSuggestionsLoading(false);
+        return;
+      }
+
+      setSuggestions(((fb?.data ?? []) as PropertySuggestionRow[]).slice(0, 10));
       setIsSuggestionsLoading(false);
     } catch (e: any) {
       setSuggestions([]);
@@ -896,6 +971,7 @@ export default function LeadsAdminPage() {
 
     setSuggestions([]);
     setSuggestionsError(null);
+    setSuggestionsNote(null);
     setIsSuggestionsLoading(false);
   }
 
@@ -1123,7 +1199,7 @@ export default function LeadsAdminPage() {
                         <div className="mt-3 flex items-center justify-between gap-2">
                           <div className="text-[11px] text-slate-500">
                             {cardLead.assigned_broker_profile_id
-                              ? brokerById.get(cardLead.assigned_broker_profile_id)?.full_name ?? "-"
+                              ? personLabel(brokerById.get(cardLead.assigned_broker_profile_id)?.full_name) || "-"
                               : "-"}
                           </div>
 
@@ -1362,6 +1438,11 @@ export default function LeadsAdminPage() {
                   </div>
                 </div>
                 <div className="max-h-64 overflow-auto px-4 py-3">
+                  {suggestionsNote ? (
+                    <div className="mb-3 rounded-xl bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-700 ring-1 ring-slate-200/70">
+                      {suggestionsNote}
+                    </div>
+                  ) : null}
                   {suggestionsError ? (
                     <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200/70">
                       {suggestionsError}
