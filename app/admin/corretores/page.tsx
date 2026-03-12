@@ -280,43 +280,80 @@ export default function CorretoresAdminPage() {
     }
 
     if (brokerIds.length) {
-      let leadsBrokerColumn:
+      type LeadsBrokerColumn =
         | "assigned_broker_profile_id"
         | "broker_id"
-        | "owner_broker_profile_id" = "assigned_broker_profile_id";
-      try {
-        const testAssigned = await (supabase as any)
+        | "user_id"
+        | "owner_broker_profile_id";
+
+      const candidates: LeadsBrokerColumn[] = [
+        "assigned_broker_profile_id",
+        "broker_id",
+        "user_id",
+        "owner_broker_profile_id",
+      ];
+
+      async function fetchAttendanceCounts(column: LeadsBrokerColumn) {
+        const map = new Map<string, number>();
+        const res = await (supabase as any)
           .from("leads")
-          .select("id, assigned_broker_profile_id")
-          .limit(1);
-        if (testAssigned.error) {
-          const testBroker = await (supabase as any).from("leads").select("id, broker_id").limit(1);
-          if (!testBroker.error) {
-            leadsBrokerColumn = "broker_id";
-          } else {
-            const testOwner = await (supabase as any)
-              .from("leads")
-              .select("id, owner_broker_profile_id")
-              .limit(1);
-            if (!testOwner.error) leadsBrokerColumn = "owner_broker_profile_id";
-          }
+          .select(`id, ${column}`)
+          .eq("stage", "atendimento")
+          .in(column, brokerIds);
+
+        if (res.error) {
+          return { ok: false as const, column, total: -1, map, error: res.error };
         }
-      } catch {
-        leadsBrokerColumn = "assigned_broker_profile_id";
+
+        for (const row of (res.data ?? []) as Array<any>) {
+          const brokerId = String(row?.[column] ?? "").trim();
+          if (!brokerId) continue;
+          map.set(brokerId, (map.get(brokerId) ?? 0) + 1);
+        }
+
+        let total = 0;
+        for (const v of map.values()) total += v;
+        return { ok: true as const, column, total, map };
       }
 
-      const leadsRes = await (supabase as any)
-        .from("leads")
-        .select(`id, ${leadsBrokerColumn}`)
-        .eq("stage", "atendimento")
-        .in(leadsBrokerColumn, brokerIds);
-
-      if (!leadsRes.error) {
-        for (const row of (leadsRes.data ?? []) as Array<any>) {
-          const brokerId = String(row?.[leadsBrokerColumn] ?? "").trim();
-          if (!brokerId) continue;
-          leadsAttendanceByBroker.set(brokerId, (leadsAttendanceByBroker.get(brokerId) ?? 0) + 1);
+      const results = [] as Array<{ ok: boolean; column: LeadsBrokerColumn; total: number; map: Map<string, number> }>;
+      for (const col of candidates) {
+        try {
+          const r = await fetchAttendanceCounts(col);
+          results.push({ ok: r.ok, column: r.column, total: r.total, map: r.map });
+        } catch {
+          results.push({ ok: false, column: col, total: -1, map: new Map() });
         }
+      }
+
+      results.sort((a, b) => b.total - a.total);
+      const best = results[0];
+
+      if (best?.ok) {
+        console.log("[Admin/Corretores] Leads em atendimento: coluna vínculo escolhida:", best.column, {
+          total: best.total,
+          totalsByColumn: results.reduce(
+            (acc, r) => {
+              acc[r.column] = r.total;
+              return acc;
+            },
+            {} as Record<string, number>,
+          ),
+        });
+
+        for (const [brokerId, count] of best.map.entries()) {
+          leadsAttendanceByBroker.set(brokerId, count);
+        }
+      } else {
+        console.log("[Admin/Corretores] Leads em atendimento: nenhuma coluna de vínculo válida encontrada", {
+          totalsByColumn: results.reduce(
+            (acc, r) => {
+              acc[r.column] = r.total;
+              return acc;
+            },
+            {} as Record<string, number>,
+          ),
+        });
       }
     }
 
