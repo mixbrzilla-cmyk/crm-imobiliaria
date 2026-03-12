@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSupabaseClient } from "@/lib/supabaseClient";
+import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,54 @@ function sanitizePhone(input: string) {
 
 function normalizeCpf(input: string) {
   return String(input ?? "").replace(/\D+/g, "").trim();
+}
+
+function getServiceSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE ||
+    process.env.SUPABASE_SERVICE_KEY;
+
+  if (!url || !serviceKey) return null;
+
+  return createClient(url, serviceKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+    db: {
+      schema: "public",
+    },
+  });
+}
+
+function parseMoneyToNumberBR(input: any) {
+  if (typeof input === "number") return Number.isFinite(input) ? input : null;
+  const raw = String(input ?? "").trim();
+  if (!raw) return null;
+
+  const cleaned = raw
+    .replace(/\s+/g, "")
+    .replace(/R\$?/gi, "")
+    .replace(/[^0-9.,-]/g, "");
+
+  if (!cleaned) return null;
+
+  const hasDot = cleaned.includes(".");
+  const hasComma = cleaned.includes(",");
+
+  let normalized = cleaned;
+  if (hasDot && hasComma) {
+    normalized = normalized.replace(/\./g, "").replace(",", ".");
+  } else if (hasComma) {
+    normalized = normalized.replace(",", ".");
+  }
+
+  const num = Number(normalized);
+  if (!Number.isFinite(num)) return null;
+  return num;
 }
 
 function corsHeaders() {
@@ -44,12 +93,13 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: Request) {
-  const supabase = getSupabaseClient();
+  const supabase = getServiceSupabase() || getSupabaseClient();
   if (!supabase) {
     return NextResponse.json(
       {
         ok: false,
-        error: "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+        error:
+          "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e (NEXT_PUBLIC_SUPABASE_ANON_KEY ou SUPABASE_SERVICE_ROLE_KEY).",
       },
       { status: 500, headers: corsHeaders() },
     );
@@ -74,8 +124,7 @@ export async function POST(req: Request) {
   const quartosRaw = prefs?.quartos ?? body?.quartos ?? null;
   const valorMaxRaw = prefs?.valor_max ?? body?.valor_max ?? body?.valorMax ?? null;
   const quartos = typeof quartosRaw === "number" ? Math.trunc(quartosRaw) : quartosRaw ? Math.trunc(Number(quartosRaw)) : null;
-  const valor_max =
-    typeof valorMaxRaw === "number" ? valorMaxRaw : valorMaxRaw ? Number(String(valorMaxRaw).replace(/\./g, "").replace(",", ".")) : null;
+  const valor_max = parseMoneyToNumberBR(valorMaxRaw);
 
   if (!nome || !telefone) {
     return NextResponse.json(
