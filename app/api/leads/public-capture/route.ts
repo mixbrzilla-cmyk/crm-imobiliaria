@@ -65,6 +65,15 @@ function formatCurrencyBRL(value: number) {
   });
 }
 
+function getMissingColumnFromError(err: any) {
+  const msg = String(err?.message ?? "");
+  const match = msg.match(/Could not find the '([^']+)' column/i);
+  if (match?.[1]) return match[1];
+  const alt = msg.match(/column\s+"?([^\s\"]+)"?\s+does\s+not\s+exist/i);
+  if (alt?.[1]) return alt[1];
+  return null;
+}
+
 function allowedOriginsFromEnv() {
   const raw =
     process.env.PUBLIC_LEAD_CAPTURE_ORIGINS ||
@@ -150,51 +159,52 @@ export async function POST(req: Request) {
   const leadId = crypto.randomUUID();
   const nowIso = new Date().toISOString();
 
-  const originLabel = (origem ?? "").trim();
-  const originForDisplay = originLabel ? originLabel.toUpperCase() : "-";
   const bairroLabel = (bairro ?? "").trim();
   const tipoLabel = (tipo ?? "").trim();
-  const buscaLabel = `${tipoLabel || "Imóvel"}${bairroLabel ? ` em ${bairroLabel}` : ""}`;
   const valorLabel = typeof valor_max === "number" && Number.isFinite(valor_max) ? formatCurrencyBRL(valor_max) : "-";
-  const consolidatedMessage = `[ORIGEM: ${originForDisplay}] - Busca: ${buscaLabel} | Valor: ${valorLabel}`;
 
-  const payload: any = {
+  const observacao = `Busca: ${tipoLabel || "-"} | Bairro: ${bairroLabel || "-"} | Valor: ${valorLabel}`;
+
+  const sourceLabel = String(origem ?? "").trim() || "public_capture";
+
+  const basePayload: any = {
     id: leadId,
-    full_name: nome,
-    phone: whatsapp,
-    stage: "recebido",
-    source: originLabel || "public_capture",
-    message: consolidatedMessage,
     created_at: nowIso,
-    assigned_broker_profile_id: null,
+    stage: "recebido",
+    source: sourceLabel,
+    full_name: nome,
+    name: nome,
+    phone: whatsapp,
+    whatsapp,
+    notes: observacao,
+    observations: observacao,
+    description: observacao,
   };
 
-  const insertRes = await (supabase as any).from("leads").insert(payload);
-  if (insertRes?.error) {
-    return NextResponse.json({ ok: false, error: insertRes.error.message }, { status: 400, headers });
+  const tryPayload: any = { ...basePayload };
+  let lastError: any = null;
+
+  for (let i = 0; i < 12; i++) {
+    const { error } = await (supabase as any).from("leads").insert(tryPayload);
+    if (!error) {
+      lastError = null;
+      break;
+    }
+
+    lastError = error;
+    const missing = getMissingColumnFromError(error);
+    if (!missing) break;
+
+    if (missing in tryPayload) {
+      delete tryPayload[missing];
+      continue;
+    }
+
+    break;
   }
 
-  try {
-    const prefsPayload: any = {
-      lead_id: leadId,
-      tipo_imovel: tipo,
-      valor_max: typeof valor_max === "number" && Number.isFinite(valor_max) ? valor_max : null,
-      bairro,
-      updated_at: nowIso,
-    };
-
-    const hasAny =
-      Boolean(prefsPayload.tipo_imovel) ||
-      Boolean(prefsPayload.bairro) ||
-      typeof prefsPayload.valor_max === "number";
-
-    if (hasAny) {
-      await (supabase as any)
-        .from("customer_preferences")
-        .upsert(prefsPayload, { onConflict: "lead_id" });
-    }
-  } catch {
-    // ignore
+  if (lastError) {
+    return NextResponse.json({ ok: false, error: lastError.message }, { status: 400, headers });
   }
 
   return NextResponse.json({ ok: true, id: leadId }, { status: 200, headers });
