@@ -67,6 +67,9 @@ export default function CadastroDetalhadoPage() {
   const ROYAL_DARK = "#050815";
   const ROYAL_MID = "#07152F";
 
+  const VIP_BG_IMAGE =
+    "https://images.unsplash.com/photo-1506368249639-73a05d6f6488?auto=format&fit=crop&w=1600&q=80";
+
   const INPUT_BASE_CLASS =
     "h-11 rounded-2xl bg-white px-4 text-sm font-medium text-slate-950 outline-none transition-all duration-200 border border-slate-200";
   const INPUT_BASE_CLASS_WITH_ICON =
@@ -416,17 +419,22 @@ export default function CadastroDetalhadoPage() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between">
+          <div className="relative flex items-start justify-center text-center">
             <div>
               <div className="mt-6 text-xs font-semibold tracking-[0.22em] text-slate-500">CADASTRO</div>
               <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
-                Imobiliária <span className="font-extrabold" style={{ color: PRIMARY }}>
+                Imobiliária{" "}
+                <span className="font-extrabold" style={{ color: PRIMARY }}>
                   MODERNA
                 </span>
               </h1>
               <div className="mt-1 text-sm text-slate-600">Experiência de descoberta imobiliária</div>
             </div>
-            <div className="text-xs font-semibold tabular-nums text-slate-600">{progress}%</div>
+
+            <div className="absolute right-0 top-6 inline-flex items-center gap-2 text-xs font-semibold tabular-nums text-slate-600">
+              <span>{progress}%</span>
+              <Lock className="h-4 w-4" style={{ color: ACCENT }} />
+            </div>
           </div>
 
           <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-white/40 ring-1 ring-white/55 backdrop-blur">
@@ -730,14 +738,33 @@ export default function CadastroDetalhadoPage() {
               </AnimatePresence>
 
               <div
-                className="rounded-2xl bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-[0_10px_30px_-24px_rgba(2,6,23,0.25)]"
+                className="relative overflow-hidden rounded-2xl px-4 py-3 text-sm font-medium shadow-[0_12px_40px_-28px_rgba(2,6,23,0.45)]"
                 style={{
-                  borderColor: "transparent",
+                  backgroundImage: `url(${VIP_BG_IMAGE})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
                 }}
               >
-                <div className="flex items-start gap-3">
-                  <Coffee className="mt-0.5 h-5 w-5" style={{ color: PRIMARY }} />
-                  <div className="leading-relaxed">{stepMeta?.micro}</div>
+                <div
+                  aria-hidden="true"
+                  className="absolute inset-0"
+                  style={{
+                    background:
+                      "linear-gradient(90deg, rgba(2,6,23,0.70) 0%, rgba(2,6,23,0.45) 55%, rgba(2,6,23,0.28) 100%)",
+                  }}
+                />
+                <div aria-hidden="true" className="absolute inset-0 backdrop-blur-[2px]" />
+
+                <div className="relative flex items-start gap-3 text-white">
+                  <div
+                    className="mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-xl"
+                    style={{ backgroundColor: "rgba(255,255,255,0.14)" }}
+                  >
+                    <Coffee className="h-4.5 w-4.5" />
+                  </div>
+                  <div className="leading-relaxed" style={{ textShadow: "0 10px 24px rgba(2,6,23,0.55)" }}>
+                    {stepMeta?.micro}
+                  </div>
                 </div>
               </div>
 
@@ -788,7 +815,10 @@ export default function CadastroDetalhadoPage() {
                 className="inline-flex h-11 flex-[1.4] items-center justify-center rounded-xl px-5 text-sm font-semibold text-white shadow-[0_14px_34px_-26px_rgba(47,59,119,0.55)] transition-all duration-200 hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-60"
                 style={{ backgroundColor: PRIMARY }}
               >
-                Próximo
+                <span className="inline-flex items-center gap-2">
+                  <Lock className="h-4 w-4" style={{ color: ACCENT }} />
+                  <span>Próximo</span>
+                </span>
               </button>
             )}
           </div>
