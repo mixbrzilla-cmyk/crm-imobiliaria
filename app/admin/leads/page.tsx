@@ -31,6 +31,9 @@ type LeadRow = {
   full_name: string;
   phone: string;
   interest: string | null;
+  intent?: string | null;
+  address?: string | null;
+  value_max?: number | string | null;
   estimated_value?: number | null;
   email?: string | null;
   message?: string | null;
@@ -221,6 +224,13 @@ function sourceIconName(source: string | null) {
 
 function sanitizePhone(input: string) {
   return input.replace(/[^0-9+]/g, "").trim();
+}
+
+function sourceLabel(source: string | null) {
+  const s = String(source ?? "").trim();
+  if (!s) return "";
+  if (s.toLowerCase() === "elementor") return "";
+  return s;
 }
 
 export default function LeadsAdminPage() {
@@ -558,7 +568,7 @@ export default function LeadsAdminPage() {
       const rich = await supabase
         .from("leads")
         .select(
-          "id, full_name, phone, interest, stage, source, assigned_broker_profile_id, created_at, estimated_value, email, message, slug_imovel",
+          "id, full_name, phone, interest, stage, source, assigned_broker_profile_id, created_at, estimated_value, email, message, slug_imovel, intent, address, value_max",
         )
         .order("created_at", { ascending: false });
 
@@ -569,7 +579,7 @@ export default function LeadsAdminPage() {
 
       const basic = await supabase
         .from("leads")
-        .select("id, full_name, phone, interest, stage, source, assigned_broker_profile_id, created_at")
+        .select("id, full_name, phone, interest, stage, source, assigned_broker_profile_id, created_at, intent, address, value_max")
         .order("created_at", { ascending: false });
 
       if (basic.error) {
@@ -977,8 +987,15 @@ export default function LeadsAdminPage() {
                   ) : null}
 
                   {items.map((lead) => {
+                    const cardLead = lead;
                     const icon = sourceIconName(lead.source);
                     const SourceIcon = icon === "search" ? Search : icon === "whatsapp" ? MessageCircle : Globe;
+
+                    const intentLabel =
+                      cardLead.intent === "comprar" ? "Compra" : cardLead.intent === "alugar" ? "Aluguel" : "";
+                    const bairro = cardLead.address ? inferBairroFromAddress(String(cardLead.address)) : "";
+                    const valueMax = parseMoneyToNumberBR(cardLead.value_max);
+                    const sourceText = sourceLabel(cardLead.source);
 
                     const digits = sanitizePhone(lead.phone);
                     const waDigits = digits.startsWith("55") ? digits : digits ? `55${digits}` : "";
@@ -999,14 +1016,16 @@ export default function LeadsAdminPage() {
                         <div className="flex items-start justify-between gap-3">
                           <button
                             type="button"
-                            onClick={() => void openLeadModal(lead)}
+                            onClick={() => void openLeadModal({ ...cardLead })}
                             className="min-w-0 text-left"
                           >
-                            <div className="truncate text-sm font-semibold text-slate-900">{lead.full_name}</div>
-                            <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-500">
-                              <SourceIcon className="h-3.5 w-3.5 text-slate-400" />
-                              <span className="truncate">{lead.source ?? "-"}</span>
-                            </div>
+                            <div className="truncate text-sm font-semibold text-slate-900">{cardLead.full_name}</div>
+                            {sourceText ? (
+                              <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-500">
+                                <SourceIcon className="h-3.5 w-3.5 text-slate-400" />
+                                <span className="truncate">{sourceText}</span>
+                              </div>
+                            ) : null}
                           </button>
 
                           <div className="flex shrink-0 flex-col items-end gap-2">
@@ -1017,21 +1036,43 @@ export default function LeadsAdminPage() {
                               </div>
                             ) : null}
 
-                            <span
-                              className={
-                                "inline-flex items-center justify-center rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 " +
-                                sourceBadgeCls(lead.source)
-                              }
-                            >
-                              {(lead.source ?? "Outros").slice(0, 14)}
-                            </span>
+                            {sourceText ? (
+                              <span
+                                className={
+                                  "inline-flex items-center justify-center rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 " +
+                                  sourceBadgeCls(lead.source)
+                                }
+                              >
+                                {sourceText.slice(0, 14)}
+                              </span>
+                            ) : null}
                           </div>
                         </div>
 
+                        {intentLabel || bairro || valueMax != null ? (
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            {intentLabel ? (
+                              <span className="inline-flex items-center justify-center rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 ring-1 ring-indigo-200/70">
+                                {intentLabel}
+                              </span>
+                            ) : null}
+                            {bairro ? (
+                              <span className="inline-flex items-center justify-center rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200/70">
+                                {bairro}
+                              </span>
+                            ) : null}
+                            {valueMax != null ? (
+                              <span className="inline-flex items-center justify-center rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-200/70">
+                                {formatCurrencyBRL(valueMax)}
+                              </span>
+                            ) : null}
+                          </div>
+                        ) : null}
+
                         <div className="mt-3 flex items-center justify-between gap-3">
-                          {lead.slug_imovel || lead.interest ? (
+                          {cardLead.slug_imovel || cardLead.interest ? (
                             <span className="inline-flex max-w-[70%] items-center justify-center truncate rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200/70">
-                              {lead.slug_imovel ?? lead.interest}
+                              {cardLead.slug_imovel ?? cardLead.interest}
                             </span>
                           ) : (
                             <span className="text-[11px] text-slate-400">&nbsp;</span>
@@ -1071,8 +1112,8 @@ export default function LeadsAdminPage() {
 
                         <div className="mt-3 flex items-center justify-between gap-2">
                           <div className="text-[11px] text-slate-500">
-                            {lead.assigned_broker_profile_id
-                              ? brokerById.get(lead.assigned_broker_profile_id)?.full_name ?? "-"
+                            {cardLead.assigned_broker_profile_id
+                              ? brokerById.get(cardLead.assigned_broker_profile_id)?.full_name ?? "-"
                               : "-"}
                           </div>
 
