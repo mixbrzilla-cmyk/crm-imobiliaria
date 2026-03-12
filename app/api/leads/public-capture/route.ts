@@ -57,6 +57,14 @@ function parseMoneyToNumberBR(input: any) {
   return num;
 }
 
+function formatCurrencyBRL(value: number) {
+  return value.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    maximumFractionDigits: 0,
+  });
+}
+
 function allowedOriginsFromEnv() {
   const raw =
     process.env.PUBLIC_LEAD_CAPTURE_ORIGINS ||
@@ -139,12 +147,21 @@ export async function POST(req: Request) {
   const leadId = crypto.randomUUID();
   const nowIso = new Date().toISOString();
 
+  const originLabel = (origem ?? "").trim();
+  const originForDisplay = originLabel ? originLabel.toUpperCase() : "-";
+  const bairroLabel = (bairro ?? "").trim();
+  const tipoLabel = (tipo ?? "").trim();
+  const buscaLabel = `${tipoLabel || "Imóvel"}${bairroLabel ? ` em ${bairroLabel}` : ""}`;
+  const valorLabel = typeof valor_max === "number" && Number.isFinite(valor_max) ? formatCurrencyBRL(valor_max) : "-";
+  const consolidatedMessage = `[ORIGEM: ${originForDisplay}] - Busca: ${buscaLabel} | Valor: ${valorLabel}`;
+
   const payload: any = {
     id: leadId,
     full_name: nome,
     phone: whatsapp,
     stage: "recebido",
-    source: origem || "public_capture",
+    source: originLabel || "public_capture",
+    message: consolidatedMessage,
     created_at: nowIso,
     assigned_broker_profile_id: null,
   };
