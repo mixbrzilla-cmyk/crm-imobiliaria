@@ -71,23 +71,28 @@ function allowedOriginsFromEnv() {
     process.env.NEXT_PUBLIC_PUBLIC_LEAD_CAPTURE_ORIGINS ||
     "";
   const list = raw
-    .split(",")
-    .map((s) => s.trim())
+    .split(/[,\n\r\t ]+/)
+    .map((s) => s.trim().replace(/\/$/g, ""))
     .filter(Boolean);
   return list;
 }
 
-function corsHeaders(origin: string | null) {
+function corsHeaders(req: Request) {
+  const origin = req.headers.get("origin");
+  const requestHeaders = req.headers.get("access-control-request-headers");
+
   const allowed = allowedOriginsFromEnv();
 
+  const normalizedOrigin = origin?.trim().replace(/\/$/g, "") || null;
+
   let allowOrigin = "*";
-  if (origin && allowed.length > 0) {
-    allowOrigin = allowed.includes(origin) ? origin : "";
+  if (normalizedOrigin && allowed.length > 0) {
+    allowOrigin = allowed.includes(normalizedOrigin) ? normalizedOrigin : "";
   }
 
   const headers: Record<string, string> = {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": requestHeaders ? requestHeaders : "Content-Type",
     "Access-Control-Max-Age": "86400",
   };
 
@@ -100,13 +105,11 @@ function corsHeaders(origin: string | null) {
 }
 
 export async function OPTIONS(req: Request) {
-  const origin = req.headers.get("origin");
-  return new NextResponse(null, { status: 204, headers: corsHeaders(origin) });
+  return new NextResponse(null, { status: 204, headers: corsHeaders(req) });
 }
 
 export async function POST(req: Request) {
-  const origin = req.headers.get("origin");
-  const headers = corsHeaders(origin);
+  const headers = corsHeaders(req);
 
   if (!headers["Access-Control-Allow-Origin"]) {
     return NextResponse.json({ ok: false, error: "Origin not allowed" }, { status: 403, headers });
