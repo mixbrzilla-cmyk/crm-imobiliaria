@@ -67,6 +67,11 @@ export default function CadastroDetalhadoPage() {
   const ROYAL_DARK = "#050815";
   const ROYAL_MID = "#07152F";
 
+  const INPUT_BASE_CLASS =
+    "h-11 rounded-2xl bg-white px-4 text-sm font-medium text-slate-950 outline-none transition-all duration-200 border border-slate-200";
+  const INPUT_BASE_CLASS_WITH_ICON =
+    "h-11 w-full rounded-2xl bg-white pl-10 pr-4 text-sm font-medium text-slate-950 outline-none transition-all duration-200 border border-slate-200";
+
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -378,12 +383,20 @@ export default function CadastroDetalhadoPage() {
       </motion.div>
 
       <div className="mx-auto w-full max-w-xl px-6 py-10">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute left-1/2 top-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl"
+          style={{
+            background: `radial-gradient(circle at 50% 50%, ${PRIMARY}26, transparent 62%)`,
+            opacity: 0.9,
+          }}
+        />
         <motion.div
           className="rounded-3xl p-6 ring-1"
           style={{
-            backgroundColor: "rgba(255,255,255,0.82)",
-            borderColor: "rgba(255,255,255,0.75)",
-            boxShadow: "0 30px 90px -60px rgba(0,0,0,0.9)",
+            backgroundColor: "rgba(255,255,255,0.92)",
+            borderColor: "rgba(15,23,42,0.08)",
+            boxShadow: "0 26px 70px -56px rgba(2,6,23,0.9)",
             backdropFilter: "blur(16px)",
           }}
           initial={{ opacity: 0, y: 18, scale: 0.98 }}
@@ -405,7 +418,7 @@ export default function CadastroDetalhadoPage() {
 
           <div className="flex items-center justify-between">
             <div>
-              <div className="mt-4 text-xs font-semibold tracking-[0.18em] text-slate-500">CADASTRO</div>
+              <div className="mt-6 text-xs font-semibold tracking-[0.22em] text-slate-500">CADASTRO</div>
               <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
                 Imobiliária <span className="font-extrabold" style={{ color: PRIMARY }}>
                   MODERNA
@@ -456,17 +469,17 @@ export default function CadastroDetalhadoPage() {
                         <input
                           value={state.nome}
                           onChange={(e) => setState((s) => ({ ...s, nome: e.target.value }))}
-                          className="h-11 rounded-2xl bg-white px-4 text-sm font-semibold text-slate-950 outline-none transition-all duration-200 border border-gray-300"
+                          className={INPUT_BASE_CLASS}
                           style={{
-                            boxShadow: "0 18px 40px -36px rgba(15,23,42,0.6)",
+                            boxShadow: "0 12px 26px -24px rgba(15,23,42,0.35)",
                           }}
                           onFocus={(e) => {
                             e.currentTarget.style.borderColor = PRIMARY;
-                            e.currentTarget.style.boxShadow = `0 0 0 4px ${PRIMARY}22, 0 0 0 1px ${PRIMARY}AA, 0 18px 40px -36px rgba(15,23,42,0.6)`;
+                            e.currentTarget.style.boxShadow = `0 0 0 3px ${PRIMARY}1F, 0 0 0 1px ${PRIMARY}99, 0 12px 26px -24px rgba(15,23,42,0.35)`;
                           }}
                           onBlur={(e) => {
-                            e.currentTarget.style.borderColor = "rgb(209 213 219)";
-                            e.currentTarget.style.boxShadow = "0 18px 40px -36px rgba(15,23,42,0.6)";
+                            e.currentTarget.style.borderColor = "rgb(226 232 240)";
+                            e.currentTarget.style.boxShadow = "0 12px 26px -24px rgba(15,23,42,0.35)";
                           }}
                           placeholder="Seu nome"
                           required
@@ -478,17 +491,17 @@ export default function CadastroDetalhadoPage() {
                         <input
                           value={state.telefone}
                           onChange={(e) => setState((s) => ({ ...s, telefone: e.target.value }))}
-                          className="h-11 rounded-2xl bg-white px-4 text-sm font-semibold text-slate-950 outline-none transition-all duration-200 border border-gray-300"
+                          className={INPUT_BASE_CLASS}
                           style={{
-                            boxShadow: "0 18px 40px -36px rgba(15,23,42,0.6)",
+                            boxShadow: "0 12px 26px -24px rgba(15,23,42,0.35)",
                           }}
                           onFocus={(e) => {
                             e.currentTarget.style.borderColor = PRIMARY;
-                            e.currentTarget.style.boxShadow = `0 0 0 4px ${PRIMARY}22, 0 0 0 1px ${PRIMARY}AA, 0 18px 40px -36px rgba(15,23,42,0.6)`;
+                            e.currentTarget.style.boxShadow = `0 0 0 3px ${PRIMARY}1F, 0 0 0 1px ${PRIMARY}99, 0 12px 26px -24px rgba(15,23,42,0.35)`;
                           }}
                           onBlur={(e) => {
-                            e.currentTarget.style.borderColor = "rgb(209 213 219)";
-                            e.currentTarget.style.boxShadow = "0 18px 40px -36px rgba(15,23,42,0.6)";
+                            e.currentTarget.style.borderColor = "rgb(226 232 240)";
+                            e.currentTarget.style.boxShadow = "0 12px 26px -24px rgba(15,23,42,0.35)";
                           }}
                           placeholder="(11) 9xxxx-xxxx"
                           inputMode="tel"
@@ -505,22 +518,22 @@ export default function CadastroDetalhadoPage() {
                         <div className="relative">
                           <Lock
                             className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
-                            style={{ color: ACCENT }}
+                            style={{ color: PRIMARY }}
                           />
                           <input
                             value={state.cpf}
                             onChange={(e) => setState((s) => ({ ...s, cpf: e.target.value }))}
-                            className="h-11 w-full rounded-2xl bg-white pl-10 pr-4 text-sm font-semibold text-slate-950 outline-none transition-all duration-200 border border-gray-300"
+                            className={INPUT_BASE_CLASS_WITH_ICON}
                             style={{
-                              boxShadow: "0 18px 40px -36px rgba(15,23,42,0.6)",
+                              boxShadow: "0 12px 26px -24px rgba(15,23,42,0.35)",
                             }}
                             onFocus={(e) => {
                               e.currentTarget.style.borderColor = PRIMARY;
-                              e.currentTarget.style.boxShadow = `0 0 0 4px ${PRIMARY}22, 0 0 0 1px ${PRIMARY}AA, 0 18px 40px -36px rgba(15,23,42,0.6)`;
+                              e.currentTarget.style.boxShadow = `0 0 0 3px ${PRIMARY}1F, 0 0 0 1px ${PRIMARY}99, 0 12px 26px -24px rgba(15,23,42,0.35)`;
                             }}
                             onBlur={(e) => {
-                              e.currentTarget.style.borderColor = "rgb(209 213 219)";
-                              e.currentTarget.style.boxShadow = "0 18px 40px -36px rgba(15,23,42,0.6)";
+                              e.currentTarget.style.borderColor = "rgb(226 232 240)";
+                              e.currentTarget.style.boxShadow = "0 12px 26px -24px rgba(15,23,42,0.35)";
                             }}
                             placeholder="000.000.000-00"
                             inputMode="numeric"
@@ -538,17 +551,17 @@ export default function CadastroDetalhadoPage() {
                         <input
                           value={state.endereco}
                           onChange={(e) => setState((s) => ({ ...s, endereco: e.target.value }))}
-                          className="h-11 rounded-2xl bg-white px-4 text-sm font-semibold text-slate-950 outline-none transition-all duration-200 border border-gray-300"
+                          className={INPUT_BASE_CLASS}
                           style={{
-                            boxShadow: "0 18px 40px -36px rgba(15,23,42,0.6)",
+                            boxShadow: "0 12px 26px -24px rgba(15,23,42,0.35)",
                           }}
                           onFocus={(e) => {
                             e.currentTarget.style.borderColor = PRIMARY;
-                            e.currentTarget.style.boxShadow = `0 0 0 4px ${PRIMARY}22, 0 0 0 1px ${PRIMARY}AA, 0 18px 40px -36px rgba(15,23,42,0.6)`;
+                            e.currentTarget.style.boxShadow = `0 0 0 3px ${PRIMARY}1F, 0 0 0 1px ${PRIMARY}99, 0 12px 26px -24px rgba(15,23,42,0.35)`;
                           }}
                           onBlur={(e) => {
-                            e.currentTarget.style.borderColor = "rgb(209 213 219)";
-                            e.currentTarget.style.boxShadow = "0 18px 40px -36px rgba(15,23,42,0.6)";
+                            e.currentTarget.style.borderColor = "rgb(226 232 240)";
+                            e.currentTarget.style.boxShadow = "0 12px 26px -24px rgba(15,23,42,0.35)";
                           }}
                           placeholder="Rua, número, bairro"
                           required
@@ -613,17 +626,17 @@ export default function CadastroDetalhadoPage() {
                         <input
                           value={state.bairros}
                           onChange={(e) => setState((s) => ({ ...s, bairros: e.target.value }))}
-                          className="h-11 rounded-2xl bg-white px-4 text-sm font-semibold text-slate-950 outline-none transition-all duration-200 border border-gray-300"
+                          className={INPUT_BASE_CLASS}
                           style={{
-                            boxShadow: "0 18px 40px -36px rgba(15,23,42,0.6)",
+                            boxShadow: "0 12px 26px -24px rgba(15,23,42,0.35)",
                           }}
                           onFocus={(e) => {
                             e.currentTarget.style.borderColor = PRIMARY;
-                            e.currentTarget.style.boxShadow = `0 0 0 4px ${PRIMARY}22, 0 0 0 1px ${PRIMARY}AA, 0 18px 40px -36px rgba(15,23,42,0.6)`;
+                            e.currentTarget.style.boxShadow = `0 0 0 3px ${PRIMARY}1F, 0 0 0 1px ${PRIMARY}99, 0 12px 26px -24px rgba(15,23,42,0.35)`;
                           }}
                           onBlur={(e) => {
-                            e.currentTarget.style.borderColor = "rgb(209 213 219)";
-                            e.currentTarget.style.boxShadow = "0 18px 40px -36px rgba(15,23,42,0.6)";
+                            e.currentTarget.style.borderColor = "rgb(226 232 240)";
+                            e.currentTarget.style.boxShadow = "0 12px 26px -24px rgba(15,23,42,0.35)";
                           }}
                           placeholder="Ex: Centro, Jardins"
                         />
@@ -635,17 +648,17 @@ export default function CadastroDetalhadoPage() {
                           <input
                             value={state.valorMax}
                             onChange={(e) => setState((s) => ({ ...s, valorMax: e.target.value }))}
-                            className="h-11 rounded-2xl bg-white px-4 text-sm font-semibold text-slate-950 outline-none transition-all duration-200 border border-gray-300"
+                            className={INPUT_BASE_CLASS}
                             style={{
-                              boxShadow: "0 18px 40px -36px rgba(15,23,42,0.6)",
+                              boxShadow: "0 12px 26px -24px rgba(15,23,42,0.35)",
                             }}
                             onFocus={(e) => {
                               e.currentTarget.style.borderColor = PRIMARY;
-                              e.currentTarget.style.boxShadow = `0 0 0 4px ${PRIMARY}22, 0 0 0 1px ${PRIMARY}AA, 0 18px 40px -36px rgba(15,23,42,0.6)`;
+                              e.currentTarget.style.boxShadow = `0 0 0 3px ${PRIMARY}1F, 0 0 0 1px ${PRIMARY}99, 0 12px 26px -24px rgba(15,23,42,0.35)`;
                             }}
                             onBlur={(e) => {
-                              e.currentTarget.style.borderColor = "rgb(209 213 219)";
-                              e.currentTarget.style.boxShadow = "0 18px 40px -36px rgba(15,23,42,0.6)";
+                              e.currentTarget.style.borderColor = "rgb(226 232 240)";
+                              e.currentTarget.style.boxShadow = "0 12px 26px -24px rgba(15,23,42,0.35)";
                             }}
                             placeholder="450000"
                             inputMode="numeric"
@@ -657,17 +670,17 @@ export default function CadastroDetalhadoPage() {
                           <input
                             value={state.quartos}
                             onChange={(e) => setState((s) => ({ ...s, quartos: e.target.value }))}
-                            className="h-11 rounded-2xl bg-white px-4 text-sm font-semibold text-slate-950 outline-none transition-all duration-200 border border-gray-300"
+                            className={INPUT_BASE_CLASS}
                             style={{
-                              boxShadow: "0 18px 40px -36px rgba(15,23,42,0.6)",
+                              boxShadow: "0 12px 26px -24px rgba(15,23,42,0.35)",
                             }}
                             onFocus={(e) => {
                               e.currentTarget.style.borderColor = PRIMARY;
-                              e.currentTarget.style.boxShadow = `0 0 0 4px ${PRIMARY}22, 0 0 0 1px ${PRIMARY}AA, 0 18px 40px -36px rgba(15,23,42,0.6)`;
+                              e.currentTarget.style.boxShadow = `0 0 0 3px ${PRIMARY}1F, 0 0 0 1px ${PRIMARY}99, 0 12px 26px -24px rgba(15,23,42,0.35)`;
                             }}
                             onBlur={(e) => {
-                              e.currentTarget.style.borderColor = "rgb(209 213 219)";
-                              e.currentTarget.style.boxShadow = "0 18px 40px -36px rgba(15,23,42,0.6)";
+                              e.currentTarget.style.borderColor = "rgb(226 232 240)";
+                              e.currentTarget.style.boxShadow = "0 12px 26px -24px rgba(15,23,42,0.35)";
                             }}
                             placeholder="2"
                             inputMode="numeric"
@@ -684,22 +697,22 @@ export default function CadastroDetalhadoPage() {
                         <div className="relative">
                           <Lock
                             className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
-                            style={{ color: ACCENT }}
+                            style={{ color: PRIMARY }}
                           />
                           <input
                             value={state.senha}
                             onChange={(e) => setState((s) => ({ ...s, senha: e.target.value }))}
-                            className="h-11 w-full rounded-2xl bg-white pl-10 pr-4 text-sm font-semibold text-slate-950 outline-none transition-all duration-200 border border-gray-300"
+                            className={INPUT_BASE_CLASS_WITH_ICON}
                             style={{
-                              boxShadow: "0 18px 40px -36px rgba(15,23,42,0.6)",
+                              boxShadow: "0 12px 26px -24px rgba(15,23,42,0.35)",
                             }}
                             onFocus={(e) => {
                               e.currentTarget.style.borderColor = PRIMARY;
-                              e.currentTarget.style.boxShadow = `0 0 0 4px ${PRIMARY}22, 0 0 0 1px ${PRIMARY}AA, 0 18px 40px -36px rgba(15,23,42,0.6)`;
+                              e.currentTarget.style.boxShadow = `0 0 0 3px ${PRIMARY}1F, 0 0 0 1px ${PRIMARY}99, 0 12px 26px -24px rgba(15,23,42,0.35)`;
                             }}
                             onBlur={(e) => {
-                              e.currentTarget.style.borderColor = "rgb(209 213 219)";
-                              e.currentTarget.style.boxShadow = "0 18px 40px -36px rgba(15,23,42,0.6)";
+                              e.currentTarget.style.borderColor = "rgb(226 232 240)";
+                              e.currentTarget.style.boxShadow = "0 12px 26px -24px rgba(15,23,42,0.35)";
                             }}
                             placeholder="Mínimo 6 caracteres"
                             type="password"
@@ -717,23 +730,14 @@ export default function CadastroDetalhadoPage() {
               </AnimatePresence>
 
               <div
-                className="rounded-2xl px-4 py-3 text-sm font-semibold ring-1"
+                className="rounded-2xl bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-[0_10px_30px_-24px_rgba(2,6,23,0.25)]"
                 style={{
-                  background: `linear-gradient(135deg, rgba(47,59,119,0.14), rgba(193,18,31,0.08))`,
-                  borderColor: "rgba(47,59,119,0.22)",
-                  color: "#0B1026",
+                  borderColor: "transparent",
                 }}
               >
                 <div className="flex items-start gap-3">
-                  {microCardIcon === "home" ? (
-                    <ShieldCheck className="mt-0.5 h-5 w-5" style={{ color: PRIMARY }} />
-                  ) : (
-                    <Coffee className="mt-0.5 h-5 w-5" style={{ color: PRIMARY }} />
-                  )}
-                  <div>
-                    <span className="mr-1">✨</span>
-                    {stepMeta?.micro}
-                  </div>
+                  <Coffee className="mt-0.5 h-5 w-5" style={{ color: PRIMARY }} />
+                  <div className="leading-relaxed">{stepMeta?.micro}</div>
                 </div>
               </div>
 
@@ -755,7 +759,7 @@ export default function CadastroDetalhadoPage() {
               type="button"
               onClick={back}
               disabled={step === 0 || isSubmitting}
-              className="inline-flex h-11 flex-1 items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-11 flex-1 items-center justify-center rounded-xl bg-transparent px-5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 transition-all duration-200 hover:bg-white/60 disabled:cursor-not-allowed disabled:opacity-60"
             >
               Voltar
             </button>
@@ -765,7 +769,7 @@ export default function CadastroDetalhadoPage() {
                 type="button"
                 onClick={() => void finish()}
                 disabled={isSubmitting}
-                className="inline-flex h-11 flex-[1.4] items-center justify-center rounded-xl px-5 text-sm font-semibold text-white shadow-[0_10px_24px_-18px_rgba(47,59,119,0.45)] transition-all duration-300 hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 flex-[1.4] items-center justify-center rounded-xl px-5 text-sm font-semibold text-white shadow-[0_14px_34px_-26px_rgba(47,59,119,0.55)] transition-all duration-200 hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-60"
                 style={{ backgroundColor: PRIMARY }}
                 onMouseEnter={(e) => {
                   (e.currentTarget as HTMLButtonElement).style.backgroundColor = ACCENT;
@@ -781,14 +785,8 @@ export default function CadastroDetalhadoPage() {
                 type="button"
                 onClick={next}
                 disabled={isSubmitting}
-                className="inline-flex h-11 flex-[1.4] items-center justify-center rounded-xl px-5 text-sm font-semibold text-white shadow-[0_10px_24px_-18px_rgba(47,59,119,0.45)] transition-all duration-300 hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 flex-[1.4] items-center justify-center rounded-xl px-5 text-sm font-semibold text-white shadow-[0_14px_34px_-26px_rgba(47,59,119,0.55)] transition-all duration-200 hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-60"
                 style={{ backgroundColor: PRIMARY }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = ACCENT;
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = PRIMARY;
-                }}
               >
                 Próximo
               </button>
