@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Coffee, Lock, ShieldCheck } from "lucide-react";
+import { Coffee, Home, Lock, ShieldCheck, User } from "lucide-react";
 
 import { getSupabaseClient } from "@/lib/supabaseClient";
 
@@ -433,7 +433,6 @@ export default function CadastroDetalhadoPage() {
 
             <div className="absolute right-0 top-6 inline-flex items-center gap-2 text-xs font-semibold tabular-nums text-slate-600">
               <span>{progress}%</span>
-              <Lock className="h-4 w-4" style={{ color: ACCENT }} />
             </div>
           </div>
 
@@ -446,6 +445,27 @@ export default function CadastroDetalhadoPage() {
                 boxShadow: `0 0 18px ${ACCENT}66`,
               }}
             />
+          </div>
+
+          <div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl bg-white/55 px-3 py-2 text-[11px] font-semibold text-slate-700 ring-1 ring-white/60 backdrop-blur">
+            <div className="flex items-center justify-center gap-2">
+              <ShieldCheck className="h-4 w-4" style={{ color: PRIMARY }} />
+              <span>
+                Segurança: <span className="font-medium text-slate-600">Dados criptografados.</span>
+              </span>
+            </div>
+            <div className="flex items-center justify-center gap-2">
+              <Home className="h-4 w-4" style={{ color: PRIMARY }} />
+              <span>
+                Sonhos: <span className="font-medium text-slate-600">Filtros personalizados.</span>
+              </span>
+            </div>
+            <div className="flex items-center justify-center gap-2">
+              <User className="h-4 w-4" style={{ color: PRIMARY }} />
+              <span>
+                Painel: <span className="font-medium text-slate-600">Acesso exclusivo.</span>
+              </span>
+            </div>
           </div>
 
           <div className="mt-6">
@@ -769,7 +789,7 @@ export default function CadastroDetalhadoPage() {
               </div>
 
               <div className="flex items-center justify-center gap-2 text-center text-[11px] font-semibold tracking-wide text-slate-200">
-                <ShieldCheck className="h-4 w-4" style={{ color: ACCENT }} />
+                <ShieldCheck className="h-4 w-4" style={{ color: PRIMARY }} />
                 <span>Ambiente Criptografado - Protocolo de Segurança Imobiliária Moderna</span>
               </div>
             </div>
@@ -815,10 +835,7 @@ export default function CadastroDetalhadoPage() {
                 className="inline-flex h-11 flex-[1.4] items-center justify-center rounded-xl px-5 text-sm font-semibold text-white shadow-[0_14px_34px_-26px_rgba(47,59,119,0.55)] transition-all duration-200 hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-60"
                 style={{ backgroundColor: PRIMARY }}
               >
-                <span className="inline-flex items-center gap-2">
-                  <Lock className="h-4 w-4" style={{ color: ACCENT }} />
-                  <span>Próximo</span>
-                </span>
+                Próximo
               </button>
             )}
           </div>
