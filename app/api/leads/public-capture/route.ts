@@ -57,14 +57,6 @@ function parseMoneyToNumberBR(input: any) {
   return num;
 }
 
-function formatCurrencyBRL(value: number) {
-  return value.toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    maximumFractionDigits: 0,
-  });
-}
-
 function allowedOriginsFromEnv() {
   const raw =
     process.env.PUBLIC_LEAD_CAPTURE_ORIGINS ||
@@ -152,19 +144,19 @@ export async function POST(req: Request) {
 
   const bairroLabel = (bairro ?? "").trim();
   const tipoLabel = (tipo ?? "").trim();
-  const valorLabel = typeof valor_max === "number" && Number.isFinite(valor_max) ? formatCurrencyBRL(valor_max) : "-";
 
-  const notes = `Intenção: ${tipoLabel || "-"} | Bairro: ${bairroLabel || "-"} | Valor: ${valorLabel}`;
-  const sourceLabel = String(origem ?? "").trim() || "public_capture";
+  const interest = `Intenção: ${tipoLabel || "-"} | Bairro: ${bairroLabel || "-"}`;
+  const value_max_db = typeof valor_max === "number" && Number.isFinite(valor_max) ? valor_max : null;
 
   const payload: any = {
     id: leadId,
     created_at: nowIso,
     stage: "recebido",
-    source: sourceLabel,
+    source: "Landing Page",
     full_name: nome,
     phone: whatsapp,
-    notes,
+    interest,
+    value_max: value_max_db,
   };
 
   const { error } = await (supabase as any).from("leads").insert(payload);
