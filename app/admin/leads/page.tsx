@@ -51,6 +51,13 @@ type CustomerPreferencesRow = {
   updated_at?: string;
 };
 
+type LeadBrain = {
+  lead_id: string;
+  intent: string | null;
+  address: string | null;
+  value_max: number | null;
+};
+
 type PropertySuggestionRow = {
   id: string;
   title: string | null;
@@ -117,6 +124,47 @@ function formatCurrencyBRL(value: number) {
     currency: "BRL",
     maximumFractionDigits: 0,
   });
+}
+
+function parseMoneyToNumberBR(input: any) {
+  if (typeof input === "number") return Number.isFinite(input) ? input : null;
+  const raw = String(input ?? "").trim();
+  if (!raw) return null;
+
+  const cleaned = raw
+    .replace(/\s+/g, "")
+    .replace(/R\$?/gi, "")
+    .replace(/[^0-9.,-]/g, "");
+
+  if (!cleaned) return null;
+
+  const hasDot = cleaned.includes(".");
+  const hasComma = cleaned.includes(",");
+
+  let normalized = cleaned;
+  if (hasDot && hasComma) {
+    normalized = normalized.replace(/\./g, "").replace(",", ".");
+  } else if (hasComma) {
+    normalized = normalized.replace(",", ".");
+  }
+
+  const num = Number(normalized);
+  if (!Number.isFinite(num)) return null;
+  return num;
+}
+
+function inferBairroFromAddress(address: string) {
+  const raw = String(address ?? "").trim();
+  if (!raw) return "";
+  const parts = raw
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length < 2) return "";
+  const candidate = parts[parts.length - 2] ?? "";
+  if (!candidate) return "";
+  if (candidate.length < 3) return "";
+  return candidate;
 }
 
 function normalizeText(input: string) {
@@ -202,6 +250,8 @@ export default function LeadsAdminPage() {
   const [isPreferencesLoading, setIsPreferencesLoading] = useState(false);
   const [isPreferencesSaving, setIsPreferencesSaving] = useState(false);
 
+  const [leadBrain, setLeadBrain] = useState<LeadBrain | null>(null);
+
   const [suggestions, setSuggestions] = useState<PropertySuggestionRow[]>([]);
   const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
   const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(false);
@@ -215,6 +265,41 @@ export default function LeadsAdminPage() {
     interest: "",
     source: "",
   });
+
+  useEffect(() => {
+    if (!selectedLead) return;
+    if (!leadBrain) return;
+    if (leadBrain.lead_id !== selectedLead.id) return;
+
+    const tipoFromIntent =
+      leadBrain.intent === "comprar" ? "Compra" : leadBrain.intent === "alugar" ? "Aluguel" : null;
+    const bairroFromAddress = leadBrain.address ? inferBairroFromAddress(leadBrain.address) : "";
+    const valorFromLead = leadBrain.value_max;
+
+    setPreferences((current) => {
+      if (!current) {
+        return {
+          lead_id: selectedLead.id,
+          tipo_imovel: tipoFromIntent,
+          bairro: bairroFromAddress || null,
+          valor_max: typeof valorFromLead === "number" && Number.isFinite(valorFromLead) ? valorFromLead : null,
+          quartos: null,
+        };
+      }
+
+      if (current.lead_id !== selectedLead.id) return current;
+
+      const next: CustomerPreferencesRow = { ...current };
+
+      if (!String(next.tipo_imovel ?? "").trim() && tipoFromIntent) next.tipo_imovel = tipoFromIntent;
+      if (!String(next.bairro ?? "").trim() && bairroFromAddress) next.bairro = bairroFromAddress;
+      if (next.valor_max == null && typeof valorFromLead === "number" && Number.isFinite(valorFromLead)) {
+        next.valor_max = valorFromLead;
+      }
+
+      return next;
+    });
+  }, [leadBrain, selectedLead]);
 
   const normalizedSearch = useMemo(() => normalizeText(search), [search]);
 
@@ -612,6 +697,7 @@ export default function LeadsAdminPage() {
     setPreferences(null);
     setPreferencesError(null);
     setIsPreferencesLoading(false);
+    setLeadBrain(null);
 
     setSuggestions([]);
     setSuggestionsError(null);
@@ -641,6 +727,32 @@ export default function LeadsAdminPage() {
     }
 
     void loadPreferences(lead.id);
+    void loadLeadBrain(lead.id);
+  }
+
+  async function loadLeadBrain(leadId: string) {
+    if (!supabase) return;
+
+    try {
+      const res = await (supabase as any)
+        .from("leads")
+        .select("id, intent, address, value_max")
+        .eq("id", leadId)
+        .maybeSingle();
+
+      if (res?.error) return;
+      const row = res?.data ?? null;
+      if (!row) return;
+
+      setLeadBrain({
+        lead_id: leadId,
+        intent: (row.intent ?? null) as any,
+        address: (row.address ?? null) as any,
+        value_max: parseMoneyToNumberBR(row.value_max),
+      });
+    } catch {
+      return;
+    }
   }
 
   async function loadPreferences(leadId: string) {
@@ -767,6 +879,8 @@ export default function LeadsAdminPage() {
     setPreferencesError(null);
     setIsPreferencesLoading(false);
     setIsPreferencesSaving(false);
+
+    setLeadBrain(null);
 
     setSuggestions([]);
     setSuggestionsError(null);
@@ -1004,8 +1118,8 @@ export default function LeadsAdminPage() {
             if (e.target === e.currentTarget) closeLeadModal();
           }}
         >
-          <div className="w-full max-w-2xl rounded-3xl bg-white shadow-[0_24px_64px_-20px_rgba(15,23,42,0.35)] ring-1 ring-slate-200/70">
-            <div className="flex items-start justify-between gap-6 border-b border-slate-100 px-6 py-5">
+          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-[0_24px_64px_-20px_rgba(15,23,42,0.35)] ring-1 ring-slate-200/70">
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-6 border-b border-slate-100 bg-white px-6 py-5">
               <div className="min-w-0">
                 <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">
                   LEAD
@@ -1026,7 +1140,7 @@ export default function LeadsAdminPage() {
               </button>
             </div>
 
-            <div className="px-6 py-5">
+            <div className="flex-1 overflow-y-auto px-6 py-5">
               <div className="flex flex-wrap items-center gap-2">
                 <span
                   className={
@@ -1063,7 +1177,16 @@ export default function LeadsAdminPage() {
                   <label className="flex flex-col gap-2">
                     <span className="text-xs font-semibold tracking-wide text-slate-600">Tipo do imóvel</span>
                     <input
-                      value={preferences?.tipo_imovel ?? ""}
+                      value={
+                        preferences?.tipo_imovel ??
+                        (leadBrain?.lead_id === selectedLead.id
+                          ? leadBrain.intent === "comprar"
+                            ? "Compra"
+                            : leadBrain.intent === "alugar"
+                              ? "Aluguel"
+                              : ""
+                          : "")
+                      }
                       onChange={(e) =>
                         setPreferences((s) =>
                           s
@@ -1083,7 +1206,10 @@ export default function LeadsAdminPage() {
                   <label className="flex flex-col gap-2">
                     <span className="text-xs font-semibold tracking-wide text-slate-600">Bairro</span>
                     <input
-                      value={preferences?.bairro ?? ""}
+                      value={
+                        preferences?.bairro ??
+                        (leadBrain?.lead_id === selectedLead.id ? inferBairroFromAddress(leadBrain.address ?? "") : "")
+                      }
                       onChange={(e) =>
                         setPreferences((s) =>
                           s
@@ -1126,10 +1252,16 @@ export default function LeadsAdminPage() {
                   <label className="flex flex-col gap-2">
                     <span className="text-xs font-semibold tracking-wide text-slate-600">Valor máximo</span>
                     <input
-                      value={preferences?.valor_max != null ? String(preferences.valor_max) : ""}
+                      value={
+                        preferences?.valor_max != null
+                          ? formatCurrencyBRL(preferences.valor_max)
+                          : leadBrain?.lead_id === selectedLead.id && leadBrain.value_max != null
+                            ? formatCurrencyBRL(leadBrain.value_max)
+                            : ""
+                      }
                       onChange={(e) => {
                         const raw = e.target.value.trim();
-                        const n = raw ? Number(raw.replace(/\./g, "").replace(",", ".")) : null;
+                        const n = raw ? parseMoneyToNumberBR(raw) : null;
                         setPreferences((s) =>
                           s
                             ? {
@@ -1267,7 +1399,40 @@ export default function LeadsAdminPage() {
                 </div>
               </div>
 
-              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="mt-5 rounded-2xl bg-white ring-1 ring-slate-200/70">
+                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                  <div className="text-sm font-semibold text-slate-900">Histórico</div>
+                  <div className="text-xs text-slate-500">
+                    {isHistoryLoading ? "Atualizando..." : `${leadHistory.length} eventos`}
+                  </div>
+                </div>
+                <div className="max-h-64 overflow-auto px-4 py-3">
+                  {leadHistory.length > 0 ? (
+                    <div className="flex flex-col gap-2">
+                      {leadHistory.map((ev) => (
+                        <div
+                          key={ev.id}
+                          className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-700 ring-1 ring-slate-200/70"
+                        >
+                          <div className="text-xs font-semibold tracking-wide text-slate-600">
+                            {ev.event_type ?? "evento"}
+                          </div>
+                          <div className="mt-1 text-sm text-slate-900">{ev.notes ?? "-"}</div>
+                          <div className="mt-1 text-[11px] text-slate-500">{ev.created_at ?? ""}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl bg-slate-50 px-4 py-6 text-sm text-slate-600 ring-1 ring-slate-200/70">
+                      Sem histórico disponível.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="sticky bottom-0 z-10 border-t border-slate-100 bg-white px-6 py-5">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <a
                   href={`https://wa.me/${sanitizePhone(selectedLead.phone)}`}
                   target="_blank"
@@ -1297,37 +1462,6 @@ export default function LeadsAdminPage() {
                     Avançar
                     <ArrowRight className="h-4 w-4" />
                   </button>
-                </div>
-              </div>
-
-              <div className="mt-5 rounded-2xl bg-white ring-1 ring-slate-200/70">
-                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-                  <div className="text-sm font-semibold text-slate-900">Histórico</div>
-                  <div className="text-xs text-slate-500">
-                    {isHistoryLoading ? "Atualizando..." : `${leadHistory.length} eventos`}
-                  </div>
-                </div>
-                <div className="max-h-64 overflow-auto px-4 py-3">
-                  {leadHistory.length > 0 ? (
-                    <div className="flex flex-col gap-2">
-                      {leadHistory.map((ev) => (
-                        <div
-                          key={ev.id}
-                          className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-700 ring-1 ring-slate-200/70"
-                        >
-                          <div className="text-xs font-semibold tracking-wide text-slate-600">
-                            {ev.event_type ?? "evento"}
-                          </div>
-                          <div className="mt-1 text-sm text-slate-900">{ev.notes ?? "-"}</div>
-                          <div className="mt-1 text-[11px] text-slate-500">{ev.created_at ?? ""}</div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="rounded-xl bg-slate-50 px-4 py-6 text-sm text-slate-600 ring-1 ring-slate-200/70">
-                      Sem histórico disponível.
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
