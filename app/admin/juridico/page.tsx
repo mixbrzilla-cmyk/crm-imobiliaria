@@ -266,6 +266,7 @@ export default function JuridicoAdminPage() {
   const [riskFilter, setRiskFilter] = useState<"all" | RiskLevel>("all");
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const [lawyers, setLawyers] = useState<LawyerRow[]>([]);
   const [cases, setCases] = useState<CaseRow[]>([]);
@@ -320,6 +321,8 @@ export default function JuridicoAdminPage() {
   const [timelineModal, setTimelineModal] = useState<null | { caseId: string; step: TimelineStep }>(null);
   const [timelineDate, setTimelineDate] = useState<string>("");
   const [timelineResponsible, setTimelineResponsible] = useState<string>("");
+
+  const [isActionSaving, setIsActionSaving] = useState(false);
 
   const loadAll = useCallback(async () => {
     setErrorMessage(null);
@@ -444,34 +447,49 @@ export default function JuridicoAdminPage() {
     };
   }, [supabase, loadAll]);
 
-  async function updateCaseJson(caseId: string, patch: Partial<CaseRow>) {
+  async function updateCaseJson(caseId: string, patch: Partial<CaseRow>, opts?: { successText?: string }) {
     setErrorMessage(null);
-    if (!supabase) {
-      setErrorMessage(
-        "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
-      );
-      return false;
-    }
+    setSuccessMessage(null);
 
     setCases((current) => current.map((c) => (c.id === caseId ? ({ ...c, ...(patch as any) } as any) : c)));
 
-    const { error } = await (supabase as any).from("legal_cases").update(patch).eq("id", caseId);
-    if (error) {
-      setErrorMessage(error.message);
+    setIsActionSaving(true);
+    try {
+      const res = await fetch("/api/legal-cases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update", id: caseId, payload: patch }),
+      });
+
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) {
+        const msg = String(json?.error ?? `Falha ao salvar (HTTP ${res.status})`);
+        setErrorMessage(msg);
+        await loadAll();
+        return false;
+      }
+
+      setSuccessMessage(opts?.successText ?? "Salvo com sucesso.");
+      await loadAll();
+      return true;
+    } catch (e: any) {
+      setErrorMessage(e?.message ?? "Falha ao salvar.");
       await loadAll();
       return false;
+    } finally {
+      setIsActionSaving(false);
     }
-    return true;
   }
 
   async function toggleCert(caseId: string, key: keyof DueDiligenceState) {
+    if (isActionSaving) return;
     const row = cases.find((c) => c.id === caseId);
     if (!row) return;
     const current = parseDueDiligence((row as any)?.due_diligence_json);
     const next: DueDiligenceState = { ...current };
     const cur = current[key];
     next[key] = cur === "pendente" ? "negativa" : cur === "negativa" ? "positiva" : "pendente";
-    await updateCaseJson(caseId, { due_diligence_json: next } as any);
+    await updateCaseJson(caseId, { due_diligence_json: next } as any, { successText: "Certidão atualizada." });
   }
 
   async function openTimeline(caseId: string, step: TimelineStep) {
@@ -489,6 +507,7 @@ export default function JuridicoAdminPage() {
 
   async function saveTimelineEvent() {
     if (!timelineModal) return;
+    if (isActionSaving) return;
     const caseId = timelineModal.caseId;
     const step = timelineModal.step;
     const row = cases.find((c) => c.id === caseId);
@@ -509,7 +528,7 @@ export default function JuridicoAdminPage() {
     };
 
     const nextWorkflow = [payloadEv, ...existing].slice(0, 24);
-    const ok = await updateCaseJson(caseId, { workflow_json: nextWorkflow } as any);
+    const ok = await updateCaseJson(caseId, { workflow_json: nextWorkflow } as any, { successText: "Timeline atualizada." });
     if (ok) setTimelineModal(null);
   }
 
@@ -521,29 +540,40 @@ export default function JuridicoAdminPage() {
   }
 
   async function saveFees(caseId: string) {
-    const ok = await updateCaseJson(caseId, { fees_json: editingFees } as any);
+    if (isActionSaving) return;
+    const ok = await updateCaseJson(caseId, { fees_json: editingFees } as any, { successText: "Honorários atualizados." });
     if (ok) setEditingFeesCaseId(null);
   }
 
   async function deleteCase(caseId: string) {
+    if (isActionSaving) return;
     setErrorMessage(null);
-    if (!supabase) {
-      setErrorMessage(
-        "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
-      );
-      return;
-    }
+    setSuccessMessage(null);
 
     const caseTitle = (cases.find((c) => c.id === caseId)?.title ?? "").trim() || caseId;
     const ok = window.confirm(`Excluir o processo "${caseTitle}"?`);
     if (!ok) return;
 
-    const { error } = await (supabase as any).from("legal_cases").delete().eq("id", caseId);
-    if (error) {
-      setErrorMessage(error.message);
-      return;
+    setIsActionSaving(true);
+    try {
+      const res = await fetch("/api/legal-cases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete", id: caseId }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) {
+        const msg = String(json?.error ?? `Falha ao excluir (HTTP ${res.status})`);
+        setErrorMessage(msg);
+        return;
+      }
+      setSuccessMessage("Processo excluído.");
+      await loadAll();
+    } catch (e: any) {
+      setErrorMessage(e?.message ?? "Falha ao excluir.");
+    } finally {
+      setIsActionSaving(false);
     }
-    await loadAll();
   }
 
   async function addLawyer(e: React.FormEvent<HTMLFormElement>) {
@@ -761,6 +791,12 @@ export default function JuridicoAdminPage() {
         {errorMessage ? (
           <div className="rounded-2xl bg-red-50 px-5 py-4 text-sm text-red-700 ring-1 ring-red-200/70">
             {errorMessage}
+          </div>
+        ) : null}
+
+        {successMessage ? (
+          <div className="rounded-2xl bg-emerald-50 px-5 py-4 text-sm text-emerald-800 ring-1 ring-emerald-200/70">
+            {successMessage}
           </div>
         ) : null}
 
@@ -1135,6 +1171,7 @@ export default function JuridicoAdminPage() {
                                   <button
                                     type="button"
                                     onClick={() => void toggleCert(c.id, x.label === "Cível" ? "cert_civel" : x.label === "Trabalhista" ? "cert_trabalhista" : "cert_protesto")}
+                                    disabled={isActionSaving}
                                     className={"rounded-full px-3 py-1 text-xs font-semibold transition-all duration-300 hover:-translate-y-[1px] " + cls}
                                   >
                                     {x.value === "negativa" ? "Negativa" : x.value === "positiva" ? "Positiva" : "Pendente"}
@@ -1217,9 +1254,10 @@ export default function JuridicoAdminPage() {
                                 <button
                                   type="button"
                                   onClick={() => void saveFees(c.id)}
+                                  disabled={isActionSaving}
                                   className="inline-flex h-10 items-center justify-center rounded-xl bg-[#001f3f] px-4 text-xs font-semibold text-white shadow-sm transition-all duration-300 hover:bg-[#001a33]"
                                 >
-                                  Salvar
+                                  {isActionSaving ? "Salvando..." : "Salvar"}
                                 </button>
                               </div>
                             </div>
@@ -1310,9 +1348,10 @@ export default function JuridicoAdminPage() {
                         <button
                           type="button"
                           onClick={() => void deleteCase(c.id)}
+                          disabled={isActionSaving}
                           className="inline-flex h-9 items-center justify-center rounded-xl bg-rose-600 px-3 text-xs font-semibold text-white shadow-sm transition-all duration-300 hover:bg-rose-700"
                         >
-                          Excluir Processo
+                          {isActionSaving ? "Excluindo..." : "Excluir Processo"}
                         </button>
                         {c.meeting_link ? (
                           <a
@@ -1407,9 +1446,10 @@ export default function JuridicoAdminPage() {
                 <button
                   type="button"
                   onClick={() => void saveTimelineEvent()}
+                  disabled={isActionSaving}
                   className="inline-flex h-11 items-center justify-center rounded-xl bg-[#2b6cff] px-5 text-sm font-semibold text-white shadow-sm transition-all duration-300 hover:bg-[#255fe6]"
                 >
-                  Salvar
+                  {isActionSaving ? "Salvando..." : "Salvar"}
                 </button>
               </div>
             </div>
