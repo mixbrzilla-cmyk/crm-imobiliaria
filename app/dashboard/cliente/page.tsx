@@ -1,5 +1,5 @@
-import LeadDreamPortalClient from "../../meu-sonho/LeadDreamPortalClient";
+import { notFound } from "next/navigation";
 
 export default function DashboardClientePage() {
-  return <LeadDreamPortalClient />;
+  notFound();
 }

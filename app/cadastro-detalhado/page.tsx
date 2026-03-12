@@ -356,7 +356,9 @@ export default function CadastroDetalhadoPage() {
         return;
       }
 
-      window.location.href = "/cliente/dashboard";
+      setErrorMessage(null);
+      setIsSubmitting(false);
+      return;
     } catch (e: any) {
       setErrorMessage(e?.message ?? "Falha inesperada.");
       setIsSubmitting(false);

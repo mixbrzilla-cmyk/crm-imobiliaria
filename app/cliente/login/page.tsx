@@ -44,8 +44,7 @@ export default function ClienteLoginPage() {
         return;
       }
 
-      setOkMessage("Acesso liberado. Redirecionando...");
-      window.location.href = "/cliente/dashboard";
+      setOkMessage("Acesso liberado.");
     } catch (e: any) {
       setErrorMessage(e?.message ?? "Falha inesperada.");
     } finally {
