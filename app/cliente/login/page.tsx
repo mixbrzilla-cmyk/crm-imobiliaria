@@ -54,7 +54,12 @@ export default function ClienteLoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div
+      className="relative min-h-screen overflow-hidden"
+      style={{
+        backgroundImage: "linear-gradient(180deg, #050815 0%, #07152F 55%, #050815 100%)",
+      }}
+    >
       <div className="mx-auto w-full max-w-lg px-6 py-10">
         <div className="rounded-3xl bg-[radial-gradient(circle_at_top,white,rgba(241,245,249,0.7))] p-6 shadow-2xl ring-1 ring-slate-200/70">
           <div className="flex items-center gap-3">
@@ -69,7 +74,9 @@ export default function ClienteLoginPage() {
             </div>
           </div>
 
-          <h1 className="mt-5 text-2xl font-semibold tracking-tight text-slate-900">Meu Dashboard</h1>
+          <h1 className="mt-5 text-2xl font-semibold tracking-tight" style={{ color: "#2B3674" }}>
+            Meu Dashboard
+          </h1>
           <div className="mt-2 text-sm text-slate-600">
             Ambiente seguro e criptografado. Seus dados estão protegidos e são utilizados apenas para a personalização do
             seu atendimento imobiliário.
@@ -83,8 +90,8 @@ export default function ClienteLoginPage() {
                 className={
                   "inline-flex h-11 items-center justify-center rounded-xl px-4 text-sm font-semibold ring-1 transition-all duration-300 " +
                   (mode === "cpf"
-                    ? "bg-[#001f3f] text-white ring-black/10"
-                    : "bg-white text-slate-800 ring-[#001f3f]/20 hover:bg-slate-50")
+                    ? "bg-[#2B3674] text-white ring-black/10"
+                    : "bg-white text-slate-800 ring-[#2B3674]/20 hover:bg-slate-50")
                 }
               >
                 CPF
@@ -95,8 +102,8 @@ export default function ClienteLoginPage() {
                 className={
                   "inline-flex h-11 items-center justify-center rounded-xl px-4 text-sm font-semibold ring-1 transition-all duration-300 " +
                   (mode === "email"
-                    ? "bg-[#001f3f] text-white ring-black/10"
-                    : "bg-white text-slate-800 ring-[#001f3f]/20 hover:bg-slate-50")
+                    ? "bg-[#2B3674] text-white ring-black/10"
+                    : "bg-white text-slate-800 ring-[#2B3674]/20 hover:bg-slate-50")
                 }
               >
                 E-mail
@@ -144,7 +151,7 @@ export default function ClienteLoginPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#001f3f] px-5 text-sm font-semibold text-white shadow-[0_12px_26px_-18px_rgba(15,23,42,0.55)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#0b2e5a] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#2B3674] px-5 text-sm font-semibold text-white shadow-[0_12px_26px_-18px_rgba(2,6,23,0.65)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#344196] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isLoading ? (
                 "Entrando..."
