@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Lock, ShieldCheck } from "lucide-react";
+import { Coffee, Lock, ShieldCheck } from "lucide-react";
 
 import { getSupabaseClient } from "@/lib/supabaseClient";
 
@@ -64,7 +64,8 @@ export default function CadastroDetalhadoPage() {
 
   const PRIMARY = "#2F3B77";
   const ACCENT = "#C1121F";
-  const SOFT_BG = "#F4F7FA";
+  const ROYAL_DARK = "#050815";
+  const ROYAL_MID = "#07152F";
 
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -324,8 +325,19 @@ export default function CadastroDetalhadoPage() {
     );
   }, [PRIMARY, stepMeta?.key]);
 
+  const microCardIcon = useMemo(() => {
+    if (stepMeta?.key === "prefs") return "home";
+    if (stepMeta?.key === "endereco") return "home";
+    return "coffee";
+  }, [stepMeta?.key]);
+
   return (
-    <div className="relative min-h-screen overflow-hidden" style={{ backgroundColor: SOFT_BG }}>
+    <div
+      className="relative min-h-screen overflow-hidden"
+      style={{
+        backgroundImage: `linear-gradient(180deg, ${ROYAL_DARK} 0%, ${ROYAL_MID} 55%, ${ROYAL_DARK} 100%)`,
+      }}
+    >
       <motion.div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0"
@@ -335,7 +347,7 @@ export default function CadastroDetalhadoPage() {
       >
         <motion.div
           className="absolute -left-24 -top-24 h-[360px] w-[360px] rounded-full blur-3xl"
-          style={{ background: `radial-gradient(circle at 30% 30%, ${PRIMARY}22, transparent 62%)` }}
+          style={{ background: `radial-gradient(circle at 30% 30%, ${PRIMARY}66, transparent 62%)` }}
           animate={{
             x: [0, 40, -15, 0],
             y: [0, 18, 44, 0],
@@ -345,7 +357,7 @@ export default function CadastroDetalhadoPage() {
         />
         <motion.div
           className="absolute -right-24 top-16 h-[420px] w-[420px] rounded-full blur-3xl"
-          style={{ background: `radial-gradient(circle at 70% 40%, ${PRIMARY}18, transparent 64%)` }}
+          style={{ background: `radial-gradient(circle at 70% 40%, ${PRIMARY}55, transparent 64%)` }}
           animate={{
             x: [0, -50, 20, 0],
             y: [0, 32, -10, 0],
@@ -355,7 +367,7 @@ export default function CadastroDetalhadoPage() {
         />
         <motion.div
           className="absolute left-1/2 top-[55%] h-[380px] w-[380px] -translate-x-1/2 rounded-full blur-3xl"
-          style={{ background: `radial-gradient(circle at 50% 50%, ${ACCENT}18, transparent 66%)` }}
+          style={{ background: `radial-gradient(circle at 50% 50%, ${ACCENT}44, transparent 66%)` }}
           animate={{
             x: [0, 24, -28, 0],
             y: [0, -22, 18, 0],
@@ -369,10 +381,10 @@ export default function CadastroDetalhadoPage() {
         <motion.div
           className="rounded-3xl p-6 ring-1"
           style={{
-            backgroundColor: "rgba(255,255,255,0.62)",
-            borderColor: "rgba(255,255,255,0.55)",
-            boxShadow: "0 22px 70px -52px rgba(15,23,42,0.65)",
-            backdropFilter: "blur(14px)",
+            backgroundColor: "rgba(255,255,255,0.82)",
+            borderColor: "rgba(255,255,255,0.75)",
+            boxShadow: "0 30px 90px -60px rgba(0,0,0,0.9)",
+            backdropFilter: "blur(16px)",
           }}
           initial={{ opacity: 0, y: 18, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -444,8 +456,18 @@ export default function CadastroDetalhadoPage() {
                         <input
                           value={state.nome}
                           onChange={(e) => setState((s) => ({ ...s, nome: e.target.value }))}
-                          className="h-11 rounded-2xl bg-white/70 px-4 text-sm text-slate-900 ring-1 ring-white/60 outline-none transition-all duration-300 focus:ring-2"
-                          style={{ boxShadow: "0 16px 34px -30px rgba(15,23,42,0.55)", borderColor: "rgba(255,255,255,0.7)" }}
+                          className="h-11 rounded-2xl bg-white px-4 text-sm font-semibold text-slate-950 outline-none transition-all duration-200 border border-gray-300"
+                          style={{
+                            boxShadow: "0 18px 40px -36px rgba(15,23,42,0.6)",
+                          }}
+                          onFocus={(e) => {
+                            e.currentTarget.style.borderColor = PRIMARY;
+                            e.currentTarget.style.boxShadow = `0 0 0 4px ${PRIMARY}22, 0 0 0 1px ${PRIMARY}AA, 0 18px 40px -36px rgba(15,23,42,0.6)`;
+                          }}
+                          onBlur={(e) => {
+                            e.currentTarget.style.borderColor = "rgb(209 213 219)";
+                            e.currentTarget.style.boxShadow = "0 18px 40px -36px rgba(15,23,42,0.6)";
+                          }}
                           placeholder="Seu nome"
                           required
                         />
@@ -456,8 +478,18 @@ export default function CadastroDetalhadoPage() {
                         <input
                           value={state.telefone}
                           onChange={(e) => setState((s) => ({ ...s, telefone: e.target.value }))}
-                          className="h-11 rounded-2xl bg-white/70 px-4 text-sm text-slate-900 ring-1 ring-white/60 outline-none transition-all duration-300 focus:ring-2"
-                          style={{ boxShadow: "0 16px 34px -30px rgba(15,23,42,0.55)", borderColor: "rgba(255,255,255,0.7)" }}
+                          className="h-11 rounded-2xl bg-white px-4 text-sm font-semibold text-slate-950 outline-none transition-all duration-200 border border-gray-300"
+                          style={{
+                            boxShadow: "0 18px 40px -36px rgba(15,23,42,0.6)",
+                          }}
+                          onFocus={(e) => {
+                            e.currentTarget.style.borderColor = PRIMARY;
+                            e.currentTarget.style.boxShadow = `0 0 0 4px ${PRIMARY}22, 0 0 0 1px ${PRIMARY}AA, 0 18px 40px -36px rgba(15,23,42,0.6)`;
+                          }}
+                          onBlur={(e) => {
+                            e.currentTarget.style.borderColor = "rgb(209 213 219)";
+                            e.currentTarget.style.boxShadow = "0 18px 40px -36px rgba(15,23,42,0.6)";
+                          }}
                           placeholder="(11) 9xxxx-xxxx"
                           inputMode="tel"
                           required
@@ -470,15 +502,31 @@ export default function CadastroDetalhadoPage() {
                     <div className="flex flex-col gap-4">
                       <label className="flex flex-col gap-2">
                         <span className="text-xs font-semibold tracking-wide text-slate-700">CPF</span>
-                        <input
-                          value={state.cpf}
-                          onChange={(e) => setState((s) => ({ ...s, cpf: e.target.value }))}
-                          className="h-11 rounded-2xl bg-white/70 px-4 text-sm text-slate-900 ring-1 ring-white/60 outline-none transition-all duration-300 focus:ring-2"
-                          style={{ boxShadow: "0 16px 34px -30px rgba(15,23,42,0.55)", borderColor: "rgba(255,255,255,0.7)" }}
-                          placeholder="000.000.000-00"
-                          inputMode="numeric"
-                          required
-                        />
+                        <div className="relative">
+                          <Lock
+                            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                            style={{ color: ACCENT }}
+                          />
+                          <input
+                            value={state.cpf}
+                            onChange={(e) => setState((s) => ({ ...s, cpf: e.target.value }))}
+                            className="h-11 w-full rounded-2xl bg-white pl-10 pr-4 text-sm font-semibold text-slate-950 outline-none transition-all duration-200 border border-gray-300"
+                            style={{
+                              boxShadow: "0 18px 40px -36px rgba(15,23,42,0.6)",
+                            }}
+                            onFocus={(e) => {
+                              e.currentTarget.style.borderColor = PRIMARY;
+                              e.currentTarget.style.boxShadow = `0 0 0 4px ${PRIMARY}22, 0 0 0 1px ${PRIMARY}AA, 0 18px 40px -36px rgba(15,23,42,0.6)`;
+                            }}
+                            onBlur={(e) => {
+                              e.currentTarget.style.borderColor = "rgb(209 213 219)";
+                              e.currentTarget.style.boxShadow = "0 18px 40px -36px rgba(15,23,42,0.6)";
+                            }}
+                            placeholder="000.000.000-00"
+                            inputMode="numeric"
+                            required
+                          />
+                        </div>
                       </label>
                     </div>
                   ) : null}
@@ -490,8 +538,18 @@ export default function CadastroDetalhadoPage() {
                         <input
                           value={state.endereco}
                           onChange={(e) => setState((s) => ({ ...s, endereco: e.target.value }))}
-                          className="h-11 rounded-2xl bg-white/70 px-4 text-sm text-slate-900 ring-1 ring-white/60 outline-none transition-all duration-300 focus:ring-2"
-                          style={{ boxShadow: "0 16px 34px -30px rgba(15,23,42,0.55)", borderColor: "rgba(255,255,255,0.7)" }}
+                          className="h-11 rounded-2xl bg-white px-4 text-sm font-semibold text-slate-950 outline-none transition-all duration-200 border border-gray-300"
+                          style={{
+                            boxShadow: "0 18px 40px -36px rgba(15,23,42,0.6)",
+                          }}
+                          onFocus={(e) => {
+                            e.currentTarget.style.borderColor = PRIMARY;
+                            e.currentTarget.style.boxShadow = `0 0 0 4px ${PRIMARY}22, 0 0 0 1px ${PRIMARY}AA, 0 18px 40px -36px rgba(15,23,42,0.6)`;
+                          }}
+                          onBlur={(e) => {
+                            e.currentTarget.style.borderColor = "rgb(209 213 219)";
+                            e.currentTarget.style.boxShadow = "0 18px 40px -36px rgba(15,23,42,0.6)";
+                          }}
                           placeholder="Rua, número, bairro"
                           required
                         />
@@ -555,8 +613,18 @@ export default function CadastroDetalhadoPage() {
                         <input
                           value={state.bairros}
                           onChange={(e) => setState((s) => ({ ...s, bairros: e.target.value }))}
-                          className="h-11 rounded-2xl bg-white/70 px-4 text-sm text-slate-900 ring-1 ring-white/60 outline-none transition-all duration-300 focus:ring-2"
-                          style={{ boxShadow: "0 16px 34px -30px rgba(15,23,42,0.55)", borderColor: "rgba(255,255,255,0.7)" }}
+                          className="h-11 rounded-2xl bg-white px-4 text-sm font-semibold text-slate-950 outline-none transition-all duration-200 border border-gray-300"
+                          style={{
+                            boxShadow: "0 18px 40px -36px rgba(15,23,42,0.6)",
+                          }}
+                          onFocus={(e) => {
+                            e.currentTarget.style.borderColor = PRIMARY;
+                            e.currentTarget.style.boxShadow = `0 0 0 4px ${PRIMARY}22, 0 0 0 1px ${PRIMARY}AA, 0 18px 40px -36px rgba(15,23,42,0.6)`;
+                          }}
+                          onBlur={(e) => {
+                            e.currentTarget.style.borderColor = "rgb(209 213 219)";
+                            e.currentTarget.style.boxShadow = "0 18px 40px -36px rgba(15,23,42,0.6)";
+                          }}
                           placeholder="Ex: Centro, Jardins"
                         />
                       </label>
@@ -567,8 +635,18 @@ export default function CadastroDetalhadoPage() {
                           <input
                             value={state.valorMax}
                             onChange={(e) => setState((s) => ({ ...s, valorMax: e.target.value }))}
-                            className="h-11 rounded-2xl bg-white/70 px-4 text-sm text-slate-900 ring-1 ring-white/60 outline-none transition-all duration-300 focus:ring-2"
-                            style={{ boxShadow: "0 16px 34px -30px rgba(15,23,42,0.55)", borderColor: "rgba(255,255,255,0.7)" }}
+                            className="h-11 rounded-2xl bg-white px-4 text-sm font-semibold text-slate-950 outline-none transition-all duration-200 border border-gray-300"
+                            style={{
+                              boxShadow: "0 18px 40px -36px rgba(15,23,42,0.6)",
+                            }}
+                            onFocus={(e) => {
+                              e.currentTarget.style.borderColor = PRIMARY;
+                              e.currentTarget.style.boxShadow = `0 0 0 4px ${PRIMARY}22, 0 0 0 1px ${PRIMARY}AA, 0 18px 40px -36px rgba(15,23,42,0.6)`;
+                            }}
+                            onBlur={(e) => {
+                              e.currentTarget.style.borderColor = "rgb(209 213 219)";
+                              e.currentTarget.style.boxShadow = "0 18px 40px -36px rgba(15,23,42,0.6)";
+                            }}
                             placeholder="450000"
                             inputMode="numeric"
                           />
@@ -579,8 +657,18 @@ export default function CadastroDetalhadoPage() {
                           <input
                             value={state.quartos}
                             onChange={(e) => setState((s) => ({ ...s, quartos: e.target.value }))}
-                            className="h-11 rounded-2xl bg-white/70 px-4 text-sm text-slate-900 ring-1 ring-white/60 outline-none transition-all duration-300 focus:ring-2"
-                            style={{ boxShadow: "0 16px 34px -30px rgba(15,23,42,0.55)", borderColor: "rgba(255,255,255,0.7)" }}
+                            className="h-11 rounded-2xl bg-white px-4 text-sm font-semibold text-slate-950 outline-none transition-all duration-200 border border-gray-300"
+                            style={{
+                              boxShadow: "0 18px 40px -36px rgba(15,23,42,0.6)",
+                            }}
+                            onFocus={(e) => {
+                              e.currentTarget.style.borderColor = PRIMARY;
+                              e.currentTarget.style.boxShadow = `0 0 0 4px ${PRIMARY}22, 0 0 0 1px ${PRIMARY}AA, 0 18px 40px -36px rgba(15,23,42,0.6)`;
+                            }}
+                            onBlur={(e) => {
+                              e.currentTarget.style.borderColor = "rgb(209 213 219)";
+                              e.currentTarget.style.boxShadow = "0 18px 40px -36px rgba(15,23,42,0.6)";
+                            }}
                             placeholder="2"
                             inputMode="numeric"
                           />
@@ -593,15 +681,31 @@ export default function CadastroDetalhadoPage() {
                     <div className="flex flex-col gap-4">
                       <label className="flex flex-col gap-2">
                         <span className="text-xs font-semibold tracking-wide text-slate-700">Senha</span>
-                        <input
-                          value={state.senha}
-                          onChange={(e) => setState((s) => ({ ...s, senha: e.target.value }))}
-                          className="h-11 rounded-2xl bg-white/70 px-4 text-sm text-slate-900 ring-1 ring-white/60 outline-none transition-all duration-300 focus:ring-2"
-                          style={{ boxShadow: "0 16px 34px -30px rgba(15,23,42,0.55)", borderColor: "rgba(255,255,255,0.7)" }}
-                          placeholder="Mínimo 6 caracteres"
-                          type="password"
-                          required
-                        />
+                        <div className="relative">
+                          <Lock
+                            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                            style={{ color: ACCENT }}
+                          />
+                          <input
+                            value={state.senha}
+                            onChange={(e) => setState((s) => ({ ...s, senha: e.target.value }))}
+                            className="h-11 w-full rounded-2xl bg-white pl-10 pr-4 text-sm font-semibold text-slate-950 outline-none transition-all duration-200 border border-gray-300"
+                            style={{
+                              boxShadow: "0 18px 40px -36px rgba(15,23,42,0.6)",
+                            }}
+                            onFocus={(e) => {
+                              e.currentTarget.style.borderColor = PRIMARY;
+                              e.currentTarget.style.boxShadow = `0 0 0 4px ${PRIMARY}22, 0 0 0 1px ${PRIMARY}AA, 0 18px 40px -36px rgba(15,23,42,0.6)`;
+                            }}
+                            onBlur={(e) => {
+                              e.currentTarget.style.borderColor = "rgb(209 213 219)";
+                              e.currentTarget.style.boxShadow = "0 18px 40px -36px rgba(15,23,42,0.6)";
+                            }}
+                            placeholder="Mínimo 6 caracteres"
+                            type="password"
+                            required
+                          />
+                        </div>
                       </label>
 
                       <div className="rounded-2xl bg-white/55 px-4 py-3 text-xs font-semibold text-slate-700 ring-1 ring-white/55 backdrop-blur">
@@ -612,12 +716,30 @@ export default function CadastroDetalhadoPage() {
                 </motion.div>
               </AnimatePresence>
 
-              <div className="rounded-2xl bg-white/55 px-4 py-3 text-sm font-semibold text-slate-800 ring-1 ring-white/55 backdrop-blur">
-                {stepMeta?.micro}
+              <div
+                className="rounded-2xl px-4 py-3 text-sm font-semibold ring-1"
+                style={{
+                  background: `linear-gradient(135deg, rgba(47,59,119,0.14), rgba(193,18,31,0.08))`,
+                  borderColor: "rgba(47,59,119,0.22)",
+                  color: "#0B1026",
+                }}
+              >
+                <div className="flex items-start gap-3">
+                  {microCardIcon === "home" ? (
+                    <ShieldCheck className="mt-0.5 h-5 w-5" style={{ color: PRIMARY }} />
+                  ) : (
+                    <Coffee className="mt-0.5 h-5 w-5" style={{ color: PRIMARY }} />
+                  )}
+                  <div>
+                    <span className="mr-1">✨</span>
+                    {stepMeta?.micro}
+                  </div>
+                </div>
               </div>
 
-              <div className="text-center text-[11px] font-semibold tracking-wide text-slate-600">
-                Ambiente Criptografado - Protocolo de Segurança Imobiliária Moderna
+              <div className="flex items-center justify-center gap-2 text-center text-[11px] font-semibold tracking-wide text-slate-200">
+                <ShieldCheck className="h-4 w-4" style={{ color: ACCENT }} />
+                <span>Ambiente Criptografado - Protocolo de Segurança Imobiliária Moderna</span>
               </div>
             </div>
           </div>
