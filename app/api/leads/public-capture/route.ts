@@ -162,7 +162,7 @@ export async function POST(req: Request) {
     created_at: nowIso,
     stage: "recebido",
     source: sourceLabel,
-    name: nome,
+    full_name: nome,
     phone: whatsapp,
     notes,
   };
