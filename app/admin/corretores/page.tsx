@@ -31,6 +31,14 @@ type BrokerRowView = {
   isActive: boolean;
   propertiesInHands: number;
   leadsInAttendance: number;
+  latestLeads: Array<{
+    id: string;
+    full_name: string | null;
+    phone: string | null;
+    interest: string | null;
+    source: string | null;
+    created_at: string | null;
+  }>;
   assignedProperties: Array<{
     id: string;
     title: string;
@@ -248,6 +256,7 @@ export default function CorretoresAdminPage() {
     const devsByBroker = new Map<string, BrokerRowView["assignedDevelopments"]>();
     const whatsClicksByBroker = new Map<string, number>();
     const leadsAttendanceByBroker = new Map<string, number>();
+    const latestLeadsByBroker = new Map<string, BrokerRowView["latestLeads"]>();
 
     let propertiesBrokerColumn: "corretor_id" | "broker_id" = "corretor_id";
     try {
@@ -343,6 +352,34 @@ export default function CorretoresAdminPage() {
 
         for (const [brokerId, count] of best.map.entries()) {
           leadsAttendanceByBroker.set(brokerId, count);
+        }
+
+        const leadsLatestRes = await (supabase as any)
+          .from("leads")
+          .select(`id, full_name, phone, interest, source, created_at, ${best.column}`)
+          .eq("stage", "atendimento")
+          .in(best.column, brokerIds)
+          .order("created_at", { ascending: false })
+          .limit(300);
+
+        if (!leadsLatestRes.error) {
+          for (const row of (leadsLatestRes.data ?? []) as Array<any>) {
+            const brokerId = String(row?.[best.column] ?? "").trim();
+            if (!brokerId) continue;
+
+            const list = latestLeadsByBroker.get(brokerId) ?? [];
+            if (list.length >= 2) continue;
+
+            list.push({
+              id: String(row?.id ?? crypto.randomUUID()),
+              full_name: (row?.full_name ?? null) as any,
+              phone: (row?.phone ?? null) as any,
+              interest: (row?.interest ?? null) as any,
+              source: (row?.source ?? null) as any,
+              created_at: (row?.created_at ?? null) as any,
+            });
+            latestLeadsByBroker.set(brokerId, list);
+          }
         }
       } else {
         console.log("[Admin/Corretores] Leads em atendimento: nenhuma coluna de vínculo válida encontrada", {
@@ -503,6 +540,7 @@ export default function CorretoresAdminPage() {
       const inHands = assignedProperties.length + assignedDevelopments.length;
       const clicks = whatsClicksByBroker.get(b.id) ?? 0;
       const leadsInAttendance = leadsAttendanceByBroker.get(b.id) ?? 0;
+      const latestLeads = latestLeadsByBroker.get(b.id) ?? [];
       return {
         id: b.id,
         full_name: name,
@@ -513,6 +551,7 @@ export default function CorretoresAdminPage() {
         isActive: status.active,
         propertiesInHands: inHands,
         leadsInAttendance,
+        latestLeads,
         assignedProperties,
         assignedDevelopments,
         whatsClicks: clicks,
@@ -892,6 +931,23 @@ export default function CorretoresAdminPage() {
                         </div>
                       </div>
                     </div>
+
+                    {r.latestLeads.length > 0 ? (
+                      <div className="mt-3 rounded-2xl bg-slate-50 p-4 text-xs text-slate-700 ring-1 ring-slate-200/70">
+                        {r.latestLeads.map((lead) => {
+                          const namePhone = `${String(lead.full_name ?? "-").trim()} ${String(lead.phone ?? "").trim()}`.trim();
+                          const interest = String(lead.interest ?? "-").trim() || "-";
+                          const source = String(lead.source ?? "-").trim() || "-";
+                          return (
+                            <div key={lead.id} className="flex flex-col gap-1">
+                              <div className="font-semibold text-slate-900">{namePhone || "-"}</div>
+                              <div className="text-slate-700">• {interest}</div>
+                              <div className="text-slate-600">• origem: {source}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : null}
 
                     <div className="mt-4">
                       <div className="flex flex-wrap items-center gap-2">
