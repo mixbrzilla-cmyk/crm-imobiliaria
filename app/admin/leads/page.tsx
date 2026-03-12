@@ -171,6 +171,29 @@ function inferBairroFromAddress(address: string) {
   return candidate;
 }
 
+function extractBairroFromAddress(address: string) {
+  const raw = String(address ?? "").trim();
+  if (!raw) return "";
+
+  const byComma = inferBairroFromAddress(raw);
+  if (byComma) return byComma;
+
+  const matchBairro = raw.match(/\bbairro\s+([^,\-\.\n\r]+)/i);
+  const fromBairro = String(matchBairro?.[1] ?? "").trim();
+  if (fromBairro.length >= 3) return fromBairro;
+
+  const dashParts = raw
+    .split("-")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (dashParts.length >= 2) {
+    const candidate = dashParts[1] ?? "";
+    if (candidate.length >= 3) return candidate;
+  }
+
+  return raw;
+}
+
 function normalizeText(input: string) {
   return input
     .normalize("NFD")
@@ -293,7 +316,7 @@ export default function LeadsAdminPage() {
 
     const tipoFromIntent =
       leadBrain.intent === "comprar" ? "Compra" : leadBrain.intent === "alugar" ? "Aluguel" : null;
-    const bairroFromAddress = leadBrain.address ? inferBairroFromAddress(leadBrain.address) : "";
+    const bairroFromAddress = leadBrain.address ? extractBairroFromAddress(leadBrain.address) : "";
     const valorFromLead = leadBrain.value_max;
 
     setPreferences((current) => {
@@ -715,7 +738,7 @@ export default function LeadsAdminPage() {
     setErrorMessage(null);
 
     const tipoFromIntent = lead.intent === "comprar" ? "Compra" : lead.intent === "alugar" ? "Aluguel" : null;
-    const bairroFromAddress = lead.address ? inferBairroFromAddress(String(lead.address)) : "";
+    const bairroFromAddress = lead.address ? extractBairroFromAddress(String(lead.address)) : "";
     const valorFromLead = parseMoneyToNumberBR(lead.value_max);
 
     setPreferences({
@@ -811,7 +834,7 @@ export default function LeadsAdminPage() {
       const row = (data ?? null) as CustomerPreferencesRow | null;
 
       const tipoFromIntent = lead.intent === "comprar" ? "Compra" : lead.intent === "alugar" ? "Aluguel" : null;
-      const bairroFromAddress = lead.address ? inferBairroFromAddress(String(lead.address)) : "";
+      const bairroFromAddress = lead.address ? extractBairroFromAddress(String(lead.address)) : "";
       const valorFromLead = parseMoneyToNumberBR(lead.value_max);
 
       setPreferences((current) => {
@@ -1071,7 +1094,7 @@ export default function LeadsAdminPage() {
 
                     const intentLabel =
                       cardLead.intent === "comprar" ? "Compra" : cardLead.intent === "alugar" ? "Aluguel" : "";
-                    const bairro = cardLead.address ? inferBairroFromAddress(String(cardLead.address)) : "";
+                    const bairro = cardLead.address ? extractBairroFromAddress(String(cardLead.address)) : "";
                     const valueMax = parseMoneyToNumberBR(cardLead.value_max);
                     const sourceText = sourceLabel(cardLead.source);
 
