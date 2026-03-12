@@ -824,20 +824,22 @@ export default function CorretoresAdminPage() {
                       </div>
                     ) : null}
 
-                    <div className="mt-5 flex items-center justify-between gap-4">
-                      <div className="inline-flex items-center gap-2 rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70">
-                        <div className="text-2xl font-semibold tracking-tight text-slate-900">{r.propertiesInHands}</div>
-                        <div className="text-xs font-semibold text-slate-600">itens</div>
-                      </div>
+                    <div className="mt-5 flex items-center gap-4">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="inline-flex items-center gap-2 rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70">
+                          <div className="text-2xl font-semibold tracking-tight text-slate-900">{r.propertiesInHands ?? 0}</div>
+                          <div className="text-xs font-semibold text-slate-600">itens</div>
+                        </div>
 
-                      <div className="inline-flex items-center gap-2 rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70">
-                        <div className="text-2xl font-semibold tracking-tight text-slate-900">{r.leadsInAttendance}</div>
-                        <div className="text-xs font-semibold text-slate-600">Leads em Atendimento</div>
+                        <div className="inline-flex items-center gap-2 rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70">
+                          <div className="text-2xl font-semibold tracking-tight text-slate-900">{r.leadsInAttendance ?? 0}</div>
+                          <div className="text-xs font-semibold text-slate-600">Leads em Atendimento</div>
+                        </div>
                       </div>
 
                       <div
                         className={
-                          "flex h-20 w-20 flex-col items-center justify-center rounded-full transition-all duration-300 " +
+                          "ml-auto flex h-20 w-20 flex-col items-center justify-center rounded-full transition-all duration-300 " +
                           (hasClicks
                             ? "bg-[#22c55e] text-white shadow-[0_18px_34px_-22px_rgba(34,197,94,0.95)]"
                             : "bg-slate-100 text-slate-600 ring-1 ring-slate-200/70")
@@ -845,11 +847,11 @@ export default function CorretoresAdminPage() {
                         title={hasClicks ? `${r.whatsClicks} cliques` : "0 cliques"}
                       >
                         <WhatsappIcon className={"h-5 w-5 " + (hasClicks ? "text-white" : "text-slate-400")} />
-                        <div className={"mt-1 text-lg font-semibold leading-none " + (hasClicks ? "text-white" : "text-slate-700")}>
+                        <div className={"mt-1 text-[11px] font-semibold " + (hasClicks ? "text-white" : "text-slate-500")}>
                           {r.whatsClicks}
                         </div>
-                        <div className={"mt-0.5 text-[10px] font-semibold " + (hasClicks ? "text-white/90" : "text-slate-400")}>
-                          {hasClicks ? "cliques" : "0 cliques"}
+                        <div className={"text-[10px] font-semibold " + (hasClicks ? "text-emerald-50" : "text-slate-400")}>
+                          cliques
                         </div>
                       </div>
                     </div>
