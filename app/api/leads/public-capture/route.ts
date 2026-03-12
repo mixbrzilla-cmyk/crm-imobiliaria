@@ -65,15 +65,6 @@ function formatCurrencyBRL(value: number) {
   });
 }
 
-function getMissingColumnFromError(err: any) {
-  const msg = String(err?.message ?? "");
-  const match = msg.match(/Could not find the '([^']+)' column/i);
-  if (match?.[1]) return match[1];
-  const alt = msg.match(/column\s+"?([^\s\"]+)"?\s+does\s+not\s+exist/i);
-  if (alt?.[1]) return alt[1];
-  return null;
-}
-
 function allowedOriginsFromEnv() {
   const raw =
     process.env.PUBLIC_LEAD_CAPTURE_ORIGINS ||
@@ -163,48 +154,22 @@ export async function POST(req: Request) {
   const tipoLabel = (tipo ?? "").trim();
   const valorLabel = typeof valor_max === "number" && Number.isFinite(valor_max) ? formatCurrencyBRL(valor_max) : "-";
 
-  const observacao = `Busca: ${tipoLabel || "-"} | Bairro: ${bairroLabel || "-"} | Valor: ${valorLabel}`;
-
+  const notes = `Intenção: ${tipoLabel || "-"} | Bairro: ${bairroLabel || "-"} | Valor: ${valorLabel}`;
   const sourceLabel = String(origem ?? "").trim() || "public_capture";
 
-  const basePayload: any = {
+  const payload: any = {
     id: leadId,
     created_at: nowIso,
     stage: "recebido",
     source: sourceLabel,
-    full_name: nome,
     name: nome,
     phone: whatsapp,
-    whatsapp,
-    notes: observacao,
-    observations: observacao,
-    description: observacao,
+    notes,
   };
 
-  const tryPayload: any = { ...basePayload };
-  let lastError: any = null;
-
-  for (let i = 0; i < 12; i++) {
-    const { error } = await (supabase as any).from("leads").insert(tryPayload);
-    if (!error) {
-      lastError = null;
-      break;
-    }
-
-    lastError = error;
-    const missing = getMissingColumnFromError(error);
-    if (!missing) break;
-
-    if (missing in tryPayload) {
-      delete tryPayload[missing];
-      continue;
-    }
-
-    break;
-  }
-
-  if (lastError) {
-    return NextResponse.json({ ok: false, error: lastError.message }, { status: 400, headers });
+  const { error } = await (supabase as any).from("leads").insert(payload);
+  if (error) {
+    return NextResponse.json({ ok: false, error: error.message }, { status: 400, headers });
   }
 
   return NextResponse.json({ ok: true, id: leadId }, { status: 200, headers });
