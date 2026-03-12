@@ -52,12 +52,11 @@ export async function GET() {
     );
   }
 
+  console.log("[api/cliente/me] CLIENT_LEAD_TOKEN_SECRET present:", !!process.env.CLIENT_LEAD_TOKEN_SECRET);
   const tokenSecret = process.env.CLIENT_LEAD_TOKEN_SECRET || "";
   if (!tokenSecret) {
-    return NextResponse.json(
-      { error: "CLIENT_LEAD_TOKEN_SECRET não configurado no ambiente do servidor." },
-      { status: 500 },
-    );
+    console.error("[api/cliente/me] CLIENT_LEAD_TOKEN_SECRET missing - refusing auth checks");
+    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
   }
 
   const cookieStore = await cookies();

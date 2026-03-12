@@ -135,7 +135,7 @@ export default function LeadDreamPortalClient() {
 
           if (!res.ok) {
             if (res.status === 401) {
-              window.location.href = "/cadastro-detalhado";
+              window.location.href = "/cliente/login";
               return;
             }
 

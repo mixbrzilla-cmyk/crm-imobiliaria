@@ -43,12 +43,11 @@ export async function POST(req: Request) {
     );
   }
 
+  console.log("[api/cliente/login] CLIENT_LEAD_TOKEN_SECRET present:", !!process.env.CLIENT_LEAD_TOKEN_SECRET);
   const tokenSecret = process.env.CLIENT_LEAD_TOKEN_SECRET || "";
   if (!tokenSecret) {
-    return NextResponse.json(
-      { error: "CLIENT_LEAD_TOKEN_SECRET não configurado no ambiente do servidor." },
-      { status: 500 },
-    );
+    console.error("[api/cliente/login] CLIENT_LEAD_TOKEN_SECRET missing - cannot issue client_lead cookie");
+    return NextResponse.json({ error: "Login indisponível no momento." }, { status: 503 });
   }
 
   let body: any;
