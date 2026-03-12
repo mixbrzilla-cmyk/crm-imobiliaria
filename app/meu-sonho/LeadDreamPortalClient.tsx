@@ -106,6 +106,14 @@ function progressSteps(stage: string | null | undefined) {
   };
 }
 
+function firstNameFromFullName(fullName: string) {
+  const n = String(fullName ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!n) return "";
+  return n.split(" ")[0] ?? "";
+}
+
 export default function LeadDreamPortalClient() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -159,9 +167,9 @@ export default function LeadDreamPortalClient() {
     return () => window.clearTimeout(t);
   }, []);
 
-  const titleName = useMemo(() => {
+  const firstName = useMemo(() => {
     const name = String(lead?.full_name ?? "").trim();
-    return name || "";
+    return firstNameFromFullName(name);
   }, [lead?.full_name]);
 
   const bairro = useMemo(() => leadNeighborhood(lead, preferences), [lead, preferences]);
@@ -171,8 +179,12 @@ export default function LeadDreamPortalClient() {
     <div className="min-h-screen bg-slate-50">
       <div className="mx-auto w-full max-w-6xl px-6 py-10">
         <div className="flex flex-col gap-2">
-          <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">PORTAL DO SONHADOR</div>
-          <div className="text-3xl font-semibold tracking-tight text-slate-900">Meu Sonho</div>
+          <div className="text-3xl font-semibold tracking-tight text-slate-900">
+            Olá{firstName ? `, ${firstName}` : ""}! Bem-vindo ao seu Dashboard Exclusivo.
+          </div>
+          <div className="text-sm text-slate-600">
+            Ambiente seguro para acompanhar seu atendimento e as oportunidades com maior compatibilidade.
+          </div>
         </div>
 
         {errorMessage ? (
@@ -189,15 +201,13 @@ export default function LeadDreamPortalClient() {
           <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
             <div className="lg:col-span-8">
               <div className="rounded-3xl bg-gradient-to-br from-[#001f3f] to-slate-900 p-6 text-white shadow-[0_18px_60px_-34px_rgba(15,23,42,0.55)] ring-1 ring-black/10">
-                <div className="text-sm font-semibold tracking-wide text-white/80">A JORNADA</div>
-                <div className="mt-3 text-xl font-semibold">
-                  Olá{titleName ? `, ${titleName}` : ""}! Sua jornada para o imóvel ideal começou.
-                </div>
-                <div className="mt-3 text-sm leading-relaxed text-white/85">
-                  Nossa tecnologia de Matching acabou de cruzar suas preferências com nossa base exclusiva. Abaixo, você
-                  encontrará os imóveis que passaram no nosso rigoroso critério de valor, localização e perfil.
-                  Enquanto você analisa, nosso sistema já selecionou o corretor especialista em {bairro || "sua região"} para
-                  te acompanhar. Você não está sozinho nessa.
+                <div className="text-sm font-semibold tracking-wide text-white/80">STATUS DO ATENDIMENTO</div>
+                <div className="mt-3 text-xl font-semibold">Acompanhe a evolução do seu atendimento.</div>
+
+                <div className="mt-4 rounded-2xl bg-white/10 px-4 py-4 text-sm leading-relaxed text-white/90 ring-1 ring-white/15">
+                  Esta área utiliza nosso algoritmo de Matching Imobiliário para filtrar oportunidades em tempo real.
+                  Analisamos variáveis de localização (Bairro), capacidade financeira e perfil do imóvel para apresentar
+                  apenas as unidades que possuem alto índice de compatibilidade com seu cadastro.
                 </div>
 
                 <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-4">
@@ -252,29 +262,47 @@ export default function LeadDreamPortalClient() {
                             <span className="rounded-full bg-slate-100 px-3 py-1 ring-1 ring-slate-200/70">
                               {p.property_type ?? "Imóvel"}
                             </span>
-                            {p.neighborhood ? (
-                              <span className="rounded-full bg-slate-100 px-3 py-1 ring-1 ring-slate-200/70">
-                                {p.neighborhood}
-                              </span>
-                            ) : null}
                             {typeof p.bedrooms === "number" ? (
                               <span className="rounded-full bg-slate-100 px-3 py-1 ring-1 ring-slate-200/70">
-                                {p.bedrooms} qtos
+                                {p.bedrooms} dormitórios
                               </span>
                             ) : null}
+                            <span className="rounded-full bg-slate-100 px-3 py-1 ring-1 ring-slate-200/70">
+                              {p.neighborhood || "Localização"}
+                              {p.city ? ` · ${p.city}` : ""}
+                            </span>
                           </div>
 
-                          <div className="mt-3 text-base font-semibold text-slate-900">{p.title ?? "Imóvel selecionado"}</div>
+                          <div className="mt-3 text-base font-semibold text-slate-900">
+                            {p.title ?? "Unidade com alta compatibilidade"}
+                          </div>
 
                           <div className="mt-2 text-sm font-semibold text-emerald-700">
-                            {typeof p.price === "number" ? formatCurrencyBRL(p.price) : "Preço sob consulta"}
+                            {typeof p.price === "number" ? formatCurrencyBRL(p.price) : "Valor sob consulta"}
+                          </div>
+
+                          <div className="mt-3 grid grid-cols-1 gap-1 text-xs text-slate-600">
+                            <div>
+                              <span className="font-semibold text-slate-900">Localização:</span> {p.neighborhood || "-"}
+                              {p.city ? `, ${p.city}` : ""}
+                            </div>
+                            <div>
+                              <span className="font-semibold text-slate-900">Tipologia:</span> {p.property_type || "-"}
+                            </div>
                           </div>
 
                           <button
                             type="button"
                             className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-[#001f3f] px-5 text-sm font-semibold text-white shadow-[0_10px_24px_-18px_rgba(15,23,42,0.55)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#001a33]"
                           >
-                            Tenho Interesse
+                            Solicitar Análise Técnica
+                          </button>
+
+                          <button
+                            type="button"
+                            className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-white px-5 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[1px] hover:bg-slate-50"
+                          >
+                            Agendar Visita Especializada
                           </button>
                         </div>
                       </div>

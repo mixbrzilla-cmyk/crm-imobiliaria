@@ -4,6 +4,9 @@ import { createClient } from "@supabase/supabase-js";
 
 import { signClientLeadToken } from "@/lib/clientLeadAuth";
 
+ export const runtime = "nodejs";
+ export const dynamic = "force-dynamic";
+
 function getServiceSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey =
