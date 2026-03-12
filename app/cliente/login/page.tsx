@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { Lock } from "lucide-react";
 
 type Mode = "cpf" | "email";
 
@@ -55,11 +56,23 @@ export default function ClienteLoginPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="mx-auto w-full max-w-lg px-6 py-10">
-        <div className="rounded-3xl bg-white p-6 shadow-[0_12px_40px_-24px_rgba(15,23,42,0.35)] ring-1 ring-slate-200/70">
-          <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">ÁREA DO CLIENTE</div>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Meu Dashboard</h1>
+        <div className="rounded-3xl bg-gradient-to-b from-white to-slate-50/70 p-6 shadow-xl ring-1 ring-slate-200/70">
+          <div className="flex items-center gap-3">
+            <img
+              src="https://imobmoderna.com.br/wp-content/uploads/2026/03/Sem-Titulo-2-1024x1024-1.png"
+              alt="CRM Imobiliária Moderna"
+              className="h-11 w-11 rounded-2xl bg-white object-cover ring-1 ring-slate-200/70"
+            />
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold text-slate-900">CRM Imobiliária Moderna</div>
+              <div className="truncate text-xs font-semibold tracking-[0.14em] text-slate-600">DASHBOARD DO CLIENTE</div>
+            </div>
+          </div>
+
+          <h1 className="mt-5 text-2xl font-semibold tracking-tight text-slate-900">Meu Dashboard</h1>
           <div className="mt-2 text-sm text-slate-600">
-            Acesse suas preferências e sugestões de imóveis.
+            Ambiente seguro e criptografado. Seus dados estão protegidos e são utilizados apenas para a personalização do
+            seu atendimento imobiliário.
           </div>
 
           <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
@@ -131,9 +144,16 @@ export default function ClienteLoginPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white shadow-[0_10px_24px_-18px_rgba(16,185,129,0.55)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white shadow-[0_10px_24px_-18px_rgba(16,185,129,0.55)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isLoading ? "Entrando..." : "Entrar"}
+              {isLoading ? (
+                "Entrando..."
+              ) : (
+                <>
+                  <Lock className="h-4 w-4" aria-hidden="true" />
+                  Entrar
+                </>
+              )}
             </button>
 
             <div className="flex items-center justify-between text-xs text-slate-500">
