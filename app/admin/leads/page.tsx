@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ArrowLeft,
@@ -298,6 +298,17 @@ export default function LeadsAdminPage() {
   const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
   const [suggestionsNote, setSuggestionsNote] = useState<string | null>(null);
   const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(false);
+
+  const suggestionsCacheRef = useRef<
+    Map<
+      string,
+      {
+        at: number;
+        suggestions: PropertySuggestionRow[];
+        note: string | null;
+      }
+    >
+  >(new Map());
 
   const [dispatchBrokerId, setDispatchBrokerId] = useState<string>("");
   const [isDispatching, setIsDispatching] = useState(false);
@@ -694,6 +705,9 @@ export default function LeadsAdminPage() {
 
     setMovingLeadId(leadId);
 
+    setRows((current) => current.map((l) => (l.id === leadId ? { ...l, stage } : l)));
+    setSelectedLead((current) => (current && current.id === leadId ? { ...current, stage } : current));
+
     try {
       const { error } = await (supabase as any)
         .from("leads")
@@ -702,14 +716,14 @@ export default function LeadsAdminPage() {
 
       if (error) {
         setErrorMessage(error.message);
+        await load();
         setMovingLeadId(null);
         return;
       }
-
-      setRows((current) => current.map((l) => (l.id === leadId ? { ...l, stage } : l)));
       setMovingLeadId(null);
     } catch {
       setErrorMessage("Não foi possível mover o lead agora.");
+      await load();
       setMovingLeadId(null);
     }
   }
@@ -910,7 +924,29 @@ export default function LeadsAdminPage() {
     setIsSuggestionsLoading(true);
     setSuggestionsError(null);
     setSuggestionsNote(null);
-    setSuggestions([]);
+
+    const cacheKey = JSON.stringify({
+      leadId,
+      tipo: String(prefs?.tipo_imovel ?? "").trim(),
+      bairro: String(prefs?.bairro ?? "").trim(),
+      quartos: typeof prefs?.quartos === "number" ? prefs!.quartos : null,
+      valorMax: typeof prefs?.valor_max === "number" ? prefs!.valor_max : null,
+      intent:
+        leadBrain?.lead_id === leadId
+          ? leadBrain.intent
+          : selectedLead?.id === leadId
+            ? (selectedLead.intent ?? null)
+            : null,
+    });
+
+    const cached = suggestionsCacheRef.current.get(cacheKey);
+    const now = Date.now();
+    if (cached && now - cached.at < 60_000) {
+      setSuggestions(cached.suggestions);
+      setSuggestionsNote(cached.note);
+      setIsSuggestionsLoading(false);
+      return;
+    }
 
     try {
       const intent =
@@ -924,7 +960,7 @@ export default function LeadsAdminPage() {
         .from("properties")
         .select("id, title, property_type, purpose, price, neighborhood, city, bedrooms, status")
         .eq("status", "disponivel")
-        .limit(24);
+        .limit(18);
 
       const tipo = String(prefs?.tipo_imovel ?? "").trim();
       const bairro = String(prefs?.bairro ?? "").trim();
@@ -952,6 +988,7 @@ export default function LeadsAdminPage() {
       const exact = (data ?? []) as PropertySuggestionRow[];
       if (exact.length > 0) {
         setSuggestions(exact);
+        suggestionsCacheRef.current.set(cacheKey, { at: now, suggestions: exact, note: null });
         setIsSuggestionsLoading(false);
         return;
       }
@@ -971,7 +1008,9 @@ export default function LeadsAdminPage() {
         return;
       }
 
-      setSuggestions(((fb?.data ?? []) as PropertySuggestionRow[]).slice(0, 10));
+      const near = ((fb?.data ?? []) as PropertySuggestionRow[]).slice(0, 10);
+      setSuggestions(near);
+      suggestionsCacheRef.current.set(cacheKey, { at: now, suggestions: near, note: "Nenhum imóvel exatamente neste perfil, mostrando os mais próximos." });
       setIsSuggestionsLoading(false);
     } catch (e: any) {
       setSuggestions([]);
@@ -1611,7 +1650,14 @@ export default function LeadsAdminPage() {
                   <button
                     type="button"
                     disabled={movingLeadId === selectedLead.id}
-                    onClick={() => void setLeadStage(selectedLead.id, nextStage(selectedLead.stage))}
+                    onClick={() =>
+                      void setLeadStage(
+                        selectedLead.id,
+                        selectedLead.stage === "recebido" || selectedLead.stage === "qualificado"
+                          ? "atendimento"
+                          : nextStage(selectedLead.stage),
+                      )
+                    }
                     className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-[#001f3f] px-4 text-sm font-semibold text-white shadow-[0_6px_16px_-10px_rgba(15,23,42,0.45)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#001a33] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     Avançar
