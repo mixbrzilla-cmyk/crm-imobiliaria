@@ -30,6 +30,7 @@ type BrokerRowView = {
   statusLabel: string;
   isActive: boolean;
   propertiesInHands: number;
+  leadsInAttendance: number;
   assignedProperties: Array<{
     id: string;
     title: string;
@@ -246,6 +247,7 @@ export default function CorretoresAdminPage() {
     const propsByBroker = new Map<string, BrokerRowView["assignedProperties"]>();
     const devsByBroker = new Map<string, BrokerRowView["assignedDevelopments"]>();
     const whatsClicksByBroker = new Map<string, number>();
+    const leadsAttendanceByBroker = new Map<string, number>();
 
     let propertiesBrokerColumn: "corretor_id" | "broker_id" = "corretor_id";
     try {
@@ -274,6 +276,47 @@ export default function CorretoresAdminPage() {
       if (!test.error) {
         propertiesClickColumn = col;
         break;
+      }
+    }
+
+    if (brokerIds.length) {
+      let leadsBrokerColumn:
+        | "assigned_broker_profile_id"
+        | "broker_id"
+        | "owner_broker_profile_id" = "assigned_broker_profile_id";
+      try {
+        const testAssigned = await (supabase as any)
+          .from("leads")
+          .select("id, assigned_broker_profile_id")
+          .limit(1);
+        if (testAssigned.error) {
+          const testBroker = await (supabase as any).from("leads").select("id, broker_id").limit(1);
+          if (!testBroker.error) {
+            leadsBrokerColumn = "broker_id";
+          } else {
+            const testOwner = await (supabase as any)
+              .from("leads")
+              .select("id, owner_broker_profile_id")
+              .limit(1);
+            if (!testOwner.error) leadsBrokerColumn = "owner_broker_profile_id";
+          }
+        }
+      } catch {
+        leadsBrokerColumn = "assigned_broker_profile_id";
+      }
+
+      const leadsRes = await (supabase as any)
+        .from("leads")
+        .select(`id, ${leadsBrokerColumn}`)
+        .eq("stage", "atendimento")
+        .in(leadsBrokerColumn, brokerIds);
+
+      if (!leadsRes.error) {
+        for (const row of (leadsRes.data ?? []) as Array<any>) {
+          const brokerId = String(row?.[leadsBrokerColumn] ?? "").trim();
+          if (!brokerId) continue;
+          leadsAttendanceByBroker.set(brokerId, (leadsAttendanceByBroker.get(brokerId) ?? 0) + 1);
+        }
       }
     }
 
@@ -422,6 +465,7 @@ export default function CorretoresAdminPage() {
       const assignedDevelopments = devsByBroker.get(b.id) ?? [];
       const inHands = assignedProperties.length + assignedDevelopments.length;
       const clicks = whatsClicksByBroker.get(b.id) ?? 0;
+      const leadsInAttendance = leadsAttendanceByBroker.get(b.id) ?? 0;
       return {
         id: b.id,
         full_name: name,
@@ -431,6 +475,7 @@ export default function CorretoresAdminPage() {
         statusLabel: status.label,
         isActive: status.active,
         propertiesInHands: inHands,
+        leadsInAttendance,
         assignedProperties,
         assignedDevelopments,
         whatsClicks: clicks,
@@ -448,6 +493,35 @@ export default function CorretoresAdminPage() {
 
     return () => clearTimeout(timeoutId);
   }, [loadBaseData]);
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    let t: any = null;
+    const channel = (supabase as any)
+      .channel("admin-corretores-leads")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "leads" },
+        () => {
+          if (t) return;
+          t = setTimeout(() => {
+            t = null;
+            void loadBaseData();
+          }, 350);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      if (t) clearTimeout(t);
+      try {
+        (supabase as any).removeChannel(channel);
+      } catch {
+        return;
+      }
+    };
+  }, [supabase, loadBaseData]);
 
   async function deleteBroker(brokerId: string) {
     setErrorMessage(null);
@@ -754,6 +828,11 @@ export default function CorretoresAdminPage() {
                       <div className="inline-flex items-center gap-2 rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70">
                         <div className="text-2xl font-semibold tracking-tight text-slate-900">{r.propertiesInHands}</div>
                         <div className="text-xs font-semibold text-slate-600">itens</div>
+                      </div>
+
+                      <div className="inline-flex items-center gap-2 rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70">
+                        <div className="text-2xl font-semibold tracking-tight text-slate-900">{r.leadsInAttendance}</div>
+                        <div className="text-xs font-semibold text-slate-600">Leads em Atendimento</div>
                       </div>
 
                       <div
