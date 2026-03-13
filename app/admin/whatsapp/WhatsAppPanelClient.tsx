@@ -974,8 +974,12 @@ export default function WhatsAppPanelClient() {
                 <textarea
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
-                  placeholder={selectedThreadId ? "Digite uma mensagem" : "Selecione uma conversa"}
-                  disabled={!selectedThreadId || isSending}
+                  placeholder={
+                    selectedThreadId
+                      ? "Digite uma mensagem"
+                      : "Digite uma mensagem (selecione ou inicie uma conversa para enviar)"
+                  }
+                  disabled={isSending}
                   className="min-h-11 flex-1 resize-none rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:bg-white focus:ring-2 focus:ring-[#001f3f]/10 disabled:cursor-not-allowed disabled:bg-slate-100"
                 />
 
