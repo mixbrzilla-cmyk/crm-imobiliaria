@@ -57,7 +57,7 @@ async function loadEvolutionSettings() {
 
   const res = await (supabase as any)
     .from("whatsapp_settings")
-    .select("evolution_api_url, evolution_global_api_key, created_at")
+    .select("id, evolution_api_url, evolution_global_api_key, created_at")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -68,6 +68,7 @@ async function loadEvolutionSettings() {
 
   const apiUrl = String((res.data as any)?.evolution_api_url ?? "").trim();
   const apiKey = String((res.data as any)?.evolution_global_api_key ?? "").trim();
+  const rowId = (res.data as any)?.id ? String((res.data as any).id) : null;
 
   if (!apiUrl || !apiKey) {
     return {
@@ -76,7 +77,7 @@ async function loadEvolutionSettings() {
     };
   }
 
-  return { ok: true as const, apiUrl, apiKey };
+  return { ok: true as const, apiUrl, apiKey, rowId };
 }
 
 function buildAuthHeaders(globalKey: string) {
@@ -107,10 +108,23 @@ function extractStateFromInstance(instance: any) {
   return null;
 }
 
+function getMigrationSql() {
+  return `alter table public.whatsapp_settings
+  add column if not exists evolution_instance_name text,
+  add column if not exists evolution_instance_state text,
+  add column if not exists evolution_instance_is_open boolean,
+  add column if not exists evolution_instance_updated_at timestamptz;`;
+}
+
 export async function GET() {
   const settings = await loadEvolutionSettings();
   if (!settings.ok) {
     return NextResponse.json({ ok: false, error: settings.error }, { status: 500 });
+  }
+
+  const supabase = getServiceSupabase();
+  if (!supabase) {
+    return NextResponse.json({ ok: false, error: "Service role não configurada." }, { status: 500 });
   }
 
   const baseUrl = toAbsoluteBaseUrl(settings.apiUrl);
@@ -144,6 +158,44 @@ export async function GET() {
   const stateNormalized = state ? state.toLowerCase() : null;
   const isOpen = stateNormalized ? ["open", "opened", "connected", "online"].includes(stateNormalized) : false;
 
+  let persisted = false;
+  let persistError: string | null = null;
+  let needsMigration = false;
+  if (settings.rowId) {
+    try {
+      const payload = {
+        evolution_instance_name: instanceName,
+        evolution_instance_state: state,
+        evolution_instance_is_open: isOpen,
+        evolution_instance_updated_at: new Date().toISOString(),
+      };
+
+      const up = await (supabase as any)
+        .from("whatsapp_settings")
+        .update(payload)
+        .eq("id", settings.rowId);
+
+      if (up?.error) {
+        // If the DB doesn't have these columns, don't fail the status endpoint.
+        persisted = false;
+        persistError = String(up.error.message ?? "Falha ao persistir status.");
+        const msg = persistError.toLowerCase();
+        if (msg.includes("column") && msg.includes("does not exist")) {
+          needsMigration = true;
+        }
+      } else {
+        persisted = true;
+      }
+    } catch (e: any) {
+      persisted = false;
+      persistError = e?.message ? String(e.message) : "Falha ao persistir status.";
+      const msg = String(persistError ?? "").toLowerCase();
+      if (msg.includes("column") && msg.includes("does not exist")) {
+        needsMigration = true;
+      }
+    }
+  }
+
   return NextResponse.json({
     ok: res.ok,
     status: res.status,
@@ -151,6 +203,10 @@ export async function GET() {
     state,
     isOpen,
     found: Boolean(found),
+    persisted,
+    persistError,
+    needsMigration,
+    migrationSql: needsMigration ? getMigrationSql() : null,
     raw: found ?? null,
     error: res.ok ? null : text?.slice(0, 2000) ?? null,
   });
