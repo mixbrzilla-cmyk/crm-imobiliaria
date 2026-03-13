@@ -471,8 +471,8 @@ export default function InventarioImoveisPage() {
     brandTextOffCls: string;
   }) {
     const cls = active
-      ? `${brandOnCls} ring-1 ring-white/15 shadow-[0_10px_24px_-18px_rgba(15,23,42,0.8)]`
-      : `bg-slate-50/80 ${brandTextOffCls} ring-1 ${brandRingOffCls}`;
+      ? `${brandOnCls} ring-1 ring-white/20 shadow-[0_14px_34px_-18px_rgba(15,23,42,0.85)]`
+      : `bg-white ${brandTextOffCls} ring-1 ${brandRingOffCls} shadow-sm`;
 
     return (
       <button
@@ -480,10 +480,13 @@ export default function InventarioImoveisPage() {
         onClick={onToggle}
         disabled={syncing}
         className={
-          "group inline-flex items-center justify-between gap-3 rounded-full px-4 py-2.5 text-xs font-semibold tracking-wide transition-all duration-300 hover:-translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 disabled:cursor-not-allowed disabled:opacity-80 " +
+          "group inline-flex items-center justify-between gap-3 rounded-full px-4 py-2.5 text-xs font-semibold tracking-wide transition-all duration-300 hover:-translate-y-[1px] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 disabled:cursor-not-allowed disabled:opacity-80 " +
           (syncing ? "animate-pulse" : "") +
           " " +
-          cls
+          cls +
+          (active
+            ? ""
+            : " hover:bg-slate-50/60")
         }
       >
         <span className="whitespace-nowrap">{label}</span>
@@ -1132,8 +1135,8 @@ export default function InventarioImoveisPage() {
                           active={olx}
                           syncing={syncOlx}
                           onToggle={() => void togglePortal(r.id, "olx")}
-                          brandOnCls="bg-[#6E2594] text-white"
-                          brandRingOffCls="ring-[rgba(110,37,148,0.35)]"
+                          brandOnCls="bg-gradient-to-r from-[#6E2594] to-[#8B2BD1] text-white"
+                          brandRingOffCls="ring-[rgba(110,37,148,0.30)]"
                           brandTextOffCls="text-[#6E2594]"
                         />
                         <PortalSwitch
@@ -1141,18 +1144,18 @@ export default function InventarioImoveisPage() {
                           active={zap}
                           syncing={syncZap}
                           onToggle={() => void togglePortal(r.id, "zap")}
-                          brandOnCls="bg-[#0000FF] text-white"
-                          brandRingOffCls="ring-[rgba(0,0,255,0.28)]"
-                          brandTextOffCls="text-[#0000FF]"
+                          brandOnCls="bg-gradient-to-r from-[#0057FF] to-[#003CFF] text-white"
+                          brandRingOffCls="ring-[rgba(0,87,255,0.30)]"
+                          brandTextOffCls="text-[#004BFF]"
                         />
                         <PortalSwitch
                           label="Viva Real"
                           active={vivareal}
                           syncing={syncViva}
                           onToggle={() => void togglePortal(r.id, "vivareal")}
-                          brandOnCls="bg-gradient-to-r from-[#00AEEF] to-[#0094D4] text-white"
-                          brandRingOffCls="ring-[rgba(0,174,239,0.35)]"
-                          brandTextOffCls="text-[#00AEEF]"
+                          brandOnCls="bg-gradient-to-r from-[#00AEEF] to-[#0077C8] text-white"
+                          brandRingOffCls="ring-[rgba(0,174,239,0.30)]"
+                          brandTextOffCls="text-[#008ED6]"
                         />
                       </div>
                     </div>
@@ -1312,7 +1315,10 @@ export default function InventarioImoveisPage() {
               </div>
             ) : null}
 
-            <div className="grid grid-cols-1 gap-6 overflow-y-auto px-6 py-6 md:grid-cols-12">
+            <div
+              className="grid grid-cols-1 gap-6 overflow-hidden px-6 py-6 md:grid-cols-12"
+              style={{ maxHeight: "calc(90vh - 92px)" }}
+            >
               <div className="md:col-span-3">
                 <div className="flex flex-col gap-2 rounded-2xl bg-slate-50 p-2 ring-1 ring-slate-200/70">
                   {tabs.map((tab) => {
@@ -1337,7 +1343,7 @@ export default function InventarioImoveisPage() {
                 </div>
               </div>
 
-              <div className="md:col-span-9">
+              <div className="md:col-span-9 overflow-y-auto pr-1" style={{ maxHeight: "calc(90vh - 92px)" }}>
                 <form onSubmit={save} className="flex flex-col gap-4">
                   {activeTab === "basicos" ? (
                     <>
@@ -1457,16 +1463,17 @@ export default function InventarioImoveisPage() {
                           </div>
 
                           <div className="mt-4 overflow-x-auto rounded-xl bg-white ring-1 ring-slate-200/70">
-                            <table className="min-w-full border-separate border-spacing-0">
-                              <thead>
-                                <tr className="bg-slate-50">
-                                  <th className="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Data</th>
-                                  <th className="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Categoria</th>
-                                  <th className="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Descrição/Item</th>
-                                  <th className="px-4 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">Valor (R$)</th>
-                                </tr>
-                              </thead>
-                              <tbody>
+                            <div className="max-h-[320px] overflow-y-auto">
+                              <table className="min-w-full border-separate border-spacing-0">
+                                <thead>
+                                  <tr className="bg-slate-50">
+                                    <th className="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Data</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Categoria</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Descrição/Item</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">Valor (R$)</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
                                 {expensesLoading ? (
                                   <tr>
                                     <td className="px-4 py-6 text-sm text-slate-600" colSpan={4}>
@@ -1496,8 +1503,9 @@ export default function InventarioImoveisPage() {
                                     </td>
                                   </tr>
                                 )}
-                              </tbody>
-                            </table>
+                                </tbody>
+                              </table>
+                            </div>
                           </div>
                         </div>
                       ) : null}

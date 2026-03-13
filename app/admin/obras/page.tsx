@@ -605,8 +605,6 @@ export default function ObrasAdminPage() {
   }
 
   const loadWorkersAndEntries = useCallback(async () => {
-    setErrorMessage(null);
-
     if (!supabase) {
       setErrorMessage(
         "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
@@ -654,8 +652,12 @@ export default function ObrasAdminPage() {
         } else {
           const data = (workersRes.value.data ?? []) as ObraWorkerRow[];
           setWorkers(data);
-          if (!entryForm.worker_id && data.length > 0) {
-            setEntryForm((s) => ({ ...s, worker_id: data[0]!.id }));
+          const activeFirst = data.find((w) => w.active);
+          const activeIds = new Set(data.filter((w) => w.active).map((w) => w.id));
+          const currentId = String(entryForm.worker_id ?? "").trim();
+          const isValidActive = currentId && activeIds.has(currentId);
+          if ((!isValidActive || !currentId) && activeFirst) {
+            setEntryForm((s) => ({ ...s, worker_id: activeFirst.id }));
           }
         }
       }
@@ -1073,7 +1075,7 @@ export default function ObrasAdminPage() {
       setErrorMessage(
         "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
       );
-      return;
+      return false;
     }
 
     const hrs = entryForm.entry_type === "hora_homem" ? parseNumber(entryForm.hours) : null;
