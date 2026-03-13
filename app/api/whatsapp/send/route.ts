@@ -56,7 +56,7 @@ async function loadEvolutionSettings() {
 
   const res = await (supabase as any)
     .from("whatsapp_settings")
-    .select("evolution_api_url, evolution_global_api_key, created_at")
+    .select("evolution_api_url, evolution_global_api_key, evolution_instance_api_key, created_at")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -79,14 +79,27 @@ async function loadEvolutionSettings() {
   const apiUrl = envApiUrl || dbApiUrl;
   const apiKey = envApiKey || dbApiKey;
 
-  if (!apiUrl || !apiKey) {
+  const dbInstanceApiKey = String((res.data as any)?.evolution_instance_api_key ?? "").trim();
+  const envInstanceApiKey = String(process.env.EVOLUTION_INSTANCE_API_KEY ?? "").trim();
+  const instanceApiKey = envInstanceApiKey || dbInstanceApiKey;
+
+  const effectiveApiKey = instanceApiKey || apiKey;
+
+  if (!apiUrl || !effectiveApiKey) {
     return {
       ok: false as const,
       error: "Evolution não configurada. Preencha URL e Global API Key no Painel WhatsApp.",
     };
   }
 
-  return { ok: true as const, apiUrl, apiKey, supabase };
+  return {
+    ok: true as const,
+    apiUrl,
+    apiKey: effectiveApiKey,
+    globalApiKey: apiKey,
+    instanceApiKey,
+    supabase,
+  };
 }
 
 function buildAuthHeaders(globalKey: string) {

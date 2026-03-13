@@ -96,6 +96,101 @@ function normalizeEvolutionWebhookPayload(payload: any): EvolutionWebhookEvent |
   };
 }
 
+function extractEvolutionInstanceFromWebhook(payload: any) {
+  const candidates = [
+    payload?.instance,
+    payload?.instanceName,
+    payload?.data?.instance,
+    payload?.data?.instanceName,
+    payload?.data?.instance?.instanceName,
+    payload?.data?.instance?.name,
+  ];
+
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim()) return c.trim();
+  }
+
+  return null;
+}
+
+function extractEvolutionStateFromWebhook(payload: any) {
+  const candidates = [
+    payload?.data?.state,
+    payload?.data?.status,
+    payload?.data?.connection,
+    payload?.data?.connectionState,
+    payload?.state,
+    payload?.status,
+  ];
+
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim()) return c.trim();
+  }
+
+  return null;
+}
+
+function extractEvolutionInstanceApiKeyFromWebhook(payload: any) {
+  const candidates = [
+    payload?.data?.token,
+    payload?.data?.apiKey,
+    payload?.data?.apikey,
+    payload?.token,
+    payload?.apiKey,
+    payload?.apikey,
+  ];
+
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim()) return c.trim();
+  }
+
+  return null;
+}
+
+function isOpenFromState(state: string | null) {
+  const s = String(state ?? "")
+    .trim()
+    .toLowerCase();
+  if (!s) return false;
+  return ["open", "opened", "connected", "online"].includes(s);
+}
+
+async function persistEvolutionConnectionStatusFromWebhook(args: {
+  supabase: any;
+  instanceName: string | null;
+  state: string | null;
+  instanceApiKey: string | null;
+}) {
+  try {
+    const res = await (args.supabase as any)
+      .from("whatsapp_settings")
+      .select("id, created_at")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (res?.error || !res?.data?.id) return;
+
+    const payload: any = {
+      evolution_instance_name: args.instanceName,
+      evolution_instance_state: args.state,
+      evolution_instance_is_open: isOpenFromState(args.state),
+      evolution_instance_updated_at: new Date().toISOString(),
+    };
+
+    if (args.instanceApiKey) {
+      payload.evolution_instance_api_key = args.instanceApiKey;
+    }
+
+    await (args.supabase as any)
+      .from("whatsapp_settings")
+      .update(payload)
+      .eq("id", res.data.id);
+  } catch {
+    // silent
+  }
+}
+
 function getServiceSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey =
@@ -209,6 +304,23 @@ export async function POST(req: Request) {
   }
 
   if (normalized.kind === "event") {
+    try {
+      const instanceName = extractEvolutionInstanceFromWebhook(payload);
+      const state = extractEvolutionStateFromWebhook(payload);
+      const instanceApiKey = extractEvolutionInstanceApiKeyFromWebhook(payload);
+
+      if (instanceName || state || instanceApiKey) {
+        await persistEvolutionConnectionStatusFromWebhook({
+          supabase,
+          instanceName,
+          state,
+          instanceApiKey,
+        });
+      }
+    } catch {
+      // silent
+    }
+
     try {
       console.log("[WhatsApp Webhook] CONNECTION_UPDATE/other event:", {
         event: normalized.event,

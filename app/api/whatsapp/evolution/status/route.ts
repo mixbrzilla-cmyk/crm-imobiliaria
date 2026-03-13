@@ -121,6 +121,25 @@ function extractStateFromInstance(instance: any) {
   return null;
 }
 
+function extractInstanceApiKey(instance: any) {
+  const candidates = [
+    instance?.token,
+    instance?.apiKey,
+    instance?.apikey,
+    instance?.key,
+    instance?.instance?.token,
+    instance?.instance?.apiKey,
+    instance?.instance?.apikey,
+    instance?.instance?.key,
+  ];
+
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim()) return c.trim();
+  }
+
+  return null;
+}
+
 function extractInstanceName(instance: any) {
   const candidates = [
     instance?.instanceName,
@@ -148,7 +167,8 @@ function getMigrationSql() {
   add column if not exists evolution_instance_name text,
   add column if not exists evolution_instance_state text,
   add column if not exists evolution_instance_is_open boolean,
-  add column if not exists evolution_instance_updated_at timestamptz;`;
+  add column if not exists evolution_instance_updated_at timestamptz,
+  add column if not exists evolution_instance_api_key text;`;
 }
 
 export async function GET() {
@@ -211,6 +231,7 @@ export async function GET() {
     : null;
 
   const state = found ? extractStateFromInstance(found) : null;
+  const instanceApiKey = found ? extractInstanceApiKey(found) : null;
   const stateNormalized = state ? state.toLowerCase() : null;
   const isOpen = stateNormalized ? ["open", "opened", "connected", "online"].includes(stateNormalized) : false;
 
@@ -224,6 +245,7 @@ export async function GET() {
         evolution_instance_state: state,
         evolution_instance_is_open: isOpen,
         evolution_instance_updated_at: new Date().toISOString(),
+        evolution_instance_api_key: instanceApiKey,
       };
 
       const up = await (supabase as any)
@@ -262,6 +284,7 @@ export async function GET() {
     targetInstanceName: instanceName,
     instanceName,
     state,
+    instanceApiKey,
     isOpen,
     found: Boolean(found),
     rawCount: Array.isArray(listArray) ? listArray.length : null,

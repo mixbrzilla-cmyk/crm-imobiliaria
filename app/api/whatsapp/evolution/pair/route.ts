@@ -101,6 +101,28 @@ function buildAuthHeaders(globalKey: string) {
   } as Record<string, string>;
 }
 
+function extractInstanceName(instance: any) {
+  const candidates = [
+    instance?.instanceName,
+    instance?.name,
+    instance?.instance,
+    instance?.instance?.instanceName,
+    instance?.instance?.name,
+  ];
+
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim()) return c.trim();
+  }
+
+  return null;
+}
+
+function normalizeInstanceName(value: string | null) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase();
+}
+
 function extractQrFromInstance(instance: any) {
   const candidates = [
     instance?.qr,
@@ -266,7 +288,10 @@ export async function POST(req: Request) {
     method: "GET",
     headers,
     cache: "no-store",
-  });
+  }).catch(
+    (e: any) =>
+      ({ ok: false, status: 0, text: async () => String(e?.message ?? e) }) as any,
+  );
 
   const listText = await listRes.text().catch(() => "");
   let listJson: any = null;
@@ -276,11 +301,27 @@ export async function POST(req: Request) {
     listJson = null;
   }
 
-  const listArray = Array.isArray(listJson) ? listJson : Array.isArray(listJson?.instances) ? listJson.instances : null;
-  const found = listArray?.find((i: any) => {
-    const name = String(i?.instanceName ?? i?.name ?? i?.instance ?? "");
-    return name === instanceName;
-  });
+  const listArray =
+    Array.isArray(listJson)
+      ? listJson
+      : Array.isArray(listJson?.instances)
+        ? listJson.instances
+        : Array.isArray(listJson?.data)
+          ? listJson.data
+          : Array.isArray(listJson?.result)
+            ? listJson.result
+            : Array.isArray(listJson?.response)
+              ? listJson.response
+              : null;
+
+  const targetNormalized = normalizeInstanceName(instanceName);
+  const found = Array.isArray(listArray)
+    ? listArray.find((i: any) => {
+        const name = extractInstanceName(i);
+        if (!name) return false;
+        return normalizeInstanceName(name) === targetNormalized;
+      })
+    : null;
 
   if (!qrRaw) {
     qrRaw = found ? extractQrFromInstance(found) : null;
@@ -300,8 +341,10 @@ export async function POST(req: Request) {
     }
   }
 
+  const ok = Boolean((createRes as any)?.ok) && Boolean((connectRes as any)?.ok);
+
   return NextResponse.json({
-    ok: true,
+    ok,
     instanceName,
     webhookSet,
     create: {
@@ -326,5 +369,9 @@ export async function POST(req: Request) {
       dataUrl: qrDataUrl,
       raw: qrRaw,
     },
+    error:
+      ok
+        ? null
+        : `Falha ao criar/conectar instância. create HTTP ${(createRes as any)?.status ?? "?"}, connect HTTP ${(connectRes as any)?.status ?? "?"}.`,
   });
 }
