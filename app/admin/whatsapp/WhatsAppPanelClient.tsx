@@ -145,6 +145,8 @@ export default function WhatsAppPanelClient() {
   const [isCheckingWebhook, setIsCheckingWebhook] = useState(false);
   const [webhookMessage, setWebhookMessage] = useState<string | null>(null);
 
+  const [isEnsuringWebhook, setIsEnsuringWebhook] = useState(false);
+
   const testProfilesConnection = useCallback(
     async (context: string, error: unknown) => {
       if (!supabase) return;
@@ -245,6 +247,45 @@ export default function WhatsAppPanelClient() {
       setErrorMessage("Não foi possível consultar o webhook agora.");
     } finally {
       setIsCheckingWebhook(false);
+    }
+  }, []);
+
+  const ensureEvolutionWebhook = useCallback(async () => {
+    setErrorMessage(null);
+    setWebhookMessage(null);
+    setIsEnsuringWebhook(true);
+
+    try {
+      const res = await fetch("/api/whatsapp/evolution/webhook/ensure", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json) {
+        setErrorMessage(`Falha ao forçar webhook (HTTP ${res.status}).`);
+        setIsEnsuringWebhook(false);
+        return;
+      }
+
+      if (!json.ok) {
+        setErrorMessage(String(json?.error ?? json?.set?.text ?? json?.find?.text ?? "Não foi possível forçar webhook."));
+        setIsEnsuringWebhook(false);
+        return;
+      }
+
+      const events =
+        json?.find?.json?.webhook?.webhook?.events ??
+        json?.find?.json?.webhook?.events ??
+        json?.find?.json?.events ??
+        null;
+
+      setWebhookMessage(
+        `Webhook atualizado. URL: ${String(json?.webhookUrl ?? "-")}. Events: ${Array.isArray(events) ? events.join(", ") : String(events ?? "-")}`,
+      );
+    } catch {
+      setErrorMessage("Não foi possível forçar o webhook agora.");
+    } finally {
+      setIsEnsuringWebhook(false);
     }
   }, []);
 
@@ -819,12 +860,35 @@ export default function WhatsAppPanelClient() {
                     if (digits.length < 8) return;
                     e.preventDefault();
                     void (async () => {
+                      setErrorMessage(null);
                       const id = await ensureThreadByPhone(digits);
-                      if (id) {
-                        await loadThreads();
-                        setSelectedThreadId(id);
-                        setSearch("");
+                      if (!id) {
+                        setErrorMessage(
+                          "Não foi possível iniciar a conversa. Verifique se SUPABASE_SERVICE_ROLE_KEY está configurada no servidor.",
+                        );
+                        return;
                       }
+
+                      setSelectedThreadId(id);
+                      setSearch("");
+
+                      setThreads((prev) => {
+                        if (prev.some((t) => t.id === id)) return prev;
+                        return [
+                          {
+                            id,
+                            external_id: digits,
+                            contact_number: digits,
+                            contact_name: null,
+                            assigned_broker_profile_id: null,
+                            status: "active",
+                            last_message_at: new Date().toISOString(),
+                          },
+                          ...prev,
+                        ];
+                      });
+
+                      void loadThreads();
                     })();
                   }}
                   placeholder="Pesquisar ou iniciar nova conversa"
@@ -1109,6 +1173,14 @@ export default function WhatsAppPanelClient() {
               </div>
 
               <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => void ensureEvolutionWebhook()}
+                  disabled={isEnsuringWebhook}
+                  className="inline-flex h-11 items-center justify-center rounded-2xl bg-white px-5 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isEnsuringWebhook ? "Forçando..." : "Forçar Webhook"}
+                </button>
                 <button
                   type="button"
                   onClick={() => void checkEvolutionWebhook()}
