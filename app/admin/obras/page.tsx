@@ -465,9 +465,15 @@ export default function ObrasAdminPage() {
       if (res.error) {
         const msg = String((res.error as any)?.message ?? "");
         const isColumnNotFound = /column\s+\"?unit\"?\s+does\s+not\s+exist|column\s+unit\s+not\s+found/i.test(msg);
+        const isTargetMissing = /target_type|target_id/i.test(msg) && /does\s+not\s+exist|not\s+found/i.test(msg);
         const code = (res.error as any)?.code;
         const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
-        if (isColumnNotFound || isSchemaMismatch) {
+        if (isTargetMissing) {
+          res = await (supabase as any)
+            .from("obra_materials")
+            .select("id, name, vendor, status, unit_price, quantity, unit, delivered_at, created_at")
+            .order("created_at", { ascending: false });
+        } else if (isColumnNotFound || isSchemaMismatch) {
           res = await (supabase as any)
             .from("obra_materials")
             .select("id, name, vendor, status, unit_price, quantity, delivered_at, target_type, target_id, created_at")
@@ -477,9 +483,15 @@ export default function ObrasAdminPage() {
         if (res.error) {
           const msg2 = String((res.error as any)?.message ?? "");
           const isDeliveredAtMissing = /delivered_at/i.test(msg2) && /does\s+not\s+exist|not\s+found/i.test(msg2);
+          const isTargetMissing2 = /target_type|target_id/i.test(msg2) && /does\s+not\s+exist|not\s+found/i.test(msg2);
           const code2 = (res.error as any)?.code;
           const isSchemaMismatch2 = code2 === "PGRST204" || code2 === "PGRST301";
-          if (isDeliveredAtMissing || isSchemaMismatch2) {
+          if (isTargetMissing2) {
+            res = await (supabase as any)
+              .from("obra_materials")
+              .select("id, name, vendor, status, unit_price, quantity, created_at")
+              .order("created_at", { ascending: false });
+          } else if (isDeliveredAtMissing || isSchemaMismatch2) {
             res = await (supabase as any)
               .from("obra_materials")
               .select("id, name, vendor, status, unit_price, quantity, target_type, target_id, created_at")
@@ -585,16 +597,32 @@ export default function ObrasAdminPage() {
     setIsWorkersLoading(true);
 
     try {
-      const [workersRes, entriesRes] = await Promise.allSettled([
+      let entriesSelect = "id, worker_id, entry_date, entry_type, hours, notes, target_type, target_id, created_at";
+
+      let entriesRes: any = await (supabase as any)
+        .from("obra_worker_entries")
+        .select(entriesSelect)
+        .order("entry_date", { ascending: false })
+        .limit(120);
+
+      if (entriesRes?.error) {
+        const msg = String(entriesRes.error?.message ?? "");
+        const isTargetMissing = /target_type|target_id/i.test(msg) && /does\s+not\s+exist|not\s+found/i.test(msg);
+        if (isTargetMissing) {
+          entriesSelect = "id, worker_id, entry_date, entry_type, hours, notes, created_at";
+          entriesRes = await (supabase as any)
+            .from("obra_worker_entries")
+            .select(entriesSelect)
+            .order("entry_date", { ascending: false })
+            .limit(120);
+        }
+      }
+
+      const [workersRes] = await Promise.allSettled([
         (supabase as any)
           .from("obra_workers")
           .select("id, full_name, role, daily_rate, hourly_rate, active, created_at")
           .order("full_name", { ascending: true }),
-        (supabase as any)
-          .from("obra_worker_entries")
-          .select("id, worker_id, entry_date, entry_type, hours, notes, target_type, target_id, created_at")
-          .order("entry_date", { ascending: false })
-          .limit(120),
       ]);
 
       if (workersRes.status === "fulfilled") {
@@ -619,7 +647,7 @@ export default function ObrasAdminPage() {
         }
       }
     } catch {
-      setErrorMessage("Não foi possível carregar a medição agora.");
+      setErrorMessage("Não foi possível carregar equipe/medições agora.");
       setWorkers([]);
       setEntries([]);
     } finally {
@@ -861,11 +889,28 @@ export default function ObrasAdminPage() {
           lastError = null;
           break;
         }
+
         lastError = error;
         const msg = String((error as any)?.message ?? "");
         const isColumnNotFound = /column\s+\"?unit\"?\s+does\s+not\s+exist|column\s+unit\s+not\s+found/i.test(msg);
         const code = (error as any)?.code;
         const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
+        const isTargetMissing = /target_type|target_id/i.test(msg) && /does\s+not\s+exist|not\s+found/i.test(msg);
+
+        if (isTargetMissing) {
+          const payloadNoTarget = { ...payloadBase };
+          const retry = await (supabase as any).from("obra_materials").insert(payloadNoTarget);
+          if (!retry?.error) {
+            lastError = null;
+            setErrorMessage(
+              'Infra pendente: crie as colunas target_type (text) e target_id (uuid) em obra_materials para vincular ao imóvel.',
+            );
+            break;
+          }
+          lastError = retry.error;
+          break;
+        }
+
         if (!isColumnNotFound && !isSchemaMismatch) break;
       }
 
@@ -1017,7 +1062,7 @@ export default function ObrasAdminPage() {
 
     try {
       const target = parseTarget(entryForm.target);
-      const payload = {
+      const payloadBase: any = {
         id: crypto.randomUUID(),
         worker_id: entryForm.worker_id,
         entry_date: entryForm.entry_date,
@@ -1027,9 +1072,25 @@ export default function ObrasAdminPage() {
         ...(target ? target : {}),
       };
 
-      const { error } = await (supabase as any).from("obra_worker_entries").insert(payload);
-      if (error) {
-        setErrorMessage(error.message);
+      let insertRes: any = await (supabase as any).from("obra_worker_entries").insert(payloadBase);
+      if (insertRes?.error) {
+        const msg = String(insertRes.error?.message ?? "");
+        const isTargetMissing = /target_type|target_id/i.test(msg) && /does\s+not\s+exist|not\s+found/i.test(msg);
+        if (isTargetMissing) {
+          const retryPayload: any = { ...payloadBase };
+          delete retryPayload.target_type;
+          delete retryPayload.target_id;
+          insertRes = await (supabase as any).from("obra_worker_entries").insert(retryPayload);
+          if (!insertRes?.error) {
+            setErrorMessage(
+              'Infra pendente: crie as colunas target_type (text) e target_id (uuid) em obra_worker_entries para vincular ao imóvel.',
+            );
+          }
+        }
+      }
+
+      if (insertRes?.error) {
+        setErrorMessage(insertRes.error.message);
         return;
       }
 

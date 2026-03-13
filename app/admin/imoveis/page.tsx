@@ -202,6 +202,13 @@ export default function InventarioImoveisPage() {
   const [expenseLines, setExpenseLines] = useState<ExpenseLine[]>([]);
   const [expensesLoading, setExpensesLoading] = useState(false);
 
+  const expenseSourceLabel = useCallback((source: ExpenseLine["source"]) => {
+    if (source === "materials") return "Insumos e Materiais";
+    if (source === "labor") return "Mão de Obra e Reformas";
+    if (source === "marketing") return "Investimento em Marketing";
+    return "Deslocamento e Veículos";
+  }, []);
+
   const showToast = useCallback((message: string) => {
     setToastMessage(message);
     window.setTimeout(() => setToastMessage(null), 8000);
@@ -1472,7 +1479,9 @@ export default function InventarioImoveisPage() {
                                       key={`${l.source}-${idx}`}
                                       className={"border-t border-slate-100 " + (idx % 2 === 1 ? "bg-slate-50/50" : "bg-white")}
                                     >
-                                      <td className="px-4 py-3 text-sm font-semibold text-slate-900">{l.source}</td>
+                                      <td className="px-4 py-3 text-sm font-semibold text-slate-900">
+                                        {expenseSourceLabel(l.source)}
+                                      </td>
                                       <td className="px-4 py-3 text-sm text-slate-700">
                                         {l.date ? new Date(l.date).toLocaleDateString("pt-BR") : "-"}
                                       </td>
