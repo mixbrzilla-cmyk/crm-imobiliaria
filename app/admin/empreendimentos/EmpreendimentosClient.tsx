@@ -10,6 +10,7 @@ import {
   FileText,
   Image as ImageIcon,
   Lightbulb,
+  Loader2,
   MapPin,
   Plus,
   Route,
@@ -329,17 +330,21 @@ export default function EmpreendimentosClient() {
     active,
     syncing,
     onToggle,
-    activeCls,
+    brandOnCls,
+    brandRingOffCls,
+    brandTextOffCls,
   }: {
     label: string;
     active: boolean;
     syncing: boolean;
     onToggle: () => void;
-    activeCls: string;
+    brandOnCls: string;
+    brandRingOffCls: string;
+    brandTextOffCls: string;
   }) {
     const cls = active
-      ? `${activeCls} ring-1 ring-slate-200/70`
-      : "bg-white text-slate-700 ring-1 ring-slate-200/70";
+      ? `${brandOnCls} ring-1 ring-white/15 shadow-[0_10px_24px_-18px_rgba(15,23,42,0.8)]`
+      : `bg-slate-50/80 ${brandTextOffCls} ring-1 ${brandRingOffCls}`;
 
     return (
       <button
@@ -347,22 +352,18 @@ export default function EmpreendimentosClient() {
         onClick={onToggle}
         disabled={syncing}
         className={
-          "group inline-flex items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition-all duration-300 hover:-translate-y-[1px] " +
+          "group inline-flex items-center justify-between gap-3 rounded-full px-4 py-2.5 text-xs font-semibold tracking-wide transition-all duration-300 hover:-translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 disabled:cursor-not-allowed disabled:opacity-80 " +
+          (syncing ? "animate-pulse" : "") +
+          " " +
           cls
         }
       >
-        <span>{label}</span>
-        <span
-          className={
-            "inline-flex items-center justify-center rounded-full px-2 py-1 text-[10px] font-semibold ring-1 " +
-            (syncing
-              ? "bg-amber-50 text-amber-900 ring-amber-200/70"
-              : active
-                ? "bg-emerald-50 text-emerald-800 ring-emerald-200/70"
-                : "bg-slate-100 text-slate-600 ring-slate-200/70")
-          }
-        >
-          {syncing ? "Sincronizando..." : active ? "Ativo" : "Inativo"}
+        <span className="whitespace-nowrap">{label}</span>
+        <span className="inline-flex items-center gap-1.5">
+          {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+          <span className="text-[10px] font-semibold">
+            {syncing ? "Sincronizando..." : active ? "Ativo" : "Off"}
+          </span>
         </span>
       </button>
     );
@@ -1040,21 +1041,27 @@ export default function EmpreendimentosClient() {
                         active={olx}
                         syncing={syncOlx}
                         onToggle={() => void togglePortal(r.id, "olx")}
-                        activeCls="bg-[#7C3AED] text-white"
+                        brandOnCls="bg-[#6E2594] text-white"
+                        brandRingOffCls="ring-[rgba(110,37,148,0.35)]"
+                        brandTextOffCls="text-[#6E2594]"
                       />
                       <PortalSwitch
                         label="Zap Imóveis"
                         active={zap}
                         syncing={syncZap}
                         onToggle={() => void togglePortal(r.id, "zap")}
-                        activeCls="bg-[#2563EB] text-white"
+                        brandOnCls="bg-[#0000FF] text-white"
+                        brandRingOffCls="ring-[rgba(0,0,255,0.28)]"
+                        brandTextOffCls="text-[#0000FF]"
                       />
                       <PortalSwitch
                         label="Viva Real"
                         active={vivareal}
                         syncing={syncViva}
                         onToggle={() => void togglePortal(r.id, "vivareal")}
-                        activeCls="bg-[#0EA5E9] text-white"
+                        brandOnCls="bg-gradient-to-r from-[#00AEEF] to-[#0094D4] text-white"
+                        brandRingOffCls="ring-[rgba(0,174,239,0.35)]"
+                        brandTextOffCls="text-[#00AEEF]"
                       />
                     </div>
                     {!portalColumn ? (
