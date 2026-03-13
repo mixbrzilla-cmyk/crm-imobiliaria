@@ -139,6 +139,9 @@ export default function WhatsAppPanelClient() {
   const [pairQrDataUrl, setPairQrDataUrl] = useState<string | null>(null);
   const [pairInstanceName, setPairInstanceName] = useState<string | null>(null);
 
+  const [pairConnectionState, setPairConnectionState] = useState<string | null>(null);
+  const [isPollingPairStatus, setIsPollingPairStatus] = useState(false);
+
   const [isResetting, setIsResetting] = useState(false);
   const [resetMessage, setResetMessage] = useState<string | null>(null);
 
@@ -627,6 +630,7 @@ export default function WhatsAppPanelClient() {
     setResetMessage(null);
     setPairQrDataUrl(null);
     setPairInstanceName(null);
+    setPairConnectionState(null);
     setIsPairOpen(true);
     setIsPairing(true);
 
@@ -659,6 +663,54 @@ export default function WhatsAppPanelClient() {
       setIsPairing(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (!isPairOpen) {
+      setIsPollingPairStatus(false);
+      return;
+    }
+
+    let cancelled = false;
+    let timer: any = null;
+
+    async function tick() {
+      if (cancelled) return;
+      setIsPollingPairStatus(true);
+      try {
+        const res = await fetch("/api/whatsapp/evolution/status", {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          cache: "no-store",
+        });
+        const json = await res.json().catch(() => null);
+        if (!cancelled && json) {
+          setPairConnectionState(json?.state ? String(json.state) : null);
+
+          if (json?.isOpen) {
+            setIsPairOpen(false);
+            setPairQrDataUrl(null);
+            setPairInstanceName(null);
+            setPairConnectionState(null);
+            setIsPollingPairStatus(false);
+            return;
+          }
+        }
+      } catch {
+        // silent
+      }
+
+      if (!cancelled) {
+        timer = setTimeout(tick, 2500);
+      }
+    }
+
+    timer = setTimeout(tick, 800);
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [isPairOpen]);
 
   const resetEvolutionInstance = useCallback(async () => {
     setErrorMessage(null);
@@ -1231,7 +1283,7 @@ export default function WhatsAppPanelClient() {
                 <div>
                   <div className="text-sm font-semibold text-slate-900">Parear WhatsApp</div>
                   <div className="mt-1 text-xs text-slate-500">
-                    {pairInstanceName ? `Instância: ${pairInstanceName}` : "Gerando instância boss_imob e QR Code"}
+                    Escaneie o QR Code no celular. Ao conectar, o painel fecha automaticamente.
                   </div>
                 </div>
                 <button
@@ -1240,6 +1292,22 @@ export default function WhatsAppPanelClient() {
                   className="inline-flex h-10 items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
                 >
                   Fechar
+                </button>
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-700 ring-1 ring-slate-200/70">
+                <div>
+                  Status: {pairConnectionState ? pairConnectionState : isPollingPairStatus ? "verificando..." : "-"}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPairConnectionState(null);
+                    setIsPollingPairStatus(false);
+                  }}
+                  className="inline-flex h-9 items-center justify-center rounded-xl bg-white px-3 text-xs font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
+                >
+                  Atualizar
                 </button>
               </div>
 

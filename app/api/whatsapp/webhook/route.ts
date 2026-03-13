@@ -36,11 +36,31 @@ function extractTextFromMessage(message: any) {
   return "";
 }
 
-function normalizeEvolutionWebhookPayload(payload: any) {
+type EvolutionWebhookEvent = {
+  kind: "event";
+  event: string;
+  raw: unknown;
+};
+
+type EvolutionWebhookMessage = {
+  kind: "message";
+  event: "MESSAGES_UPSERT";
+  threadExternalId: string;
+  fromNumber: string | null;
+  toNumber: string | null;
+  messageText: string;
+  timestamp: string;
+  contactName: string | null;
+  direction: "in" | "out";
+  raw: unknown;
+};
+
+function normalizeEvolutionWebhookPayload(payload: any): EvolutionWebhookEvent | EvolutionWebhookMessage | null {
   if (!payload || typeof payload !== "object") return null;
 
   const event = normalizeEventName(payload?.event ?? payload?.type ?? payload?.data?.event);
-  if (event && event !== "MESSAGES_UPSERT") return null;
+  if (!event) return null;
+  if (event !== "MESSAGES_UPSERT") return { kind: "event", event, raw: payload };
 
   const data = payload?.data ?? payload;
   const msgContainer = data?.messages ?? data?.message ?? data;
@@ -63,6 +83,8 @@ function normalizeEvolutionWebhookPayload(payload: any) {
   if (!text) return null;
 
   return {
+    kind: "message",
+    event,
     threadExternalId: phone,
     fromNumber: fromMe ? null : phone,
     toNumber: fromMe ? phone : null,
@@ -186,11 +208,28 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, ignored: true });
   }
 
+  if (normalized.kind === "event") {
+    try {
+      console.log("[WhatsApp Webhook] CONNECTION_UPDATE/other event:", {
+        event: normalized.event,
+        instance: payload?.instance ?? payload?.data?.instance ?? payload?.data?.instanceName ?? null,
+        status: payload?.data?.state ?? payload?.data?.status ?? payload?.data?.connection ?? payload?.data?.connectionState ?? null,
+      });
+    } catch {
+      // silent
+    }
+
+    return NextResponse.json({ ok: true, event: normalized.event, ignored: true });
+  }
+
+  // From here on it's a message payload
+  const msg = normalized;
+
   const threadId = await ensureThread({
     supabase,
-    threadExternalId: normalized.threadExternalId,
-    contactNumber: normalized.fromNumber,
-    contactName: normalized.contactName,
+    threadExternalId: msg.threadExternalId,
+    contactNumber: msg.fromNumber,
+    contactName: msg.contactName,
   });
 
   if (!threadId) {
@@ -201,18 +240,18 @@ export async function POST(req: Request) {
     supabase,
     threadId,
     brokerId: null,
-    direction: normalized.direction,
-    fromNumber: normalized.fromNumber,
-    toNumber: normalized.toNumber,
-    messageText: normalized.messageText,
-    timestamp: normalized.timestamp,
-    raw: normalized.raw,
+    direction: msg.direction,
+    fromNumber: msg.fromNumber,
+    toNumber: msg.toNumber,
+    messageText: msg.messageText,
+    timestamp: msg.timestamp,
+    raw: msg.raw,
   });
 
   try {
-    const phone = normalizeWhatsapp(normalized.fromNumber) || normalizeWhatsapp(normalized.toNumber);
+    const phone = normalizeWhatsapp(msg.fromNumber) || normalizeWhatsapp(msg.toNumber);
     if (phone) {
-      await touchOwnerLastContact(supabase, phone, normalized.timestamp);
+      await touchOwnerLastContact(supabase, phone, msg.timestamp);
     }
   } catch {
     // silent
