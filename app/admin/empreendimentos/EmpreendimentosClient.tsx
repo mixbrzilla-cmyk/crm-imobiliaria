@@ -333,6 +333,7 @@ export default function EmpreendimentosClient() {
     brandOnCls,
     brandRingOffCls,
     brandTextOffCls,
+    brandGlowCls,
   }: {
     label: string;
     active: boolean;
@@ -341,10 +342,11 @@ export default function EmpreendimentosClient() {
     brandOnCls: string;
     brandRingOffCls: string;
     brandTextOffCls: string;
+    brandGlowCls: string;
   }) {
     const cls = active
-      ? `${brandOnCls} ring-1 ring-white/15 shadow-[0_10px_24px_-18px_rgba(15,23,42,0.8)]`
-      : `bg-slate-50/80 ${brandTextOffCls} ring-1 ${brandRingOffCls}`;
+      ? `${brandOnCls} ring-1 ring-white/20 shadow-[0_12px_28px_-18px_rgba(15,23,42,0.85)] ${brandGlowCls}`
+      : `bg-white ${brandTextOffCls} ring-1 ${brandRingOffCls} shadow-[0_8px_18px_-16px_rgba(15,23,42,0.35)]`;
 
     return (
       <button
@@ -352,10 +354,11 @@ export default function EmpreendimentosClient() {
         onClick={onToggle}
         disabled={syncing}
         className={
-          "group inline-flex items-center justify-between gap-3 rounded-full px-4 py-2.5 text-xs font-semibold tracking-wide transition-all duration-300 hover:-translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 disabled:cursor-not-allowed disabled:opacity-80 " +
+          "group inline-flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-xs font-semibold tracking-wide transition-all duration-300 hover:-translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 disabled:cursor-not-allowed disabled:opacity-80 " +
           (syncing ? "animate-pulse" : "") +
           " " +
-          cls
+          cls +
+          (active ? "" : " hover:bg-slate-50")
         }
       >
         <span className="whitespace-nowrap">{label}</span>
@@ -1035,7 +1038,7 @@ export default function EmpreendimentosClient() {
 
                   <div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-slate-200/70">
                     <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">STATUS NOS PORTAIS</div>
-                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
                       <PortalSwitch
                         label="OLX"
                         active={olx}
@@ -1044,6 +1047,7 @@ export default function EmpreendimentosClient() {
                         brandOnCls="bg-[#6E2594] text-white"
                         brandRingOffCls="ring-[rgba(110,37,148,0.35)]"
                         brandTextOffCls="text-[#6E2594]"
+                        brandGlowCls="shadow-[0_0_22px_-12px_rgba(139,43,209,0.75)]"
                       />
                       <PortalSwitch
                         label="Zap Imóveis"
@@ -1053,6 +1057,7 @@ export default function EmpreendimentosClient() {
                         brandOnCls="bg-[#0000FF] text-white"
                         brandRingOffCls="ring-[rgba(0,0,255,0.28)]"
                         brandTextOffCls="text-[#0000FF]"
+                        brandGlowCls="shadow-[0_0_22px_-12px_rgba(0,87,255,0.75)]"
                       />
                       <PortalSwitch
                         label="Viva Real"
@@ -1062,6 +1067,7 @@ export default function EmpreendimentosClient() {
                         brandOnCls="bg-gradient-to-r from-[#00AEEF] to-[#0094D4] text-white"
                         brandRingOffCls="ring-[rgba(0,174,239,0.35)]"
                         brandTextOffCls="text-[#00AEEF]"
+                        brandGlowCls="shadow-[0_0_22px_-12px_rgba(0,174,239,0.75)]"
                       />
                     </div>
                     {!portalColumn ? (

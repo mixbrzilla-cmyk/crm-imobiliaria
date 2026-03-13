@@ -716,6 +716,7 @@ export default function InventarioImoveisPage() {
     brandOnCls,
     brandRingOffCls,
     brandTextOffCls,
+    brandGlowCls,
   }: {
     label: string;
     active: boolean;
@@ -724,10 +725,11 @@ export default function InventarioImoveisPage() {
     brandOnCls: string;
     brandRingOffCls: string;
     brandTextOffCls: string;
+    brandGlowCls: string;
   }) {
     const cls = active
-      ? `${brandOnCls} ring-1 ring-white/20 shadow-[0_14px_34px_-18px_rgba(15,23,42,0.85)]`
-      : `bg-white ${brandTextOffCls} ring-1 ${brandRingOffCls} shadow-sm`;
+      ? `${brandOnCls} ring-1 ring-white/20 shadow-[0_12px_28px_-18px_rgba(15,23,42,0.85)] ${brandGlowCls}`
+      : `bg-white ${brandTextOffCls} ring-1 ${brandRingOffCls} shadow-[0_8px_18px_-16px_rgba(15,23,42,0.35)]`;
 
     return (
       <button
@@ -735,13 +737,13 @@ export default function InventarioImoveisPage() {
         onClick={onToggle}
         disabled={syncing}
         className={
-          "group inline-flex items-center justify-between gap-3 rounded-full px-4 py-2.5 text-xs font-semibold tracking-wide transition-all duration-300 hover:-translate-y-[1px] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 disabled:cursor-not-allowed disabled:opacity-80 " +
+          "group inline-flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-xs font-semibold tracking-wide transition-all duration-300 hover:-translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 disabled:cursor-not-allowed disabled:opacity-80 " +
           (syncing ? "animate-pulse" : "") +
           " " +
           cls +
           (active
             ? ""
-            : " hover:bg-slate-50/60")
+            : " hover:bg-slate-50")
         }
       >
         <span className="whitespace-nowrap">{label}</span>
@@ -1384,7 +1386,7 @@ export default function InventarioImoveisPage() {
 
                     <div className="mt-4 rounded-2xl bg-white p-3 ring-1 ring-slate-200/70">
                       <div className="text-[10px] font-semibold tracking-wide text-slate-500">Status nos Portais</div>
-                      <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
                         <PortalSwitch
                           label="OLX"
                           active={olx}
@@ -1393,6 +1395,7 @@ export default function InventarioImoveisPage() {
                           brandOnCls="bg-gradient-to-r from-[#6E2594] to-[#8B2BD1] text-white"
                           brandRingOffCls="ring-[rgba(110,37,148,0.30)]"
                           brandTextOffCls="text-[#6E2594]"
+                          brandGlowCls="shadow-[0_0_22px_-12px_rgba(139,43,209,0.75)]"
                         />
                         <PortalSwitch
                           label="Zap Imóveis"
@@ -1402,6 +1405,7 @@ export default function InventarioImoveisPage() {
                           brandOnCls="bg-gradient-to-r from-[#0057FF] to-[#003CFF] text-white"
                           brandRingOffCls="ring-[rgba(0,87,255,0.30)]"
                           brandTextOffCls="text-[#004BFF]"
+                          brandGlowCls="shadow-[0_0_22px_-12px_rgba(0,87,255,0.75)]"
                         />
                         <PortalSwitch
                           label="Viva Real"
@@ -1411,6 +1415,7 @@ export default function InventarioImoveisPage() {
                           brandOnCls="bg-gradient-to-r from-[#00AEEF] to-[#0077C8] text-white"
                           brandRingOffCls="ring-[rgba(0,174,239,0.30)]"
                           brandTextOffCls="text-[#008ED6]"
+                          brandGlowCls="shadow-[0_0_22px_-12px_rgba(0,174,239,0.75)]"
                         />
                       </div>
                     </div>
