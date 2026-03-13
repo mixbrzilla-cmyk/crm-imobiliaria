@@ -214,11 +214,159 @@ export default function EmpreendimentosClient() {
 
   const [supportsDetails, setSupportsDetails] = useState(true);
 
+  const portalColumns = useMemo(
+    () => ["portals_json", "portal_status_json", "portais_json", "portais_status_json", "integrations_json"] as const,
+    [],
+  );
+  const [portalColumn, setPortalColumn] = useState<string | null>(null);
+  const [portalSyncByKey, setPortalSyncByKey] = useState<Record<string, boolean>>({});
+
   const brokerById = useMemo(() => {
     const map = new Map<string, BrokerProfile>();
     for (const b of brokers) map.set(b.id, b);
     return map;
   }, [brokers]);
+
+  function getPortalValue(row: any, key: "olx" | "zap" | "vivareal") {
+    const col = portalColumn;
+    if (!col) return false;
+    const raw = row?.[col];
+    if (!raw) return false;
+    if (typeof raw === "object") return Boolean(raw?.[key]);
+    if (typeof raw === "string") {
+      try {
+        const obj = JSON.parse(raw);
+        return Boolean(obj?.[key]);
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  }
+
+  function setPortalValueLocal(developmentId: string, key: "olx" | "zap" | "vivareal", value: boolean) {
+    const col = portalColumn;
+    if (!col) return;
+    setRows((current) =>
+      current.map((r: any) => {
+        if (r.id !== developmentId) return r;
+        const raw = r?.[col];
+        let obj: any = {};
+        if (raw && typeof raw === "object") obj = { ...raw };
+        if (raw && typeof raw === "string") {
+          try {
+            obj = { ...(JSON.parse(raw) ?? {}) };
+          } catch {
+            obj = {};
+          }
+        }
+        obj[key] = value;
+        return { ...r, [col]: obj };
+      }),
+    );
+  }
+
+  async function detectPortalColumn() {
+    if (!supabase) return null;
+    for (const col of portalColumns) {
+      try {
+        const res = await (supabase as any).from("developments").select(`id, ${col}`).limit(1);
+        if (!res?.error) return col;
+        const msg = String(res.error?.message ?? "");
+        const code = (res.error as any)?.code;
+        const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
+        const isMissing = /does not exist|not found|column/i.test(msg);
+        if (isSchemaMismatch || isMissing) continue;
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  }
+
+  async function togglePortal(developmentId: string, portal: "olx" | "zap" | "vivareal") {
+    if (!portalColumn) {
+      setErrorMessage("Configure uma coluna JSONB (ex: portals_json) para armazenar status nos portais.");
+      return;
+    }
+
+    const row = rows.find((r) => r.id === developmentId) as any;
+    const current = getPortalValue(row, portal);
+    const next = !current;
+    const k = `${developmentId}:${portal}`;
+
+    setPortalValueLocal(developmentId, portal, next);
+    setPortalSyncByKey((s) => ({ ...s, [k]: true }));
+
+    try {
+      const res = await fetch("/api/portais-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entityType: "development", id: developmentId, portal, value: next }),
+      });
+
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) {
+        const msg = String(json?.error ?? `Falha ao salvar (HTTP ${res.status})`);
+        setErrorMessage(msg);
+        setPortalValueLocal(developmentId, portal, current);
+        return;
+      }
+    } catch (e: any) {
+      setErrorMessage(e?.message ?? "Falha ao salvar status nos portais.");
+      setPortalValueLocal(developmentId, portal, current);
+    } finally {
+      setPortalSyncByKey((s) => {
+        const copy = { ...s };
+        delete copy[k];
+        return copy;
+      });
+    }
+  }
+
+  function PortalSwitch({
+    label,
+    active,
+    syncing,
+    onToggle,
+    activeCls,
+  }: {
+    label: string;
+    active: boolean;
+    syncing: boolean;
+    onToggle: () => void;
+    activeCls: string;
+  }) {
+    const cls = active
+      ? `${activeCls} ring-1 ring-slate-200/70`
+      : "bg-white text-slate-700 ring-1 ring-slate-200/70";
+
+    return (
+      <button
+        type="button"
+        onClick={onToggle}
+        disabled={syncing}
+        className={
+          "group inline-flex items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition-all duration-300 hover:-translate-y-[1px] " +
+          cls
+        }
+      >
+        <span>{label}</span>
+        <span
+          className={
+            "inline-flex items-center justify-center rounded-full px-2 py-1 text-[10px] font-semibold ring-1 " +
+            (syncing
+              ? "bg-amber-50 text-amber-900 ring-amber-200/70"
+              : active
+                ? "bg-emerald-50 text-emerald-800 ring-emerald-200/70"
+                : "bg-slate-100 text-slate-600 ring-slate-200/70")
+          }
+        >
+          {syncing ? "Sincronizando..." : active ? "Ativo" : "Inativo"}
+        </span>
+      </button>
+    );
+  }
 
   async function testProfilesConnection(context: string, error: unknown) {
     if (!supabase) return;
@@ -375,6 +523,11 @@ export default function EmpreendimentosClient() {
     }
 
     try {
+      if (portalColumn == null) {
+        const col = await detectPortalColumn();
+        setPortalColumn(col);
+      }
+
       let res = await supabase.from("developments").select("*").order("created_at", { ascending: false });
       if (res.error) {
         const code = (res.error as any)?.code;
@@ -734,6 +887,14 @@ export default function EmpreendimentosClient() {
             const value = getDisplayValue(r);
             const ownerLast = (r as any)?.last_owner_contact_at ?? null;
             const ownerWhatsapp = String((r as any)?.owner_whatsapp ?? "").trim();
+
+            const olx = getPortalValue(r as any, "olx");
+            const zap = getPortalValue(r as any, "zap");
+            const vivareal = getPortalValue(r as any, "vivareal");
+            const syncOlx = Boolean(portalSyncByKey[`${r.id}:olx`]);
+            const syncZap = Boolean(portalSyncByKey[`${r.id}:zap`]);
+            const syncViva = Boolean(portalSyncByKey[`${r.id}:vivareal`]);
+
             return (
               <div
                 key={r.id}
@@ -869,6 +1030,38 @@ export default function EmpreendimentosClient() {
 
                   <div className="mt-4 text-xs text-slate-500">
                     {r.video_url ? "Vídeo disponível" : "Sem vídeo"} • {r.sales_material_url ? "Material OK" : "Sem material"}
+                  </div>
+
+                  <div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-slate-200/70">
+                    <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">STATUS NOS PORTAIS</div>
+                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      <PortalSwitch
+                        label="OLX"
+                        active={olx}
+                        syncing={syncOlx}
+                        onToggle={() => void togglePortal(r.id, "olx")}
+                        activeCls="bg-[#7C3AED] text-white"
+                      />
+                      <PortalSwitch
+                        label="Zap Imóveis"
+                        active={zap}
+                        syncing={syncZap}
+                        onToggle={() => void togglePortal(r.id, "zap")}
+                        activeCls="bg-[#2563EB] text-white"
+                      />
+                      <PortalSwitch
+                        label="Viva Real"
+                        active={vivareal}
+                        syncing={syncViva}
+                        onToggle={() => void togglePortal(r.id, "vivareal")}
+                        activeCls="bg-[#0EA5E9] text-white"
+                      />
+                    </div>
+                    {!portalColumn ? (
+                      <div className="mt-3 text-xs font-semibold text-amber-700">
+                        Coluna JSONB de portais não detectada (ex: portals_json). Os switches vão pedir configuração.
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </div>

@@ -57,6 +57,11 @@ type PropertyRow = {
   tour_url: string | null;
   status: PropertyStatus | null;
   description: string | null;
+  portals_json?: any;
+  portal_status_json?: any;
+  portais_json?: any;
+  portais_status_json?: any;
+  integrations_json?: any;
   created_at?: string;
 };
 
@@ -176,10 +181,123 @@ export default function InventarioImoveisPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  const portalColumns = useMemo(
+    () => ["portals_json", "portal_status_json", "portais_json", "portais_status_json", "integrations_json"] as const,
+    [],
+  );
+  const [portalColumn, setPortalColumn] = useState<string | null>(null);
+  const [portalSyncByKey, setPortalSyncByKey] = useState<Record<string, boolean>>({});
+
   const showToast = useCallback((message: string) => {
     setToastMessage(message);
     window.setTimeout(() => setToastMessage(null), 8000);
   }, []);
+
+  const getPortalValue = useCallback(
+    (row: any, key: "olx" | "zap" | "vivareal") => {
+      const col = portalColumn;
+      if (!col) return false;
+      const raw = row?.[col];
+      if (!raw) return false;
+      if (typeof raw === "object") return Boolean(raw?.[key]);
+      if (typeof raw === "string") {
+        try {
+          const obj = JSON.parse(raw);
+          return Boolean(obj?.[key]);
+        } catch {
+          return false;
+        }
+      }
+      return false;
+    },
+    [portalColumn],
+  );
+
+  const setPortalValueLocal = useCallback(
+    (propertyId: string, key: "olx" | "zap" | "vivareal", value: boolean) => {
+      const col = portalColumn;
+      if (!col) return;
+      setRows((current) =>
+        current.map((r: any) => {
+          if (r.id !== propertyId) return r;
+          const raw = r?.[col];
+          let obj: any = {};
+          if (raw && typeof raw === "object") obj = { ...raw };
+          if (raw && typeof raw === "string") {
+            try {
+              obj = { ...(JSON.parse(raw) ?? {}) };
+            } catch {
+              obj = {};
+            }
+          }
+          obj[key] = value;
+          return { ...r, [col]: obj };
+        }),
+      );
+    },
+    [portalColumn],
+  );
+
+  const togglePortal = useCallback(
+    async (propertyId: string, portal: "olx" | "zap" | "vivareal") => {
+      if (!portalColumn) {
+        showToast("Configure uma coluna JSONB (ex: portals_json) para armazenar status nos portais.");
+        return;
+      }
+
+      const row = rows.find((r) => r.id === propertyId) as any;
+      const current = getPortalValue(row, portal);
+      const next = !current;
+      const k = `${propertyId}:${portal}`;
+
+      setPortalValueLocal(propertyId, portal, next);
+      setPortalSyncByKey((s) => ({ ...s, [k]: true }));
+
+      try {
+        const res = await fetch("/api/portais-status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ entityType: "property", id: propertyId, portal, value: next }),
+        });
+        const json = await res.json().catch(() => null);
+        if (!res.ok || !json?.ok) {
+          const msg = String(json?.error ?? `Falha ao salvar (HTTP ${res.status})`);
+          showToast(msg);
+          setPortalValueLocal(propertyId, portal, current);
+          return;
+        }
+        showToast("Status nos portais atualizado.");
+      } catch (e: any) {
+        showToast(e?.message ?? "Falha ao salvar status nos portais.");
+        setPortalValueLocal(propertyId, portal, current);
+      } finally {
+        setPortalSyncByKey((s) => {
+          const copy = { ...s };
+          delete copy[k];
+          return copy;
+        });
+      }
+    },
+    [portalColumn, rows, getPortalValue, setPortalValueLocal, showToast],
+  );
+
+  async function detectPortalColumn() {
+    if (!supabase) return null;
+    for (const col of portalColumns) {
+      try {
+        const res = await (supabase as any).from("properties").select(`id, ${col}`).limit(1);
+        if (!res?.error) return col;
+        const msg = String(res.error?.message ?? "");
+        const code = (res.error as any)?.code;
+        const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
+        const isMissing = /does not exist|not found|column/i.test(msg);
+        if (isSchemaMismatch || isMissing) continue;
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  }
 
   const [updatingFieldByRowId, setUpdatingFieldByRowId] = useState<Record<string, "corretor" | "premium" | null>>(
     {},
@@ -220,8 +338,12 @@ export default function InventarioImoveisPage() {
     }
 
     try {
+      const detectedPortalCol = portalColumn ?? (await detectPortalColumn());
+      if (portalColumn == null) setPortalColumn(detectedPortalCol);
+
       const brokerCol = propertiesBrokerColumn;
-      const baseSelect = `id, title, property_type, purpose, price, is_premium, ${brokerCol}, data_direcionamento, owner_whatsapp, last_owner_contact_at, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description, created_at`;
+      const portalsSelect = detectedPortalCol ? `, ${detectedPortalCol}` : "";
+      const baseSelect = `id, title, property_type, purpose, price, is_premium, ${brokerCol}, data_direcionamento, owner_whatsapp, last_owner_contact_at, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description${portalsSelect}, created_at`;
       const selectStr = supportsAssignedBrokerId ? `${baseSelect}, assigned_broker_id` : baseSelect;
       const { data, error } = await supabase
         .from("properties")
@@ -239,8 +361,12 @@ export default function InventarioImoveisPage() {
       setRows((data ?? []) as any);
     } catch {
       try {
+        const detectedPortalCol = portalColumn ?? (await detectPortalColumn());
+        if (portalColumn == null) setPortalColumn(detectedPortalCol);
+
         const brokerCol = propertiesBrokerColumn;
-        const baseSelect = `id, title, property_type, purpose, price, is_premium, ${brokerCol}, owner_whatsapp, last_owner_contact_at, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description, created_at`;
+        const portalsSelect = detectedPortalCol ? `, ${detectedPortalCol}` : "";
+        const baseSelect = `id, title, property_type, purpose, price, is_premium, ${brokerCol}, owner_whatsapp, last_owner_contact_at, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description${portalsSelect}, created_at`;
         const selectStr = supportsAssignedBrokerId ? `${baseSelect}, assigned_broker_id` : baseSelect;
         const { data, error } = await supabase
           .from("properties")
@@ -259,6 +385,50 @@ export default function InventarioImoveisPage() {
         setErrorMessage("Não foi possível carregar o inventário agora.");
       }
     }
+  }
+
+  function PortalSwitch({
+    label,
+    active,
+    syncing,
+    onToggle,
+    activeCls,
+  }: {
+    label: string;
+    active: boolean;
+    syncing: boolean;
+    onToggle: () => void;
+    activeCls: string;
+  }) {
+    const cls = active
+      ? `${activeCls} ring-1 ring-slate-200/70`
+      : "bg-white text-slate-700 ring-1 ring-slate-200/70";
+
+    return (
+      <button
+        type="button"
+        onClick={onToggle}
+        disabled={syncing}
+        className={
+          "group inline-flex items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition-all duration-300 hover:-translate-y-[1px] " +
+          cls
+        }
+      >
+        <span>{label}</span>
+        <span
+          className={
+            "inline-flex items-center justify-center rounded-full px-2 py-1 text-[10px] font-semibold ring-1 " +
+            (syncing
+              ? "bg-amber-50 text-amber-900 ring-amber-200/70"
+              : active
+                ? "bg-emerald-50 text-emerald-800 ring-emerald-200/70"
+                : "bg-slate-100 text-slate-600 ring-slate-200/70")
+          }
+        >
+          {syncing ? "Sincronizando..." : active ? "Ativo" : "Inativo"}
+        </span>
+      </button>
+    );
   }
 
   async function loadBrokers() {
@@ -806,11 +976,18 @@ export default function InventarioImoveisPage() {
               const parkingLine = parking != null ? `${parking} vaga${parking === 1 ? "" : "s"}` : "-";
               const ownerLast = (r as any)?.last_owner_contact_at ?? null;
               const ownerWhatsapp = String((r as any)?.owner_whatsapp ?? "").trim();
+              const badgeStatus = (r.status ?? "disponivel") as PropertyStatus;
+              const olx = getPortalValue(r as any, "olx");
+              const zap = getPortalValue(r as any, "zap");
+              const vivareal = getPortalValue(r as any, "vivareal");
+              const syncOlx = Boolean(portalSyncByKey[`${r.id}:olx`]);
+              const syncZap = Boolean(portalSyncByKey[`${r.id}:zap`]);
+              const syncViva = Boolean(portalSyncByKey[`${r.id}:vivareal`]);
 
               return (
                 <div
                   key={r.id}
-                  className="group overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[2px] hover:shadow-md"
+                  className="group overflow-hidden rounded-2xl bg-white shadow-[0_10px_24px_-14px_rgba(15,23,42,0.55)] ring-1 ring-slate-200/70 transition-all duration-300 hover:-translate-y-[2px]"
                 >
                   <div className="relative h-44 w-full bg-slate-100">
                     {photo ? (
@@ -861,6 +1038,33 @@ export default function InventarioImoveisPage() {
                       <div className="flex items-center gap-2">
                         <CarFront className="h-4 w-4 text-slate-600" />
                         <div className="text-xs font-semibold text-slate-700">{parkingLine}</div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 rounded-2xl bg-white p-3 ring-1 ring-slate-200/70">
+                      <div className="text-[10px] font-semibold tracking-wide text-slate-500">Status nos Portais</div>
+                      <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                        <PortalSwitch
+                          label="OLX"
+                          active={olx}
+                          syncing={syncOlx}
+                          onToggle={() => void togglePortal(r.id, "olx")}
+                          activeCls="bg-[#7C3AED] text-white"
+                        />
+                        <PortalSwitch
+                          label="Zap Imóveis"
+                          active={zap}
+                          syncing={syncZap}
+                          onToggle={() => void togglePortal(r.id, "zap")}
+                          activeCls="bg-[#2563EB] text-white"
+                        />
+                        <PortalSwitch
+                          label="Viva Real"
+                          active={vivareal}
+                          syncing={syncViva}
+                          onToggle={() => void togglePortal(r.id, "vivareal")}
+                          activeCls="bg-[#0EA5E9] text-white"
+                        />
                       </div>
                     </div>
 
