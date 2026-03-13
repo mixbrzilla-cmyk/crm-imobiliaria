@@ -121,6 +121,39 @@ function extractQrFromInstance(instance: any) {
   return null;
 }
 
+function extractQrFromConnectResponse(payload: any) {
+  const candidates = [
+    payload?.qr,
+    payload?.qrCode,
+    payload?.qrcode,
+    payload?.qr_code,
+    payload?.qrCodeBase64,
+    payload?.qr_code_base64,
+    payload?.base64,
+    payload?.data,
+    payload?.instance,
+    payload?.instanceData,
+  ];
+
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim()) return c.trim();
+    if (c && typeof c === "object") {
+      const inner =
+        c?.base64 ||
+        c?.qr ||
+        c?.qrcode ||
+        c?.qrCode ||
+        c?.qr_code ||
+        c?.image ||
+        c?.src ||
+        c?.url;
+      if (typeof inner === "string" && inner.trim()) return inner.trim();
+    }
+  }
+
+  return null;
+}
+
 export async function POST() {
   const settings = await loadEvolutionSettings();
   if (!settings.ok) {
@@ -152,7 +185,28 @@ export async function POST() {
     createJson = null;
   }
 
-  // 2) fetch instances and try to extract QR
+  // 2) force QR generation
+  const connectUrl = new URL(`/instance/connect/${instanceName}`, baseUrl).toString();
+  const connectRes = await fetch(connectUrl, {
+    method: "GET",
+    headers,
+    cache: "no-store",
+  }).catch(
+    (e: any) =>
+      ({ ok: false, status: 0, json: async () => null, text: async () => String(e?.message ?? e) }) as any,
+  );
+
+  const connectBodyText = await connectRes.text().catch(() => "");
+  let connectJson: any = null;
+  try {
+    connectJson = connectBodyText ? JSON.parse(connectBodyText) : null;
+  } catch {
+    connectJson = null;
+  }
+
+  let qrRaw = connectJson ? extractQrFromConnectResponse(connectJson) : null;
+
+  // 3) fallback: fetch instances and try to extract QR
   const listUrl = new URL("/instance/fetchInstances", baseUrl).toString();
   const listRes = await fetch(listUrl, {
     method: "GET",
@@ -174,7 +228,9 @@ export async function POST() {
     return name === instanceName;
   });
 
-  const qrRaw = found ? extractQrFromInstance(found) : null;
+  if (!qrRaw) {
+    qrRaw = found ? extractQrFromInstance(found) : null;
+  }
 
   // Normalize base64 into data URL when needed
   let qrDataUrl: string | null = null;
@@ -198,6 +254,12 @@ export async function POST() {
       ok: Boolean((createRes as any)?.ok),
       json: createJson,
       text: createJson ? null : createBodyText?.slice(0, 2000) ?? null,
+    },
+    connect: {
+      status: (connectRes as any)?.status ?? null,
+      ok: Boolean((connectRes as any)?.ok),
+      json: connectJson,
+      text: connectJson ? null : connectBodyText?.slice(0, 2000) ?? null,
     },
     fetchInstances: {
       status: listRes.status,
