@@ -48,6 +48,8 @@ type WhatsappSettingsRow = {
   token: string | null;
   client_key: string | null;
   webhook_url: string | null;
+  evolution_api_url?: string | null;
+  evolution_global_api_key?: string | null;
   created_at?: string;
 };
 
@@ -56,6 +58,8 @@ type SettingsFormState = {
   token: string;
   client_key: string;
   webhook_url: string;
+  evolution_api_url: string;
+  evolution_global_api_key: string;
 };
 
 type BrokerProfile = {
@@ -136,7 +140,11 @@ export default function WhatsAppPanelClient() {
     token: "",
     client_key: "",
     webhook_url: "",
+    evolution_api_url: "",
+    evolution_global_api_key: "",
   });
+
+  const [evolutionTestMessage, setEvolutionTestMessage] = useState<string | null>(null);
 
   const hasZapiConfig = useMemo(() => {
     return Boolean(settingsForm.instance_id.trim() && settingsForm.token.trim());
@@ -413,12 +421,23 @@ export default function WhatsAppPanelClient() {
   const loadSettings = useCallback(async () => {
     if (!supabase) return;
     try {
-      const res = await supabase
+      let res: any = await supabase
         .from("whatsapp_settings")
-        .select("id, instance_id, token, client_key, webhook_url, created_at")
+        .select(
+          "id, instance_id, token, client_key, webhook_url, evolution_api_url, evolution_global_api_key, created_at",
+        )
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
+
+      if (res.error) {
+        res = await supabase
+          .from("whatsapp_settings")
+          .select("id, instance_id, token, client_key, webhook_url, created_at")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+      }
 
       if (res.error) {
         console.log("DEBUG SUPABASE:", res.error);
@@ -438,6 +457,8 @@ export default function WhatsAppPanelClient() {
           token: row.token ?? "",
           client_key: row.client_key ?? "",
           webhook_url: row.webhook_url ?? "",
+          evolution_api_url: (row as any)?.evolution_api_url ?? "",
+          evolution_global_api_key: (row as any)?.evolution_global_api_key ?? "",
         });
       } else {
         setInfoMessage("Aguardando configuração da Z-API. Preencha as credenciais para habilitar envios.");
@@ -450,6 +471,7 @@ export default function WhatsAppPanelClient() {
 
   const saveSettings = useCallback(async () => {
     setErrorMessage(null);
+    setEvolutionTestMessage(null);
     if (!supabase) return;
     if (!supportsSettingsTable) {
       setErrorMessage("Tabela whatsapp_settings não encontrada no Supabase.");
@@ -464,24 +486,30 @@ export default function WhatsAppPanelClient() {
         token: settingsForm.token.trim() ? settingsForm.token.trim() : null,
         client_key: settingsForm.client_key.trim() ? settingsForm.client_key.trim() : null,
         webhook_url: settingsForm.webhook_url.trim() ? settingsForm.webhook_url.trim() : null,
+        evolution_api_url: settingsForm.evolution_api_url.trim() ? settingsForm.evolution_api_url.trim() : null,
+        evolution_global_api_key: settingsForm.evolution_global_api_key.trim()
+          ? settingsForm.evolution_global_api_key.trim()
+          : null,
       };
 
-      if (!payload.instance_id || !payload.token) {
-        setErrorMessage("Preencha instance_id e token.");
+      if (payload.evolution_api_url && !payload.evolution_global_api_key) {
+        setErrorMessage("Preencha a Global API Key da Estação WhatsApp.");
         setIsSavingSettings(false);
         return;
       }
 
-      const validateRes = await fetch("/api/whatsapp/validate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ instance_id: payload.instance_id, token: payload.token }),
-      });
-      const validateJson = await validateRes.json().catch(() => null);
-      if (!validateRes.ok || !validateJson?.ok) {
-        setErrorMessage(validateJson?.error ?? "Z-API não conectada. Verifique instance_id e token.");
-        setIsSavingSettings(false);
-        return;
+      if (payload.instance_id && payload.token) {
+        const validateRes = await fetch("/api/whatsapp/validate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ instance_id: payload.instance_id, token: payload.token }),
+        });
+        const validateJson = await validateRes.json().catch(() => null);
+        if (!validateRes.ok || !validateJson?.ok) {
+          setErrorMessage(validateJson?.error ?? "Z-API não conectada. Verifique instance_id e token.");
+          setIsSavingSettings(false);
+          return;
+        }
       }
 
       const res = await (supabase as any)
@@ -504,6 +532,42 @@ export default function WhatsAppPanelClient() {
       setErrorMessage("Não foi possível salvar a configuração agora.");
     }
   }, [loadSettings, loadThreads, settingsForm, supabase, supportsSettingsTable]);
+
+  const testEvolution = useCallback(async () => {
+    setErrorMessage(null);
+    setEvolutionTestMessage(null);
+    const url = settingsForm.evolution_api_url.trim();
+    const key = settingsForm.evolution_global_api_key.trim();
+    if (!url || !key) {
+      setErrorMessage("Preencha URL da API e Global API Key.");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/whatsapp/evolution/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ api_url: url, global_api_key: key }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) {
+        setErrorMessage(String(json?.error ?? `Falha ao testar conexão (HTTP ${res.status})`));
+        return;
+      }
+      setEvolutionTestMessage(String(json?.message ?? "Conexão OK"));
+    } catch {
+      setErrorMessage("Não foi possível testar a conexão agora.");
+    }
+  }, [settingsForm.evolution_api_url, settingsForm.evolution_global_api_key]);
+
+  const openEvolutionManager = useCallback(() => {
+    const url = settingsForm.evolution_api_url.trim();
+    if (!url) {
+      setErrorMessage("Configure a URL da Estação WhatsApp para abrir o gerenciador.");
+      return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+  }, [settingsForm.evolution_api_url]);
 
   async function assignThreadToBroker(threadId: string, brokerId: string) {
     if (!supabase) return;
@@ -892,9 +956,9 @@ export default function WhatsAppPanelClient() {
             <div className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-[0_25px_60px_-45px_rgba(0,0,0,0.55)] ring-1 ring-slate-200/70">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <div className="text-sm font-semibold text-slate-900">Configuração WhatsApp (Z-API)</div>
+                  <div className="text-sm font-semibold text-slate-900">Configuração da Estação WhatsApp</div>
                   <div className="mt-1 text-xs text-slate-500">
-                    Ajuste instância, token, clientKey e o número oficial.
+                    Defina a Evolution API (VPS) para QR Code e gerenciador de instâncias.
                   </div>
                 </div>
                 <button
@@ -912,54 +976,58 @@ export default function WhatsAppPanelClient() {
                 </div>
               ) : null}
 
-              <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+              {evolutionTestMessage ? (
+                <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900 ring-1 ring-emerald-200/70">
+                  {evolutionTestMessage}
+                </div>
+              ) : null}
+
+              <div className="mt-5 grid grid-cols-1 gap-4">
                 <label className="flex flex-col gap-2">
-                  <span className="text-xs font-semibold tracking-wide text-slate-600">Instância</span>
+                  <span className="text-xs font-semibold tracking-wide text-slate-600">URL da API</span>
                   <input
-                    value={settingsForm.instance_id}
-                    onChange={(e) => setSettingsForm((s) => ({ ...s, instance_id: e.target.value }))}
+                    value={settingsForm.evolution_api_url}
+                    onChange={(e) => setSettingsForm((s) => ({ ...s, evolution_api_url: e.target.value }))}
                     className="h-11 rounded-2xl bg-slate-50 px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:bg-white focus:ring-2 focus:ring-slate-900/10"
-                    placeholder="INSTANCE_ID"
+                    placeholder="http://187.77.240.10:8080"
                   />
                 </label>
 
                 <label className="flex flex-col gap-2">
-                  <span className="text-xs font-semibold tracking-wide text-slate-600">Token</span>
+                  <span className="text-xs font-semibold tracking-wide text-slate-600">Global API Key</span>
                   <input
-                    value={settingsForm.token}
-                    onChange={(e) => setSettingsForm((s) => ({ ...s, token: e.target.value }))}
+                    value={settingsForm.evolution_global_api_key}
+                    onChange={(e) => setSettingsForm((s) => ({ ...s, evolution_global_api_key: e.target.value }))}
                     className="h-11 rounded-2xl bg-slate-50 px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:bg-white focus:ring-2 focus:ring-slate-900/10"
-                    placeholder="TOKEN"
+                    placeholder="GLOBAL_API_KEY"
                   />
                 </label>
 
-                <label className="flex flex-col gap-2 md:col-span-2">
-                  <span className="text-xs font-semibold tracking-wide text-slate-600">ClientKey</span>
-                  <input
-                    value={settingsForm.client_key}
-                    onChange={(e) => setSettingsForm((s) => ({ ...s, client_key: e.target.value }))}
-                    className="h-11 rounded-2xl bg-slate-50 px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:bg-white focus:ring-2 focus:ring-slate-900/10"
-                    placeholder="CLIENT_KEY"
-                  />
-                </label>
-
-                <label className="flex flex-col gap-2 md:col-span-2">
-                  <span className="text-xs font-semibold tracking-wide text-slate-600">Webhook URL</span>
-                  <input
-                    value={settingsForm.webhook_url}
-                    onChange={(e) => setSettingsForm((s) => ({ ...s, webhook_url: e.target.value }))}
-                    className="h-11 rounded-2xl bg-slate-50 px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:bg-white focus:ring-2 focus:ring-slate-900/10"
-                    placeholder="https://SEU_DOMINIO.com/api/whatsapp/webhook"
-                  />
-                </label>
+                <div className="text-[11px] font-semibold text-slate-500">
+                  Dica: use a URL base da VPS (com porta). Ex: http://187.77.240.10:8080
+                </div>
               </div>
 
-              <div className="mt-6 flex items-center justify-end gap-2">
+              <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => openEvolutionManager()}
+                  className="inline-flex h-11 items-center justify-center rounded-2xl bg-white px-5 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
+                >
+                  Abrir Gerenciador
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void testEvolution()}
+                  className="inline-flex h-11 items-center justify-center rounded-2xl bg-white px-5 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
+                >
+                  Testar Conexão
+                </button>
                 <button
                   type="button"
                   onClick={() => void saveSettings()}
                   disabled={isSavingSettings || !supportsSettingsTable}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-[#ff0000] px-6 text-sm font-semibold text-white shadow-[0_6px_14px_-10px_rgba(239,68,68,0.55)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-11 items-center justify-center rounded-2xl bg-[#ff0000] px-6 text-sm font-semibold text-white shadow-[0_6px_14px_-10px_rgba(15,23,42,0.35)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isSavingSettings ? "Salvando..." : "Salvar"}
                 </button>
