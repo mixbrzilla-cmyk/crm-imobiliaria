@@ -7,19 +7,37 @@ function normalizeBaseUrl(url: string) {
   return raw.replace(/\/+$/, "");
 }
 
+function toAbsoluteBaseUrl(input: string) {
+  const raw = normalizeBaseUrl(input);
+  if (!raw) return null;
+
+  try {
+    return new URL(raw);
+  } catch {
+    // allow host:port without scheme
+    try {
+      return new URL(`http://${raw}`);
+    } catch {
+      return null;
+    }
+  }
+}
+
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
-  const apiUrl = normalizeBaseUrl(String(body?.api_url ?? ""));
+  const baseUrl = toAbsoluteBaseUrl(String(body?.api_url ?? ""));
   const globalKey = String(body?.global_api_key ?? "").trim();
 
-  if (!apiUrl || !globalKey) {
+  if (!baseUrl || !globalKey) {
     return NextResponse.json(
-      { ok: false, error: "api_url e global_api_key são obrigatórios" },
+      { ok: false, error: "api_url (válida) e global_api_key são obrigatórios" },
       { status: 400 },
     );
   }
 
-  const candidates = [apiUrl, `${apiUrl}/health`, `${apiUrl}/api/health`];
+  const candidates = [
+    new URL("/instance/fetchInstances", baseUrl).toString(),
+  ];
 
   let lastError = "";
 
