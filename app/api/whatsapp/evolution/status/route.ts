@@ -66,9 +66,22 @@ async function loadEvolutionSettings() {
     return { ok: false as const, error: res.error.message };
   }
 
-  const apiUrl = String((res.data as any)?.evolution_api_url ?? "").trim();
-  const apiKey = String((res.data as any)?.evolution_global_api_key ?? "").trim();
+  const dbApiUrl = String((res.data as any)?.evolution_api_url ?? "").trim();
+  const dbApiKey = String((res.data as any)?.evolution_global_api_key ?? "").trim();
+  const envApiUrl = String(
+    process.env.EVOLUTION_API_URL ??
+      process.env.EVOLUTION_BASE_URL ??
+      process.env.EVOLUTION_URL ??
+      "",
+  ).trim();
+  const envApiKey = String(
+    process.env.EVOLUTION_API_KEY ?? process.env.EVOLUTION_GLOBAL_API_KEY ?? "",
+  ).trim();
+  const apiUrl = envApiUrl || dbApiUrl;
+  const apiKey = envApiKey || dbApiKey;
   const rowId = (res.data as any)?.id ? String((res.data as any).id) : null;
+  const apiUrlSource = envApiUrl ? ("env" as const) : ("db" as const);
+  const apiKeySource = envApiKey ? ("env" as const) : ("db" as const);
 
   if (!apiUrl || !apiKey) {
     return {
@@ -77,7 +90,7 @@ async function loadEvolutionSettings() {
     };
   }
 
-  return { ok: true as const, apiUrl, apiKey, rowId };
+  return { ok: true as const, apiUrl, apiKey, rowId, apiUrlSource, apiKeySource };
 }
 
 function buildAuthHeaders(globalKey: string) {
@@ -157,8 +170,8 @@ export async function GET() {
   const instanceName = "boss_imob";
   const headers = buildAuthHeaders(settings.apiKey);
 
-  const url = new URL("/instance/fetchInstances", baseUrl).toString();
-  const res = await fetch(url, { method: "GET", headers, cache: "no-store" });
+  const fetchInstancesUrl = new URL("/instance/fetchInstances", baseUrl).toString();
+  const res = await fetch(fetchInstancesUrl, { method: "GET", headers, cache: "no-store" });
 
   const text = await res.text().catch(() => "");
   let json: any = null;
@@ -242,6 +255,10 @@ export async function GET() {
   return NextResponse.json({
     ok: res.ok,
     status: res.status,
+    apiUrlSource: (settings as any).apiUrlSource ?? null,
+    apiKeySource: (settings as any).apiKeySource ?? null,
+    resolvedBaseUrl: baseUrl.toString().replace(/\/+$/, ""),
+    resolvedFetchInstancesUrl: fetchInstancesUrl,
     targetInstanceName: instanceName,
     instanceName,
     state,

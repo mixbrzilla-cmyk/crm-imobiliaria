@@ -67,8 +67,19 @@ async function loadEvolutionSettings() {
   }
 
   const row = res.data as any;
-  const apiUrl = String(row?.evolution_api_url ?? "").trim();
-  const apiKey = String(row?.evolution_global_api_key ?? "").trim();
+  const dbApiUrl = String(row?.evolution_api_url ?? "").trim();
+  const dbApiKey = String(row?.evolution_global_api_key ?? "").trim();
+  const envApiUrl = String(
+    process.env.EVOLUTION_API_URL ??
+      process.env.EVOLUTION_BASE_URL ??
+      process.env.EVOLUTION_URL ??
+      "",
+  ).trim();
+  const envApiKey = String(
+    process.env.EVOLUTION_API_KEY ?? process.env.EVOLUTION_GLOBAL_API_KEY ?? "",
+  ).trim();
+  const apiUrl = envApiUrl || dbApiUrl;
+  const apiKey = envApiKey || dbApiKey;
 
   if (!apiUrl || !apiKey) {
     return {
