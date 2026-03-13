@@ -95,7 +95,7 @@ function initials(name: string | null) {
 export default function WhatsAppPanelClient() {
   const supabase = useMemo(() => getSupabaseClient(), []);
 
-  const SETTINGS_ID = "singleton";
+  const [settingsRowId, setSettingsRowId] = useState<string | null>(null);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
@@ -436,11 +436,15 @@ export default function WhatsAppPanelClient() {
 
       const row = (res.data ?? null) as WhatsappSettingsRow | null;
       if (row) {
+        const rawId = (res.data as any)?.id;
+        const normalizedId = rawId ? String(rawId) : "";
+        setSettingsRowId(normalizedId.trim() ? normalizedId : null);
         setSettingsForm({
           evolution_api_url: (row as any)?.evolution_api_url ?? "",
           evolution_global_api_key: (row as any)?.evolution_global_api_key ?? "",
         });
       } else {
+        setSettingsRowId(null);
         setSettingsForm({ evolution_api_url: "", evolution_global_api_key: "" });
         setInfoMessage("Configure a Estação WhatsApp (Evolution API) para habilitar o gerenciador e testes de conexão.");
       }
@@ -462,7 +466,6 @@ export default function WhatsAppPanelClient() {
     setIsSavingSettings(true);
     try {
       const payload = {
-        id: SETTINGS_ID,
         evolution_api_url: settingsForm.evolution_api_url.trim() ? settingsForm.evolution_api_url.trim() : null,
         evolution_global_api_key: settingsForm.evolution_global_api_key.trim()
           ? settingsForm.evolution_global_api_key.trim()
@@ -475,9 +478,13 @@ export default function WhatsAppPanelClient() {
         return;
       }
 
-      const res = await (supabase as any)
-        .from("whatsapp_settings")
-        .upsert(payload, { onConflict: "id" });
+      let res: any;
+      if (settingsRowId) {
+        res = await (supabase as any).from("whatsapp_settings").update(payload).eq("id", settingsRowId);
+      } else {
+        const insertPayload = { id: crypto.randomUUID(), ...payload };
+        res = await (supabase as any).from("whatsapp_settings").insert(insertPayload);
+      }
       if (res.error) {
         console.log("DEBUG SUPABASE:", res.error);
         console.log("[WhatsApp] Erro ao salvar whatsapp_settings:", res.error);
@@ -494,7 +501,7 @@ export default function WhatsAppPanelClient() {
       setIsSavingSettings(false);
       setErrorMessage("Não foi possível salvar a configuração agora.");
     }
-  }, [loadSettings, loadThreads, settingsForm, supabase, supportsSettingsTable]);
+  }, [loadSettings, loadThreads, settingsForm, settingsRowId, supabase, supportsSettingsTable]);
 
   const testEvolution = useCallback(async () => {
     setErrorMessage(null);

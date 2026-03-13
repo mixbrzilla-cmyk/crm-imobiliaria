@@ -30,6 +30,8 @@ export async function POST(req: Request) {
         method: "GET",
         headers: {
           apikey: globalKey,
+          "x-api-key": globalKey,
+          "X-Api-Key": globalKey,
           Authorization: `Bearer ${globalKey}`,
         },
         cache: "no-store",
