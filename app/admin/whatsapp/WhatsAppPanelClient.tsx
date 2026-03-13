@@ -134,6 +134,11 @@ export default function WhatsAppPanelClient() {
 
   const [evolutionTestMessage, setEvolutionTestMessage] = useState<string | null>(null);
 
+  const [isPairOpen, setIsPairOpen] = useState(false);
+  const [isPairing, setIsPairing] = useState(false);
+  const [pairQrDataUrl, setPairQrDataUrl] = useState<string | null>(null);
+  const [pairInstanceName, setPairInstanceName] = useState<string | null>(null);
+
   const testProfilesConnection = useCallback(
     async (context: string, error: unknown) => {
       if (!supabase) return;
@@ -530,14 +535,43 @@ export default function WhatsAppPanelClient() {
     }
   }, [settingsForm.evolution_api_url, settingsForm.evolution_global_api_key]);
 
-  const openEvolutionManager = useCallback(() => {
-    const url = settingsForm.evolution_api_url.trim();
-    if (!url) {
-      setErrorMessage("Configure a URL da Estação WhatsApp para abrir o gerenciador.");
-      return;
+  const pairEvolution = useCallback(async () => {
+    setErrorMessage(null);
+    setEvolutionTestMessage(null);
+    setPairQrDataUrl(null);
+    setPairInstanceName(null);
+    setIsPairOpen(true);
+    setIsPairing(true);
+
+    try {
+      const res = await fetch("/api/whatsapp/evolution/pair", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) {
+        setErrorMessage(String(json?.error ?? `Falha ao parear (HTTP ${res.status})`));
+        setIsPairing(false);
+        return;
+      }
+
+      const instanceName = json?.instanceName ? String(json.instanceName) : null;
+      const qrDataUrl = json?.qr?.dataUrl ? String(json.qr.dataUrl) : null;
+
+      setPairInstanceName(instanceName);
+      setPairQrDataUrl(qrDataUrl);
+
+      if (!qrDataUrl) {
+        setErrorMessage(
+          "Instância criada/validada, mas o QR Code não veio no fetchInstances. Verifique se a Evolution está pronta para gerar o QR.",
+        );
+      }
+    } catch {
+      setErrorMessage("Não foi possível parear agora.");
+    } finally {
+      setIsPairing(false);
     }
-    window.open(url, "_blank", "noopener,noreferrer");
-  }, [settingsForm.evolution_api_url]);
+  }, []);
 
   async function assignThreadToBroker(threadId: string, brokerId: string) {
     if (!supabase) return;
@@ -975,10 +1009,10 @@ export default function WhatsAppPanelClient() {
               <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
                 <button
                   type="button"
-                  onClick={() => openEvolutionManager()}
+                  onClick={() => void pairEvolution()}
                   className="inline-flex h-11 items-center justify-center rounded-2xl bg-white px-5 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
                 >
-                  Abrir Gerenciador
+                  Parear WhatsApp
                 </button>
                 <button
                   type="button"
@@ -994,6 +1028,60 @@ export default function WhatsAppPanelClient() {
                   className="inline-flex h-11 items-center justify-center rounded-2xl bg-[#ff0000] px-6 text-sm font-semibold text-white shadow-[0_6px_14px_-10px_rgba(15,23,42,0.35)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isSavingSettings ? "Salvando..." : "Salvar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {isPairOpen ? (
+          <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 px-4 py-10">
+            <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-[0_25px_60px_-45px_rgba(0,0,0,0.55)] ring-1 ring-slate-200/70">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-sm font-semibold text-slate-900">Parear WhatsApp</div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    {pairInstanceName ? `Instância: ${pairInstanceName}` : "Gerando instância boss_imob e QR Code"}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsPairOpen(false)}
+                  className="inline-flex h-10 items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
+                >
+                  Fechar
+                </button>
+              </div>
+
+              <div className="mt-5 rounded-3xl bg-slate-50 p-5 ring-1 ring-slate-200/70">
+                {isPairing ? (
+                  <div className="text-sm font-semibold text-slate-700">Gerando QR Code...</div>
+                ) : pairQrDataUrl ? (
+                  <div className="flex flex-col items-center gap-4">
+                    <img
+                      src={pairQrDataUrl}
+                      alt="QR Code WhatsApp"
+                      className="h-72 w-72 rounded-2xl bg-white p-4 ring-1 ring-slate-200/70"
+                    />
+                    <div className="text-xs font-semibold text-slate-600">
+                      Abra o WhatsApp no celular e escaneie o QR Code.
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-slate-700">
+                    QR Code não disponível no momento.
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-5 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => void pairEvolution()}
+                  disabled={isPairing}
+                  className="inline-flex h-11 items-center justify-center rounded-2xl bg-white px-5 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Atualizar QR
                 </button>
               </div>
             </div>
