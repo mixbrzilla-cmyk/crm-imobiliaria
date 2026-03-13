@@ -108,6 +108,28 @@ function extractStateFromInstance(instance: any) {
   return null;
 }
 
+function extractInstanceName(instance: any) {
+  const candidates = [
+    instance?.instanceName,
+    instance?.name,
+    instance?.instance,
+    instance?.instance?.instanceName,
+    instance?.instance?.name,
+  ];
+
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim()) return c.trim();
+  }
+
+  return null;
+}
+
+function normalizeInstanceName(value: string | null) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase();
+}
+
 function getMigrationSql() {
   return `alter table public.whatsapp_settings
   add column if not exists evolution_instance_name text,
@@ -146,11 +168,32 @@ export async function GET() {
     json = null;
   }
 
-  const listArray = Array.isArray(json) ? json : Array.isArray(json?.instances) ? json.instances : null;
+  const listArray =
+    Array.isArray(json)
+      ? json
+      : Array.isArray(json?.instances)
+        ? json.instances
+        : Array.isArray(json?.data)
+          ? json.data
+          : Array.isArray(json?.result)
+            ? json.result
+            : Array.isArray(json?.response)
+              ? json.response
+              : null;
+
+  const targetNormalized = normalizeInstanceName(instanceName);
+  const availableInstances = Array.isArray(listArray)
+    ? listArray
+        .map((i: any) => extractInstanceName(i))
+        .filter(Boolean)
+        .map((v: any) => String(v))
+    : [];
+
   const found = Array.isArray(listArray)
     ? listArray.find((i: any) => {
-        const name = String(i?.instanceName ?? i?.name ?? i?.instance ?? i?.instance?.instanceName ?? "");
-        return name === instanceName;
+        const name = extractInstanceName(i);
+        if (!name) return false;
+        return normalizeInstanceName(name) === targetNormalized;
       })
     : null;
 
@@ -199,10 +242,13 @@ export async function GET() {
   return NextResponse.json({
     ok: res.ok,
     status: res.status,
+    targetInstanceName: instanceName,
     instanceName,
     state,
     isOpen,
     found: Boolean(found),
+    rawCount: Array.isArray(listArray) ? listArray.length : null,
+    availableInstances,
     persisted,
     persistError,
     needsMigration,
