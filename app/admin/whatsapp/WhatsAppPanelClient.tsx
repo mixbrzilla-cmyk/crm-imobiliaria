@@ -142,6 +142,9 @@ export default function WhatsAppPanelClient() {
   const [isResetting, setIsResetting] = useState(false);
   const [resetMessage, setResetMessage] = useState<string | null>(null);
 
+  const [isCheckingWebhook, setIsCheckingWebhook] = useState(false);
+  const [webhookMessage, setWebhookMessage] = useState<string | null>(null);
+
   const testProfilesConnection = useCallback(
     async (context: string, error: unknown) => {
       if (!supabase) return;
@@ -182,29 +185,68 @@ export default function WhatsAppPanelClient() {
   }, [ownerByWhatsapp, selectedThread?.contact_number]);
 
   async function ensureThreadByPhone(phone: string) {
-    if (!supabase) return null;
     const normalized = phone.replace(/\D+/g, "").trim();
     if (!normalized) return null;
 
     try {
-      const existing = await supabase.from("chat_threads").select("id").eq("external_id", normalized).maybeSingle();
-      if (!existing.error && existing.data?.id) return String(existing.data.id);
-
-      const id = crypto.randomUUID();
-      const insert = await (supabase as any).from("chat_threads").insert({
-        id,
-        external_id: normalized,
-        contact_number: normalized,
-        contact_name: null,
-        status: "active",
-        last_message_at: new Date().toISOString(),
+      const res = await fetch("/api/whatsapp/thread/ensure", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: normalized }),
       });
-      if (insert.error) return null;
-      return id;
+
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) return null;
+      const id = json?.threadId ? String(json.threadId) : "";
+      return id.trim() ? id : null;
     } catch {
       return null;
     }
   }
+
+  const checkEvolutionWebhook = useCallback(async () => {
+    setErrorMessage(null);
+    setWebhookMessage(null);
+    setIsCheckingWebhook(true);
+
+    try {
+      const res = await fetch("/api/whatsapp/evolution/webhook", {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json) {
+        setErrorMessage(`Falha ao consultar webhook (HTTP ${res.status}).`);
+        setIsCheckingWebhook(false);
+        return;
+      }
+
+      if (!json.ok) {
+        setErrorMessage(String(json?.text ?? json?.error ?? "Webhook não configurado/inalcançável."));
+        setIsCheckingWebhook(false);
+        return;
+      }
+
+      const url =
+        json?.json?.webhook?.webhook?.url ??
+        json?.json?.webhook?.url ??
+        json?.json?.url ??
+        null;
+
+      const events =
+        json?.json?.webhook?.webhook?.events ??
+        json?.json?.webhook?.events ??
+        null;
+
+      setWebhookMessage(
+        `Webhook OK. URL: ${String(url ?? "-")}. Events: ${Array.isArray(events) ? events.join(", ") : String(events ?? "-")}`,
+      );
+    } catch {
+      setErrorMessage("Não foi possível consultar o webhook agora.");
+    } finally {
+      setIsCheckingWebhook(false);
+    }
+  }, []);
 
   const filteredThreads = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -1034,6 +1076,12 @@ export default function WhatsAppPanelClient() {
                 </div>
               ) : null}
 
+              {webhookMessage ? (
+                <div className="mt-4 rounded-3xl bg-white px-5 py-4 text-xs font-semibold text-slate-900 ring-1 ring-slate-200/70">
+                  {webhookMessage}
+                </div>
+              ) : null}
+
               <div className="mt-5 grid grid-cols-1 gap-4">
                 <label className="flex flex-col gap-2">
                   <span className="text-xs font-semibold tracking-wide text-slate-600">URL da API</span>
@@ -1061,6 +1109,14 @@ export default function WhatsAppPanelClient() {
               </div>
 
               <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => void checkEvolutionWebhook()}
+                  disabled={isCheckingWebhook}
+                  className="inline-flex h-11 items-center justify-center rounded-2xl bg-white px-5 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isCheckingWebhook ? "Verificando..." : "Ver Webhook"}
+                </button>
                 <button
                   type="button"
                   onClick={() => void resetEvolutionInstance()}
