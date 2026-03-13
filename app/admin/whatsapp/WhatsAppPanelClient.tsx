@@ -142,6 +142,9 @@ export default function WhatsAppPanelClient() {
   const [pairConnectionState, setPairConnectionState] = useState<string | null>(null);
   const [isPollingPairStatus, setIsPollingPairStatus] = useState(false);
 
+  const [evolutionIsOpen, setEvolutionIsOpen] = useState<boolean | null>(null);
+  const [evolutionState, setEvolutionState] = useState<string | null>(null);
+
   const [isResetting, setIsResetting] = useState(false);
   const [resetMessage, setResetMessage] = useState<string | null>(null);
 
@@ -798,6 +801,11 @@ export default function WhatsAppPanelClient() {
   async function sendMessage() {
     setErrorMessage(null);
 
+    if (evolutionIsOpen === false) {
+      setErrorMessage("WhatsApp desconectado. Pareie a instância para liberar o envio.");
+      return;
+    }
+
     if (!selectedThread || !selectedThreadId) {
       setErrorMessage("Selecione um chat.");
       return;
@@ -859,6 +867,37 @@ export default function WhatsAppPanelClient() {
     }, 0);
     return () => clearTimeout(t);
   }, [loadBrokers, loadSettings, loadThreads]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let timer: any = null;
+
+    async function poll() {
+      if (cancelled) return;
+      try {
+        const res = await fetch("/api/whatsapp/evolution/status", {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          cache: "no-store",
+        });
+        const json = await res.json().catch(() => null);
+        if (cancelled || !json) return;
+        if (typeof json?.isOpen === "boolean") setEvolutionIsOpen(Boolean(json.isOpen));
+        setEvolutionState(json?.state ? String(json.state) : null);
+      } catch {
+        // silent
+      }
+
+      timer = setTimeout(poll, 8000);
+    }
+
+    void poll();
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
 
   useEffect(() => {
     if (!selectedThreadId) return;
@@ -1070,6 +1109,15 @@ export default function WhatsAppPanelClient() {
               </div>
 
               <div className="flex items-center gap-2">
+                <div className="hidden items-center gap-2 rounded-full bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200/70 sm:flex">
+                  <span
+                    className={
+                      "h-2 w-2 rounded-full " +
+                      (evolutionIsOpen ? "bg-emerald-500" : evolutionIsOpen === false ? "bg-amber-500" : "bg-slate-300")
+                    }
+                  />
+                  {evolutionState ? `WhatsApp: ${evolutionState}` : "WhatsApp: -"}
+                </div>
                 <div className="hidden text-xs font-semibold text-slate-600 sm:block">Enviar para Corretor</div>
                 <select
                   value={selectedThread?.assigned_broker_profile_id ?? ""}
@@ -1184,7 +1232,16 @@ export default function WhatsAppPanelClient() {
                 <button
                   type="button"
                   onClick={() => void sendMessage()}
-                  disabled={!selectedThreadId || isSending || !draft.trim()}
+                  disabled={!selectedThreadId || isSending || !draft.trim() || evolutionIsOpen === false}
+                  title={
+                    !selectedThreadId
+                      ? "Selecione ou inicie uma conversa para enviar"
+                      : evolutionIsOpen === false
+                        ? "WhatsApp desconectado. Pareie a instância."
+                        : !draft.trim()
+                          ? "Digite uma mensagem"
+                          : ""
+                  }
                   className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-[#001f3f] px-5 text-sm font-semibold text-white shadow-[0_6px_14px_-10px_rgba(15,23,42,0.45)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#001a33] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <SendHorizonal className="h-4 w-4" />
