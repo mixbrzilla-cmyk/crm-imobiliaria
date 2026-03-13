@@ -3,22 +3,31 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
-  BadgeCheck,
+  BedDouble,
+  Building2,
   Camera,
   CarFront,
+  CheckCircle2,
+  ClipboardList,
+  Crown,
   Cuboid,
-  Loader2,
-  Ruler,
   FileText,
   Home,
   Layers,
+  Loader2,
   Link as LinkIcon,
   MapPin,
+  MessageCircle,
+  Pencil,
   Plus,
-  Search,
+  RefreshCw,
+  Ruler,
   SlidersHorizontal,
-  Tag,
   Trash2,
+  BadgeCheck,
+  Search,
+  Tag,
+  Users,
   X,
 } from "lucide-react";
 
@@ -163,10 +172,12 @@ type BrokerProfile = {
 
 type ExpenseLine = {
   source: "materials" | "labor" | "marketing" | "vehicle";
+  id: string;
   date: string | null;
   category: string | null;
   description: string | null;
   amount: number;
+  done: boolean;
 };
 
 export default function InventarioImoveisPage() {
@@ -353,6 +364,55 @@ export default function InventarioImoveisPage() {
       setExpenseLines([]);
     } finally {
       setExpensesLoading(false);
+    }
+  }
+
+  async function concludeExpense(line: ExpenseLine) {
+    if (!selectedId) return;
+    const ok = window.confirm("Marcar este lançamento como concluído/entregue?");
+    if (!ok) return;
+
+    setExpenseLines((cur) => cur.map((l) => (l.source === line.source && l.id === line.id ? { ...l, done: true } : l)));
+
+    try {
+      const res = await fetch("/api/property-expenses", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: line.source, id: line.id }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) {
+        setErrorMessage(String(json?.error ?? `Falha ao concluir (HTTP ${res.status})`));
+        await loadLinkedExpenses(selectedId);
+      }
+    } catch {
+      setErrorMessage("Não foi possível concluir o lançamento agora.");
+      await loadLinkedExpenses(selectedId);
+    }
+  }
+
+  async function deleteExpenseLine(line: ExpenseLine) {
+    if (!selectedId) return;
+    const ok = window.confirm("Tem certeza que deseja apagar este lançamento?");
+    if (!ok) return;
+
+    const prev = expenseLines;
+    setExpenseLines((cur) => cur.filter((l) => !(l.source === line.source && l.id === line.id)));
+
+    try {
+      const res = await fetch("/api/property-expenses", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: line.source, id: line.id }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) {
+        setExpenseLines(prev);
+        setErrorMessage(String(json?.error ?? `Falha ao excluir (HTTP ${res.status})`));
+      }
+    } catch {
+      setExpenseLines(prev);
+      setErrorMessage("Não foi possível excluir o lançamento agora.");
     }
   }
 
@@ -1471,12 +1531,13 @@ export default function InventarioImoveisPage() {
                                     <th className="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Categoria</th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Descrição/Item</th>
                                     <th className="px-4 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">Valor (R$)</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">Ações</th>
                                   </tr>
                                 </thead>
                                 <tbody>
                                 {expensesLoading ? (
                                   <tr>
-                                    <td className="px-4 py-6 text-sm text-slate-600" colSpan={4}>
+                                    <td className="px-4 py-6 text-sm text-slate-600" colSpan={5}>
                                       Carregando gastos vinculados...
                                     </td>
                                   </tr>
@@ -1484,21 +1545,57 @@ export default function InventarioImoveisPage() {
                                   expenseLines.map((l, idx) => (
                                     <tr
                                       key={`${l.source}-${idx}`}
-                                      className={"border-t border-slate-100 " + (idx % 2 === 1 ? "bg-slate-50/50" : "bg-white")}
+                                      className={
+                                        "border-t border-slate-100 " +
+                                        (l.done
+                                          ? "bg-emerald-50/70"
+                                          : idx % 2 === 1
+                                            ? "bg-slate-50/50"
+                                            : "bg-white")
+                                      }
                                     >
                                       <td className="px-4 py-3 text-sm text-slate-700">
                                         {l.date ? new Date(l.date).toLocaleDateString("pt-BR") : "-"}
                                       </td>
                                       <td className="px-4 py-3 text-sm font-semibold text-slate-900">{expenseSourceLabel(l.source)}</td>
-                                      <td className="px-4 py-3 text-sm text-slate-700">{(l.description ?? "").trim() || l.category || "-"}</td>
+                                      <td className={"px-4 py-3 text-sm " + (l.done ? "text-slate-500 line-through" : "text-slate-700")}>
+                                        {(l.description ?? "").trim() || l.category || "-"}
+                                      </td>
                                       <td className="px-4 py-3 text-right text-sm font-semibold text-slate-900">
                                         {formatCurrencyBRL(Number(l.amount ?? 0) || 0)}
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        <div className="flex justify-end gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => void concludeExpense(l)}
+                                            className={
+                                              "inline-flex h-9 items-center justify-center rounded-xl px-3 text-xs font-semibold ring-1 transition-all duration-300 " +
+                                              (l.done
+                                                ? "bg-emerald-100 text-emerald-900 ring-emerald-200/70"
+                                                : "bg-white text-emerald-700 ring-emerald-200/70 hover:bg-emerald-50")
+                                            }
+                                            title="Concluir/Entregue"
+                                            aria-label="Concluir/Entregue"
+                                          >
+                                            <BadgeCheck className="h-4 w-4" />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => void deleteExpenseLine(l)}
+                                            className="inline-flex h-9 items-center justify-center rounded-xl bg-red-50 px-3 text-xs font-semibold text-red-700 ring-1 ring-red-200/70 transition-all duration-300 hover:bg-red-100"
+                                            title="Apagar"
+                                            aria-label="Apagar"
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                          </button>
+                                        </div>
                                       </td>
                                     </tr>
                                   ))
                                 ) : (
                                   <tr>
-                                    <td className="px-4 py-6 text-sm text-slate-600" colSpan={4}>
+                                    <td className="px-4 py-6 text-sm text-slate-600" colSpan={5}>
                                       Nenhum gasto vinculado a este imóvel.
                                     </td>
                                   </tr>

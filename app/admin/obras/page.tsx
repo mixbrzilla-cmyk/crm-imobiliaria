@@ -30,6 +30,8 @@ type ObraMaterialRow = {
   quantity: number | null;
   unit?: string | null;
   delivered_at?: string | null;
+  data_compra?: string | null;
+  previsao_entrega?: string | null;
   target_type?: "property" | "development" | null;
   target_id?: string | null;
   created_at?: string;
@@ -68,6 +70,8 @@ type MaterialsForm = {
   unit_price: string;
   quantity: string;
   unit: "un" | "m2" | "l";
+  data_compra: string;
+  previsao_entrega: string;
   target: string;
 };
 
@@ -195,6 +199,8 @@ export default function ObrasAdminPage() {
     unit_price: "",
     quantity: "",
     unit: "un",
+    data_compra: "",
+    previsao_entrega: "",
     target: "",
   });
 
@@ -481,7 +487,9 @@ export default function ObrasAdminPage() {
     try {
       let res = await (supabase as any)
         .from("obra_materials")
-        .select("id, name, vendor, status, unit_price, quantity, unit, delivered_at, target_type, target_id, created_at")
+        .select(
+          "id, name, vendor, status, unit_price, quantity, unit, delivered_at, data_compra, previsao_entrega, target_type, target_id, created_at",
+        )
         .order("created_at", { ascending: false });
 
       if (res.error) {
@@ -493,12 +501,12 @@ export default function ObrasAdminPage() {
         if (isTargetMissing) {
           res = await (supabase as any)
             .from("obra_materials")
-            .select("id, name, vendor, status, unit_price, quantity, unit, delivered_at, created_at")
+            .select("id, name, vendor, status, unit_price, quantity, unit, delivered_at, data_compra, previsao_entrega, created_at")
             .order("created_at", { ascending: false });
         } else if (isColumnNotFound || isSchemaMismatch) {
           res = await (supabase as any)
             .from("obra_materials")
-            .select("id, name, vendor, status, unit_price, quantity, delivered_at, target_type, target_id, created_at")
+            .select("id, name, vendor, status, unit_price, quantity, delivered_at, data_compra, previsao_entrega, target_type, target_id, created_at")
             .order("created_at", { ascending: false });
         }
 
@@ -511,12 +519,12 @@ export default function ObrasAdminPage() {
           if (isTargetMissing2) {
             res = await (supabase as any)
               .from("obra_materials")
-              .select("id, name, vendor, status, unit_price, quantity, created_at")
+              .select("id, name, vendor, status, unit_price, quantity, data_compra, previsao_entrega, created_at")
               .order("created_at", { ascending: false });
           } else if (isDeliveredAtMissing || isSchemaMismatch2) {
             res = await (supabase as any)
               .from("obra_materials")
-              .select("id, name, vendor, status, unit_price, quantity, target_type, target_id, created_at")
+              .select("id, name, vendor, status, unit_price, quantity, data_compra, previsao_entrega, target_type, target_id, created_at")
               .order("created_at", { ascending: false });
           }
         }
@@ -896,6 +904,8 @@ export default function ObrasAdminPage() {
         status: materialsForm.status,
         unit_price: unit,
         quantity: qty,
+        data_compra: materialsForm.data_compra || null,
+        previsao_entrega: materialsForm.previsao_entrega || null,
         ...(target ? target : {}),
       };
 
@@ -915,6 +925,8 @@ export default function ObrasAdminPage() {
         lastError = error;
         const msg = String((error as any)?.message ?? "");
         const isColumnNotFound = /column\s+\"?unit\"?\s+does\s+not\s+exist|column\s+unit\s+not\s+found/i.test(msg);
+        const isLogisticsMissing =
+          /data_compra|previsao_entrega/i.test(msg) && /does\s+not\s+exist|not\s+found/i.test(msg);
         const code = (error as any)?.code;
         const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
         const isTargetMissing = /target_type|target_id/i.test(msg) && /does\s+not\s+exist|not\s+found/i.test(msg);
@@ -933,7 +945,23 @@ export default function ObrasAdminPage() {
           break;
         }
 
-        if (!isColumnNotFound && !isSchemaMismatch) break;
+        if (!isColumnNotFound && !isSchemaMismatch && !isLogisticsMissing) break;
+
+        if (isLogisticsMissing) {
+          const retryPayload: any = { ...payloadBase };
+          delete retryPayload.data_compra;
+          delete retryPayload.previsao_entrega;
+          const retry = await (supabase as any).from("obra_materials").insert(retryPayload);
+          if (!retry?.error) {
+            lastError = null;
+            setErrorMessage(
+              'Infra pendente: crie as colunas data_compra (date) e previsao_entrega (date) em obra_materials para logística.',
+            );
+            break;
+          }
+          lastError = retry.error;
+          break;
+        }
       }
 
       if (lastError) {
@@ -948,6 +976,8 @@ export default function ObrasAdminPage() {
         unit_price: "",
         quantity: "",
         unit: "un",
+        data_compra: "",
+        previsao_entrega: "",
         target: "",
       });
 
@@ -1374,6 +1404,7 @@ export default function ObrasAdminPage() {
                   <tr className="bg-slate-50">
                     <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Insumo</th>
                     <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Status</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Entrega</th>
                     <th className="px-5 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">Unit.</th>
                     <th className="px-5 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">Qtd.</th>
                     <th className="px-5 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">Total</th>
@@ -1386,11 +1417,17 @@ export default function ObrasAdminPage() {
                       const unit = m.unit_price ?? 0;
                       const qty = m.quantity ?? 0;
                       const total = unit * qty;
+                      const dueRaw = String(m.previsao_entrega ?? "").trim();
+                      const isOverdue =
+                        Boolean(dueRaw) &&
+                        m.status !== "entregue" &&
+                        new Date(`${dueRaw}T00:00:00`).getTime() < new Date().setHours(0, 0, 0, 0);
                       return (
                         <tr
                           key={m.id}
                           className={
-                            "border-t border-slate-100 " + (idx % 2 === 1 ? "bg-slate-50/50" : "bg-white")
+                            "border-t border-slate-100 " +
+                            (isOverdue ? "bg-red-50/50" : idx % 2 === 1 ? "bg-slate-50/50" : "bg-white")
                           }
                         >
                           <td className="px-5 py-4">
@@ -1406,6 +1443,18 @@ export default function ObrasAdminPage() {
                             >
                               {statusLabel(m.status)}
                             </span>
+                            {isOverdue ? (
+                              <div className="mt-1 text-xs font-semibold text-red-700">Atrasado</div>
+                            ) : null}
+                          </td>
+                          <td className="px-5 py-4 text-sm text-slate-700">
+                            {m.previsao_entrega ? (
+                              <span className={isOverdue ? "font-semibold text-red-700" : ""}>
+                                {new Date(`${m.previsao_entrega}T00:00:00`).toLocaleDateString("pt-BR")}
+                              </span>
+                            ) : (
+                              "-"
+                            )}
                           </td>
                           <td className="px-5 py-4 text-right text-sm text-slate-700">{formatCurrencyBRL(unit)}</td>
                           <td className="px-5 py-4 text-right text-sm text-slate-700">
@@ -2038,6 +2087,26 @@ export default function ObrasAdminPage() {
                       </option>
                     ))}
                   </select>
+                </label>
+
+                <label className="flex flex-col gap-2">
+                  <span className="text-xs font-semibold tracking-wide text-slate-600">Data da Compra</span>
+                  <input
+                    type="date"
+                    value={materialsForm.data_compra}
+                    onChange={(e) => setMaterialsForm((s) => ({ ...s, data_compra: e.target.value }))}
+                    className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
+                  />
+                </label>
+
+                <label className="flex flex-col gap-2">
+                  <span className="text-xs font-semibold tracking-wide text-slate-600">Previsão de Entrega</span>
+                  <input
+                    type="date"
+                    value={materialsForm.previsao_entrega}
+                    onChange={(e) => setMaterialsForm((s) => ({ ...s, previsao_entrega: e.target.value }))}
+                    className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
+                  />
                 </label>
 
                 <label className="flex flex-col gap-2 md:col-span-2">
