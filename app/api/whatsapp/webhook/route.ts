@@ -199,7 +199,25 @@ function getServiceSupabase() {
     process.env.SUPABASE_SERVICE_ROLE ||
     process.env.SUPABASE_SERVICE_KEY;
 
-  if (!url || !serviceKey) return null;
+  if (!url || !serviceKey) {
+    try {
+      const len =
+        process.env.SUPABASE_SERVICE_ROLE_KEY?.length ??
+        process.env.SUPABASE_SERVICE_ROLE?.length ??
+        process.env.SUPABASE_SERVICE_KEY?.length ??
+        null;
+      console.log("[ServiceSupabase] missing env", {
+        hasUrl: Boolean(url),
+        keyLength: len,
+        hasServiceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+        hasServiceRole: Boolean(process.env.SUPABASE_SERVICE_ROLE),
+        hasServiceKey: Boolean(process.env.SUPABASE_SERVICE_KEY),
+      });
+    } catch {
+      // silent
+    }
+    return null;
+  }
 
   return createClient(url, serviceKey, {
     auth: {
