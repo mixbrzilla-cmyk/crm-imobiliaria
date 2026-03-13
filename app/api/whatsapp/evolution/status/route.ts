@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 function normalizeBaseUrl(url: string) {
   const raw = String(url ?? "").trim();
@@ -25,7 +26,7 @@ function toAbsoluteBaseUrl(input: string) {
 }
 
 function getServiceSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey =
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.SUPABASE_SERVICE_ROLE ||

@@ -3,9 +3,10 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 function getServiceSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey =
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.SUPABASE_SERVICE_ROLE ||
@@ -34,7 +35,24 @@ function normalizeWhatsapp(value: string) {
 export async function POST(req: Request) {
   const supabase = getServiceSupabase();
   if (!supabase) {
-    return NextResponse.json({ ok: false, error: "Service role não configurada." }, { status: 500 });
+    const hasUrl = Boolean(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL);
+    const hasKey = Boolean(
+      process.env.SUPABASE_SERVICE_ROLE_KEY ||
+        process.env.SUPABASE_SERVICE_ROLE ||
+        process.env.SUPABASE_SERVICE_KEY,
+    );
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Service role não configurada.",
+        missing: {
+          supabaseUrl: !hasUrl,
+          serviceRoleKey: !hasKey,
+        },
+      },
+      { status: 500 },
+    );
   }
 
   const body = await req.json().catch(() => null);
