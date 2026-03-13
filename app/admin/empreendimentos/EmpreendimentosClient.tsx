@@ -404,9 +404,9 @@ export default function EmpreendimentosClient() {
   }) {
     const cls = active
       ? `${brandOnCls} ring-1 ring-white/20 ${brandGlowCls}`
-      : `bg-white ring-1 ${brandRingOffCls}`;
+      : `bg-slate-50 ring-1 ${brandRingOffCls}`;
 
-    const iconCls = active ? iconOnCls : `${iconOffCls} opacity-70 grayscale`;
+    const iconCls = active ? iconOnCls : `${iconOffCls} opacity-90`;
 
     return (
       <button
@@ -416,11 +416,11 @@ export default function EmpreendimentosClient() {
         title={title}
         aria-label={title}
         className={
-          "relative inline-flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-300 hover:-translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-80 " +
+          "relative inline-flex h-12 w-12 items-center justify-center rounded-full transition-all duration-300 hover:-translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-80 " +
           (syncing ? "animate-pulse" : "") +
           " " +
           cls +
-          (active ? "" : " hover:bg-slate-50")
+          (active ? "" : " hover:bg-slate-100")
         }
       >
         <span className={"inline-flex h-8 w-8 items-center justify-center " + iconCls}>{icon}</span>
@@ -1086,17 +1086,6 @@ export default function EmpreendimentosClient() {
                     </button>
                   </div>
 
-                  <div className="mt-3 rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-200/70">
-                    <div className="text-[10px] font-semibold tracking-wide text-slate-500">
-                      Último contato com proprietário
-                    </div>
-                    <div className="mt-1 text-xs font-semibold text-slate-700">{formatTimeBR(ownerLast)}</div>
-                  </div>
-
-                  <div className="mt-4 text-xs text-slate-500">
-                    {r.video_url ? "Vídeo disponível" : "Sem vídeo"} • {r.sales_material_url ? "Material OK" : "Sem material"}
-                  </div>
-
                   <div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-slate-200/70">
                     <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">STATUS NOS PORTAIS</div>
                     <div className="mt-3 flex flex-wrap items-center justify-center gap-4">
@@ -1106,8 +1095,8 @@ export default function EmpreendimentosClient() {
                         syncing={syncOlx}
                         onToggle={() => void togglePortal(r.id, "olx")}
                         brandOnCls="bg-[#6E2594]"
-                        brandRingOffCls="ring-[rgba(110,37,148,0.22)]"
-                        brandGlowCls="shadow-[0_0_22px_-12px_rgba(139,43,209,0.85)]"
+                        brandRingOffCls="ring-[rgba(110,37,148,0.35)]"
+                        brandGlowCls="shadow-[0_0_22px_-10px_rgba(110,37,148,0.65)]"
                         iconOnCls="text-white"
                         iconOffCls="text-[#6E2594]"
                         icon={<OlxLogo className="h-8 w-8" />}
@@ -1118,8 +1107,8 @@ export default function EmpreendimentosClient() {
                         syncing={syncZap}
                         onToggle={() => void togglePortal(r.id, "zap")}
                         brandOnCls="bg-[#0000FF]"
-                        brandRingOffCls="ring-[rgba(0,0,255,0.22)]"
-                        brandGlowCls="shadow-[0_0_22px_-12px_rgba(0,87,255,0.85)]"
+                        brandRingOffCls="ring-[rgba(0,0,255,0.32)]"
+                        brandGlowCls="shadow-[0_0_22px_-10px_rgba(0,0,255,0.65)]"
                         iconOnCls="text-white"
                         iconOffCls="text-[#0000FF]"
                         icon={<ZapLogo className="h-8 w-8" />}
@@ -1129,9 +1118,9 @@ export default function EmpreendimentosClient() {
                         active={vivareal}
                         syncing={syncViva}
                         onToggle={() => void togglePortal(r.id, "vivareal")}
-                        brandOnCls="bg-gradient-to-r from-[#00AEEF] to-[#0094D4]"
-                        brandRingOffCls="ring-[rgba(0,174,239,0.22)]"
-                        brandGlowCls="shadow-[0_0_22px_-12px_rgba(0,174,239,0.85)]"
+                        brandOnCls="bg-[#00AEEF]"
+                        brandRingOffCls="ring-[rgba(0,174,239,0.35)]"
+                        brandGlowCls="shadow-[0_0_22px_-10px_rgba(0,174,239,0.65)]"
                         iconOnCls="text-white"
                         iconOffCls="text-[#00AEEF]"
                         icon={<VivaLogo className="h-8 w-8" />}
@@ -1142,6 +1131,13 @@ export default function EmpreendimentosClient() {
                         Coluna JSONB de portais não detectada (ex: portals_json). Os switches vão pedir configuração.
                       </div>
                     ) : null}
+                  </div>
+
+                  <div className="mt-3 rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-200/70">
+                    <div className="text-[10px] font-semibold tracking-wide text-slate-500">
+                      Último contato com proprietário
+                    </div>
+                    <div className="mt-1 text-xs font-semibold text-slate-700">{formatTimeBR(ownerLast)}</div>
                   </div>
                 </div>
               </div>

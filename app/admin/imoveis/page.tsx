@@ -767,9 +767,9 @@ export default function InventarioImoveisPage() {
   }) {
     const cls = active
       ? `${brandOnCls} ring-1 ring-white/20 ${brandGlowCls}`
-      : `bg-white ring-1 ${brandRingOffCls}`;
+      : `bg-slate-50 ring-1 ${brandRingOffCls}`;
 
-    const iconCls = active ? iconOnCls : `${iconOffCls} opacity-70 grayscale`;
+    const iconCls = active ? iconOnCls : `${iconOffCls} opacity-90`;
 
     return (
       <button
@@ -779,11 +779,11 @@ export default function InventarioImoveisPage() {
         title={title}
         aria-label={title}
         className={
-          "relative inline-flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-300 hover:-translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-80 " +
+          "relative inline-flex h-12 w-12 items-center justify-center rounded-full transition-all duration-300 hover:-translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-80 " +
           (syncing ? "animate-pulse" : "") +
           " " +
           cls +
-          (active ? "" : " hover:bg-slate-50")
+          (active ? "" : " hover:bg-slate-100")
         }
       >
         <span className={"inline-flex h-8 w-8 items-center justify-center " + iconCls}>{icon}</span>
@@ -1431,9 +1431,9 @@ export default function InventarioImoveisPage() {
                           active={olx}
                           syncing={syncOlx}
                           onToggle={() => void togglePortal(r.id, "olx")}
-                          brandOnCls="bg-gradient-to-r from-[#6E2594] to-[#8B2BD1]"
-                          brandRingOffCls="ring-[rgba(110,37,148,0.22)]"
-                          brandGlowCls="shadow-[0_0_22px_-12px_rgba(139,43,209,0.85)]"
+                          brandOnCls="bg-[#6E2594]"
+                          brandRingOffCls="ring-[rgba(110,37,148,0.35)]"
+                          brandGlowCls="shadow-[0_0_22px_-10px_rgba(110,37,148,0.65)]"
                           iconOnCls="text-white"
                           iconOffCls="text-[#6E2594]"
                           icon={<OlxLogo className="h-8 w-8" />}
@@ -1443,11 +1443,11 @@ export default function InventarioImoveisPage() {
                           active={zap}
                           syncing={syncZap}
                           onToggle={() => void togglePortal(r.id, "zap")}
-                          brandOnCls="bg-gradient-to-r from-[#0057FF] to-[#003CFF]"
-                          brandRingOffCls="ring-[rgba(0,87,255,0.22)]"
-                          brandGlowCls="shadow-[0_0_22px_-12px_rgba(0,87,255,0.85)]"
+                          brandOnCls="bg-[#0000FF]"
+                          brandRingOffCls="ring-[rgba(0,0,255,0.32)]"
+                          brandGlowCls="shadow-[0_0_22px_-10px_rgba(0,0,255,0.65)]"
                           iconOnCls="text-white"
-                          iconOffCls="text-[#0057FF]"
+                          iconOffCls="text-[#0000FF]"
                           icon={<ZapLogo className="h-8 w-8" />}
                         />
                         <PortalIconButton
@@ -1455,9 +1455,9 @@ export default function InventarioImoveisPage() {
                           active={vivareal}
                           syncing={syncViva}
                           onToggle={() => void togglePortal(r.id, "vivareal")}
-                          brandOnCls="bg-gradient-to-r from-[#00AEEF] to-[#0077C8]"
-                          brandRingOffCls="ring-[rgba(0,174,239,0.22)]"
-                          brandGlowCls="shadow-[0_0_22px_-12px_rgba(0,174,239,0.85)]"
+                          brandOnCls="bg-[#00AEEF]"
+                          brandRingOffCls="ring-[rgba(0,174,239,0.35)]"
+                          brandGlowCls="shadow-[0_0_22px_-10px_rgba(0,174,239,0.65)]"
                           iconOnCls="text-white"
                           iconOffCls="text-[#00AEEF]"
                           icon={<VivaLogo className="h-8 w-8" />}
