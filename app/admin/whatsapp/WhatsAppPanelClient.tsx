@@ -139,6 +139,9 @@ export default function WhatsAppPanelClient() {
   const [pairQrDataUrl, setPairQrDataUrl] = useState<string | null>(null);
   const [pairInstanceName, setPairInstanceName] = useState<string | null>(null);
 
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
+
   const testProfilesConnection = useCallback(
     async (context: string, error: unknown) => {
       if (!supabase) return;
@@ -538,6 +541,7 @@ export default function WhatsAppPanelClient() {
   const pairEvolution = useCallback(async () => {
     setErrorMessage(null);
     setEvolutionTestMessage(null);
+    setResetMessage(null);
     setPairQrDataUrl(null);
     setPairInstanceName(null);
     setIsPairOpen(true);
@@ -570,6 +574,32 @@ export default function WhatsAppPanelClient() {
       setErrorMessage("Não foi possível parear agora.");
     } finally {
       setIsPairing(false);
+    }
+  }, []);
+
+  const resetEvolutionInstance = useCallback(async () => {
+    setErrorMessage(null);
+    setEvolutionTestMessage(null);
+    setResetMessage(null);
+    setIsResetting(true);
+
+    try {
+      const res = await fetch("/api/whatsapp/evolution/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) {
+        setErrorMessage(String(json?.error ?? `Falha ao resetar (HTTP ${res.status})`));
+        setIsResetting(false);
+        return;
+      }
+
+      setResetMessage("Instância limpa. Agora você pode clicar em 'Parear WhatsApp' para gerar um QR novo.");
+    } catch {
+      setErrorMessage("Não foi possível resetar agora.");
+    } finally {
+      setIsResetting(false);
     }
   }, []);
 
@@ -975,8 +1005,14 @@ export default function WhatsAppPanelClient() {
               ) : null}
 
               {evolutionTestMessage ? (
-                <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900 ring-1 ring-emerald-200/70">
+                <div className="mt-4 rounded-3xl bg-emerald-50 px-5 py-4 text-xs font-semibold text-emerald-900 ring-1 ring-emerald-200/70">
                   {evolutionTestMessage}
+                </div>
+              ) : null}
+
+              {resetMessage ? (
+                <div className="mt-4 rounded-3xl bg-emerald-50 px-5 py-4 text-xs font-semibold text-emerald-900 ring-1 ring-emerald-200/70">
+                  {resetMessage}
                 </div>
               ) : null}
 
@@ -1007,6 +1043,14 @@ export default function WhatsAppPanelClient() {
               </div>
 
               <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => void resetEvolutionInstance()}
+                  disabled={isResetting}
+                  className="inline-flex h-11 items-center justify-center rounded-2xl bg-white px-5 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isResetting ? "Limpando..." : "Limpar Conexão"}
+                </button>
                 <button
                   type="button"
                   onClick={() => void pairEvolution()}
