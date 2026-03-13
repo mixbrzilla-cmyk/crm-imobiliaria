@@ -30,6 +30,8 @@ type ObraMaterialRow = {
   quantity: number | null;
   unit?: string | null;
   delivered_at?: string | null;
+  target_type?: "property" | "development" | null;
+  target_id?: string | null;
   created_at?: string;
 };
 
@@ -54,6 +56,8 @@ type ObraWorkerEntryRow = {
   entry_type: EntryType;
   hours: number | null;
   notes: string | null;
+  target_type?: "property" | "development" | null;
+  target_id?: string | null;
   created_at?: string;
 };
 
@@ -64,6 +68,7 @@ type MaterialsForm = {
   unit_price: string;
   quantity: string;
   unit: "un" | "m2" | "l";
+  target: string;
 };
 
 type WorkerForm = {
@@ -80,6 +85,7 @@ type EntryForm = {
   entry_type: EntryType;
   hours: string;
   notes: string;
+  target: string;
 };
 
 type ExpenseCategory =
@@ -100,6 +106,8 @@ type MarketingExpenseRow = {
   category: string;
   description: string | null;
   amount: number | null;
+  target_type?: "property" | "development" | null;
+  target_id?: string | null;
   created_at?: string;
 };
 
@@ -109,6 +117,8 @@ type VehicleExpenseRow = {
   category: string;
   description: string | null;
   amount: number | null;
+  target_type?: "property" | "development" | null;
+  target_id?: string | null;
   created_at?: string;
 };
 
@@ -117,6 +127,14 @@ type ExpenseForm = {
   category: ExpenseCategory;
   description: string;
   amount: string;
+  target: string;
+};
+
+type TargetOption = {
+  key: string;
+  type: "property" | "development";
+  id: string;
+  label: string;
 };
 
 function parseNumber(input: string) {
@@ -177,6 +195,7 @@ export default function ObrasAdminPage() {
     unit_price: "",
     quantity: "",
     unit: "un",
+    target: "",
   });
 
   const [workers, setWorkers] = useState<ObraWorkerRow[]>([]);
@@ -209,6 +228,7 @@ export default function ObrasAdminPage() {
     category: "placas",
     description: "",
     amount: "",
+    target: "",
   });
 
   const [vehicleForm, setVehicleForm] = useState<ExpenseForm>({
@@ -216,7 +236,189 @@ export default function ObrasAdminPage() {
     category: "combustivel",
     description: "",
     amount: "",
+    target: "",
   });
+
+  const [targets, setTargets] = useState<TargetOption[]>([]);
+  const [targetsError, setTargetsError] = useState<string | null>(null);
+
+  const [estimatedCommission, setEstimatedCommission] = useState(0);
+  const [linkedExpensesTotal, setLinkedExpensesTotal] = useState(0);
+
+  function parseTarget(value: string): { target_type: "property" | "development"; target_id: string } | null {
+    const raw = String(value ?? "").trim();
+    if (!raw) return null;
+    const [type, ...rest] = raw.split(":");
+    const id = rest.join(":");
+    if ((type !== "property" && type !== "development") || !id) return null;
+    return { target_type: type, target_id: id };
+  }
+
+  async function loadTargets() {
+    setTargetsError(null);
+    if (!supabase) {
+      setTargets([]);
+      return;
+    }
+
+    try {
+      const [propsRes, devRes] = await Promise.allSettled([
+        (supabase as any)
+          .from("properties")
+          .select("id, title, property_type, neighborhood, city")
+          .order("created_at", { ascending: false })
+          .limit(500),
+        (supabase as any)
+          .from("developments")
+          .select("id, name, city")
+          .order("created_at", { ascending: false })
+          .limit(500),
+      ]);
+
+      const next: TargetOption[] = [];
+
+      if (propsRes.status === "fulfilled" && !propsRes.value.error) {
+        for (const p of (propsRes.value.data ?? []) as any[]) {
+          const title = String(p.title ?? p.property_type ?? "Imóvel").trim() || "Imóvel";
+          const neighborhood = String(p.neighborhood ?? "").trim();
+          const city = String(p.city ?? "").trim();
+          const local = [neighborhood, city].filter(Boolean).join(" • ");
+          const label = local ? `${title} (${local})` : title;
+          next.push({ key: `property:${p.id}`, type: "property", id: p.id, label });
+        }
+      }
+
+      if (devRes.status === "fulfilled" && !devRes.value.error) {
+        for (const d of (devRes.value.data ?? []) as any[]) {
+          const name = String(d.name ?? "Empreendimento").trim() || "Empreendimento";
+          const city = String(d.city ?? "").trim();
+          const label = city ? `${name} (${city})` : name;
+          next.push({ key: `development:${d.id}`, type: "development", id: d.id, label });
+        }
+      }
+
+      setTargets(next);
+    } catch {
+      setTargetsError("Não foi possível carregar Inventário/Empreendimentos para vincular gastos.");
+      setTargets([]);
+    }
+  }
+
+  async function detectPropertiesCommissionColumn(): Promise<string | null> {
+    if (!supabase) return null;
+    const candidates = ["commission_percent", "commission_percentage", "commission_rate"];
+    for (const col of candidates) {
+      try {
+        const test = await (supabase as any).from("properties").select(`id, ${col}`).limit(1);
+        if (!test?.error) return col;
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  }
+
+  async function computeFinancials() {
+    if (!supabase) {
+      setEstimatedCommission(0);
+      setLinkedExpensesTotal(0);
+      return;
+    }
+
+    try {
+      const commissionCol = await detectPropertiesCommissionColumn();
+      const selectStr = commissionCol ? `id, price, ${commissionCol}` : "id, price";
+      const propsRes = await (supabase as any).from("properties").select(selectStr).limit(1500);
+      const props = propsRes?.error ? ([] as any[]) : ((propsRes.data ?? []) as any[]);
+
+      const commissionTotal = props.reduce((acc, p) => {
+        const price = typeof p.price === "number" ? p.price : p.price != null ? Number(p.price) : 0;
+        if (!Number.isFinite(price) || price <= 0) return acc;
+        const percentRaw = commissionCol ? p?.[commissionCol] : null;
+        const percent = percentRaw != null ? Number(percentRaw) : 5;
+        const pct = Number.isFinite(percent) && percent > 0 ? percent : 5;
+        return acc + (pct / 100) * price;
+      }, 0);
+      setEstimatedCommission(commissionTotal);
+
+      let total = 0;
+
+      try {
+        const mats = await (supabase as any)
+          .from("obra_materials")
+          .select("id, unit_price, quantity, target_type, target_id")
+          .not("target_id", "is", null)
+          .limit(2000);
+        if (!mats?.error) {
+          total += ((mats.data ?? []) as any[]).reduce(
+            (acc, r) => acc + (Number(r.unit_price ?? 0) || 0) * (Number(r.quantity ?? 0) || 0),
+            0,
+          );
+        }
+      } catch {
+        // ignore
+      }
+
+      try {
+        const ent = await (supabase as any)
+          .from("obra_worker_entries")
+          .select("id, entry_type, hours, worker_id, target_type, target_id")
+          .not("target_id", "is", null)
+          .limit(2000);
+        if (!ent?.error) {
+          const workersRes = await (supabase as any)
+            .from("obra_workers")
+            .select("id, daily_rate, hourly_rate")
+            .limit(2000);
+          const workerById = new Map<string, any>();
+          if (!workersRes?.error) {
+            for (const w of (workersRes.data ?? []) as any[]) workerById.set(String(w.id), w);
+          }
+          total += ((ent.data ?? []) as any[]).reduce((acc, e) => {
+            const w = workerById.get(String(e.worker_id ?? ""));
+            if (!w) return acc;
+            const type = String(e.entry_type ?? "").toLowerCase();
+            if (type === "diaria") return acc + (Number(w.daily_rate ?? 0) || 0);
+            if (type === "hora_homem") return acc + (Number(w.hourly_rate ?? 0) || 0) * (Number(e.hours ?? 0) || 0);
+            return acc;
+          }, 0);
+        }
+      } catch {
+        // ignore
+      }
+
+      try {
+        const mkt = await (supabase as any)
+          .from("marketing_expenses")
+          .select("id, amount, target_type, target_id")
+          .not("target_id", "is", null)
+          .limit(2000);
+        if (!mkt?.error) {
+          total += ((mkt.data ?? []) as any[]).reduce((acc, r) => acc + (Number(r.amount ?? 0) || 0), 0);
+        }
+      } catch {
+        // ignore
+      }
+
+      try {
+        const veh = await (supabase as any)
+          .from("vehicle_expenses")
+          .select("id, amount, target_type, target_id")
+          .not("target_id", "is", null)
+          .limit(2000);
+        if (!veh?.error) {
+          total += ((veh.data ?? []) as any[]).reduce((acc, r) => acc + (Number(r.amount ?? 0) || 0), 0);
+        }
+      } catch {
+        // ignore
+      }
+
+      setLinkedExpensesTotal(total);
+    } catch {
+      setEstimatedCommission(0);
+      setLinkedExpensesTotal(0);
+    }
+  }
 
   const [workerForm, setWorkerForm] = useState<WorkerForm>({
     full_name: "",
@@ -237,6 +439,7 @@ export default function ObrasAdminPage() {
       entry_type: "diaria",
       hours: "",
       notes: "",
+      target: "",
     };
   });
 
@@ -256,7 +459,7 @@ export default function ObrasAdminPage() {
     try {
       let res = await (supabase as any)
         .from("obra_materials")
-        .select("id, name, vendor, status, unit_price, quantity, unit, delivered_at, created_at")
+        .select("id, name, vendor, status, unit_price, quantity, unit, delivered_at, target_type, target_id, created_at")
         .order("created_at", { ascending: false });
 
       if (res.error) {
@@ -267,7 +470,7 @@ export default function ObrasAdminPage() {
         if (isColumnNotFound || isSchemaMismatch) {
           res = await (supabase as any)
             .from("obra_materials")
-            .select("id, name, vendor, status, unit_price, quantity, delivered_at, created_at")
+            .select("id, name, vendor, status, unit_price, quantity, delivered_at, target_type, target_id, created_at")
             .order("created_at", { ascending: false });
         }
 
@@ -279,7 +482,7 @@ export default function ObrasAdminPage() {
           if (isDeliveredAtMissing || isSchemaMismatch2) {
             res = await (supabase as any)
               .from("obra_materials")
-              .select("id, name, vendor, status, unit_price, quantity, created_at")
+              .select("id, name, vendor, status, unit_price, quantity, target_type, target_id, created_at")
               .order("created_at", { ascending: false });
           }
         }
@@ -389,7 +592,7 @@ export default function ObrasAdminPage() {
           .order("full_name", { ascending: true }),
         (supabase as any)
           .from("obra_worker_entries")
-          .select("id, worker_id, entry_date, entry_type, hours, notes, created_at")
+          .select("id, worker_id, entry_date, entry_type, hours, notes, target_type, target_id, created_at")
           .order("entry_date", { ascending: false })
           .limit(120),
       ]);
@@ -427,6 +630,11 @@ export default function ObrasAdminPage() {
   useEffect(() => {
     void loadMaterials();
   }, [loadMaterials]);
+
+  useEffect(() => {
+    void loadTargets();
+    void computeFinancials();
+  }, []);
 
   useEffect(() => {
     if (tab !== "medicao") return;
@@ -548,12 +756,14 @@ export default function ObrasAdminPage() {
 
     setIsMarketingSaving(true);
     try {
+      const target = parseTarget(marketingForm.target);
       const payload = {
         id: crypto.randomUUID(),
         spent_at: marketingForm.spent_at,
         category: marketingForm.category,
         description: marketingForm.description.trim() || null,
         amount: parseBRLInputToNumber(marketingForm.amount),
+        ...(target ? target : {}),
       };
       const res = await (supabase as any).from("marketing_expenses").insert(payload);
       if (res.error) {
@@ -567,6 +777,7 @@ export default function ObrasAdminPage() {
       }
       setMarketingForm((s) => ({ ...s, description: "", amount: "" }));
       await loadMarketingExpenses();
+      void computeFinancials();
     } catch {
       setErrorMessage("Não foi possível salvar o gasto de marketing.");
     } finally {
@@ -581,12 +792,14 @@ export default function ObrasAdminPage() {
 
     setIsVehicleSaving(true);
     try {
+      const target = parseTarget(vehicleForm.target);
       const payload = {
         id: crypto.randomUUID(),
         spent_at: vehicleForm.spent_at,
         category: vehicleForm.category,
         description: vehicleForm.description.trim() || null,
         amount: parseBRLInputToNumber(vehicleForm.amount),
+        ...(target ? target : {}),
       };
       const res = await (supabase as any).from("vehicle_expenses").insert(payload);
       if (res.error) {
@@ -600,6 +813,7 @@ export default function ObrasAdminPage() {
       }
       setVehicleForm((s) => ({ ...s, description: "", amount: "" }));
       await loadVehicleExpenses();
+      void computeFinancials();
     } catch {
       setErrorMessage("Não foi possível salvar o gasto de veículo.");
     } finally {
@@ -624,6 +838,7 @@ export default function ObrasAdminPage() {
     setIsMaterialSaving(true);
 
     try {
+      const target = parseTarget(materialsForm.target);
       const payloadBase = {
         id: crypto.randomUUID(),
         name: materialsForm.name.trim(),
@@ -631,6 +846,7 @@ export default function ObrasAdminPage() {
         status: materialsForm.status,
         unit_price: unit,
         quantity: qty,
+        ...(target ? target : {}),
       };
 
       const payloadAttempts: Array<any> = [
@@ -665,9 +881,11 @@ export default function ObrasAdminPage() {
         unit_price: "",
         quantity: "",
         unit: "un",
+        target: "",
       });
 
       await loadMaterials();
+      void computeFinancials();
     } catch {
       setErrorMessage("Não foi possível salvar o material.");
     } finally {
@@ -798,6 +1016,7 @@ export default function ObrasAdminPage() {
     setIsEntrySaving(true);
 
     try {
+      const target = parseTarget(entryForm.target);
       const payload = {
         id: crypto.randomUUID(),
         worker_id: entryForm.worker_id,
@@ -805,6 +1024,7 @@ export default function ObrasAdminPage() {
         entry_type: entryForm.entry_type,
         hours: hrs,
         notes: entryForm.notes.trim() || null,
+        ...(target ? target : {}),
       };
 
       const { error } = await (supabase as any).from("obra_worker_entries").insert(payload);
@@ -815,6 +1035,7 @@ export default function ObrasAdminPage() {
 
       setEntryForm((s) => ({ ...s, hours: "", notes: "" }));
       await loadWorkersAndEntries();
+      void computeFinancials();
     } catch {
       setErrorMessage("Não foi possível salvar o lançamento.");
     } finally {
@@ -889,6 +1110,150 @@ export default function ObrasAdminPage() {
         </div>
       ) : null}
 
+      {isEntryModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 p-4 sm:items-center">
+          <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-[0_20px_60px_-24px_rgba(15,23,42,0.65)] ring-1 ring-slate-200/70">
+            <div className="flex items-start justify-between gap-6 border-b border-slate-100 px-6 py-5">
+              <div>
+                <div className="text-sm font-semibold text-slate-900">Lançar Medição</div>
+                <div className="mt-1 text-xs text-slate-500">Vincule o serviço ao imóvel/empreendimento para calcular comissão líquida.</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEntryModalOpen(false)}
+                className="inline-flex h-10 items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
+              >
+                Fechar
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                void addEntry(e);
+                setIsEntryModalOpen(false);
+              }}
+              className="px-6 py-6"
+            >
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <label className="flex flex-col gap-2 md:col-span-2">
+                  <span className="text-xs font-semibold tracking-wide text-slate-600">Destino (opcional)</span>
+                  <select
+                    value={entryForm.target}
+                    onChange={(e) => setEntryForm((s) => ({ ...s, target: e.target.value }))}
+                    className="h-11 rounded-xl bg-white px-3 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
+                  >
+                    <option value="">Sem vínculo</option>
+                    {targets.map((t) => (
+                      <option key={t.key} value={t.key}>
+                        {t.type === "property" ? "Imóvel: " : "Empreendimento: "}
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="flex flex-col gap-2">
+                  <span className="text-xs font-semibold tracking-wide text-slate-600">Colaborador</span>
+                  <select
+                    value={entryForm.worker_id}
+                    onChange={(e) => setEntryForm((s) => ({ ...s, worker_id: e.target.value }))}
+                    className="h-11 rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
+                    required
+                  >
+                    <option value="">Selecione</option>
+                    {workers.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.full_name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="flex flex-col gap-2">
+                  <span className="text-xs font-semibold tracking-wide text-slate-600">Data</span>
+                  <input
+                    type="date"
+                    value={entryForm.entry_date}
+                    onChange={(e) => setEntryForm((s) => ({ ...s, entry_date: e.target.value }))}
+                    className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
+                    required
+                  />
+                </label>
+
+                <label className="flex flex-col gap-2">
+                  <span className="text-xs font-semibold tracking-wide text-slate-600">Setor</span>
+                  <select
+                    value={entryForm.sector}
+                    onChange={(e) => setEntryForm((s) => ({ ...s, sector: e.target.value as EntryForm["sector"] }))}
+                    className="h-11 rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
+                  >
+                    <option value="fundacao">Fundação</option>
+                    <option value="alvenaria">Alvenaria</option>
+                    <option value="eletrica">Elétrica</option>
+                  </select>
+                </label>
+
+                <label className="flex flex-col gap-2">
+                  <span className="text-xs font-semibold tracking-wide text-slate-600">Tipo</span>
+                  <select
+                    value={entryForm.entry_type}
+                    onChange={(e) => setEntryForm((s) => ({ ...s, entry_type: e.target.value as EntryType }))}
+                    className="h-11 rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
+                  >
+                    <option value="diaria">Diária</option>
+                    <option value="hora_homem">Hora-Homem</option>
+                    <option value="falta">Falta</option>
+                  </select>
+                </label>
+
+                {entryForm.entry_type === "hora_homem" ? (
+                  <label className="flex flex-col gap-2">
+                    <span className="text-xs font-semibold tracking-wide text-slate-600">Horas</span>
+                    <input
+                      value={entryForm.hours}
+                      onChange={(e) => setEntryForm((s) => ({ ...s, hours: e.target.value }))}
+                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
+                      placeholder="Ex: 8"
+                      inputMode="decimal"
+                      required
+                    />
+                  </label>
+                ) : (
+                  <div className="hidden md:block" />
+                )}
+
+                <label className="flex flex-col gap-2 md:col-span-2">
+                  <span className="text-xs font-semibold tracking-wide text-slate-600">Observações (opcional)</span>
+                  <input
+                    value={entryForm.notes}
+                    onChange={(e) => setEntryForm((s) => ({ ...s, notes: e.target.value }))}
+                    className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
+                    placeholder="Ex: Reparos na cozinha / Pintura"
+                  />
+                </label>
+              </div>
+
+              {targetsError ? (
+                <div className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200/70">
+                  {targetsError}
+                </div>
+              ) : null}
+
+              <div className="mt-5 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={isEntrySaving}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#ff0000] px-6 text-sm font-semibold text-white shadow-sm transition-all duration-300 hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <BadgeCheck className="h-4 w-4" />
+                  {isEntrySaving ? "Salvando..." : "Salvar"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-4">
         <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100/40 p-6 shadow-md ring-1 ring-slate-200/70">
           <div className="flex items-center justify-between gap-3">
@@ -899,6 +1264,22 @@ export default function ObrasAdminPage() {
             {formatCurrencyBRL(totalMaterials)}
           </div>
           <div className="mt-2 text-xs text-slate-500">Materiais (unitário x quantidade)</div>
+        </div>
+
+        <div className="rounded-2xl bg-emerald-50/70 p-6 shadow-md ring-1 ring-emerald-200/70">
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-semibold text-emerald-900">Lucro Estimado</div>
+            <Gauge className="h-5 w-5 text-emerald-800" />
+          </div>
+          <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
+            {formatCurrencyBRL(Math.max(0, estimatedCommission - linkedExpensesTotal))}
+          </div>
+          <div className="mt-2 text-xs font-semibold text-emerald-900/80">
+            Comissão prevista {formatCurrencyBRL(estimatedCommission)} • Gastos vinculados {formatCurrencyBRL(linkedExpensesTotal)}
+          </div>
+          <div className="mt-2 text-[11px] text-emerald-900/70">
+            Depende das colunas de vínculo (target_type/target_id) e % comissão no imóvel.
+          </div>
         </div>
 
         <div className="rounded-2xl bg-amber-50/70 p-6 shadow-md ring-1 ring-amber-200/70">
@@ -1302,7 +1683,23 @@ export default function ObrasAdminPage() {
               </div>
             ) : null}
 
-            <form onSubmit={addMarketingExpense} className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-4">
+            <form onSubmit={addMarketingExpense} className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-5">
+              <label className="flex flex-col gap-2 md:col-span-2">
+                <span className="text-xs font-semibold tracking-wide text-slate-600">Destino (opcional)</span>
+                <select
+                  value={marketingForm.target}
+                  onChange={(e) => setMarketingForm((s) => ({ ...s, target: e.target.value }))}
+                  className="h-11 rounded-xl bg-white px-3 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                >
+                  <option value="">Sem vínculo</option>
+                  {targets.map((t) => (
+                    <option key={t.key} value={t.key}>
+                      {t.type === "property" ? "Imóvel: " : "Empreendimento: "}
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <label className="flex flex-col gap-2">
                 <span className="text-xs font-semibold tracking-wide text-slate-600">Data</span>
                 <input
@@ -1346,7 +1743,7 @@ export default function ObrasAdminPage() {
                   {isMarketingSaving ? "Salvando..." : "Adicionar"}
                 </button>
               </div>
-              <label className="flex flex-col gap-2 md:col-span-4">
+              <label className="flex flex-col gap-2 md:col-span-5">
                 <span className="text-xs font-semibold tracking-wide text-slate-600">Descrição (opcional)</span>
                 <input
                   value={marketingForm.description}
@@ -1454,7 +1851,23 @@ export default function ObrasAdminPage() {
               </div>
             ) : null}
 
-            <form onSubmit={addVehicleExpense} className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-4">
+            <form onSubmit={addVehicleExpense} className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-5">
+              <label className="flex flex-col gap-2 md:col-span-2">
+                <span className="text-xs font-semibold tracking-wide text-slate-600">Destino (opcional)</span>
+                <select
+                  value={vehicleForm.target}
+                  onChange={(e) => setVehicleForm((s) => ({ ...s, target: e.target.value }))}
+                  className="h-11 rounded-xl bg-white px-3 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 outline-none"
+                >
+                  <option value="">Sem vínculo</option>
+                  {targets.map((t) => (
+                    <option key={t.key} value={t.key}>
+                      {t.type === "property" ? "Imóvel: " : "Empreendimento: "}
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <label className="flex flex-col gap-2">
                 <span className="text-xs font-semibold tracking-wide text-slate-600">Data</span>
                 <input
@@ -1498,7 +1911,7 @@ export default function ObrasAdminPage() {
                   {isVehicleSaving ? "Salvando..." : "Adicionar"}
                 </button>
               </div>
-              <label className="flex flex-col gap-2 md:col-span-4">
+              <label className="flex flex-col gap-2 md:col-span-5">
                 <span className="text-xs font-semibold tracking-wide text-slate-600">Descrição (opcional)</span>
                 <input
                   value={vehicleForm.description}
@@ -1610,6 +2023,23 @@ export default function ObrasAdminPage() {
             >
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="flex flex-col gap-2 md:col-span-2">
+                  <span className="text-xs font-semibold tracking-wide text-slate-600">Destino (opcional)</span>
+                  <select
+                    value={materialsForm.target}
+                    onChange={(e) => setMaterialsForm((s) => ({ ...s, target: e.target.value }))}
+                    className="h-11 rounded-xl bg-white px-3 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
+                  >
+                    <option value="">Sem vínculo</option>
+                    {targets.map((t) => (
+                      <option key={t.key} value={t.key}>
+                        {t.type === "property" ? "Imóvel: " : "Empreendimento: "}
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="flex flex-col gap-2 md:col-span-2">
                   <span className="text-xs font-semibold tracking-wide text-slate-600">Insumo</span>
                   <input
                     value={materialsForm.name}
@@ -1686,6 +2116,12 @@ export default function ObrasAdminPage() {
                   return formatCurrencyBRL(unit * qty);
                 })()}
               </div>
+
+              {targetsError ? (
+                <div className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200/70">
+                  {targetsError}
+                </div>
+              ) : null}
 
               <div className="mt-5 flex justify-end">
                 <button

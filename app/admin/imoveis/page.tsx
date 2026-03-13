@@ -71,6 +71,7 @@ type FormState = {
   property_type: string;
   purpose: PropertyPurpose;
   price: string;
+  commission_percent: string;
   neighborhood: string;
   city: string;
   owner_whatsapp: string;
@@ -160,6 +161,14 @@ type BrokerProfile = {
   role?: string | null;
 };
 
+type ExpenseLine = {
+  source: "materials" | "labor" | "marketing" | "vehicle";
+  date: string | null;
+  category: string | null;
+  description: string | null;
+  amount: number;
+};
+
 export default function InventarioImoveisPage() {
   const supabase = useMemo(() => getSupabaseClient(), []);
 
@@ -188,6 +197,10 @@ export default function InventarioImoveisPage() {
   );
   const [portalColumn, setPortalColumn] = useState<string | null>(null);
   const [portalSyncByKey, setPortalSyncByKey] = useState<Record<string, boolean>>({});
+
+  const [commissionColumn, setCommissionColumn] = useState<string | null>(null);
+  const [expenseLines, setExpenseLines] = useState<ExpenseLine[]>([]);
+  const [expensesLoading, setExpensesLoading] = useState(false);
 
   const showToast = useCallback((message: string) => {
     setToastMessage(message);
@@ -300,6 +313,42 @@ export default function InventarioImoveisPage() {
     return null;
   }
 
+  async function detectCommissionColumn() {
+    if (!supabase) return null;
+    const candidates = ["commission_percent", "commission_percentage", "commission_rate"];
+    for (const col of candidates) {
+      try {
+        const res = await (supabase as any).from("properties").select(`id, ${col}`).limit(1);
+        if (!res?.error) return col;
+        const msg = String(res.error?.message ?? "");
+        const code = (res.error as any)?.code;
+        const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
+        const isMissing = /does not exist|not found|column/i.test(msg);
+        if (isSchemaMismatch || isMissing) continue;
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  }
+
+  async function loadLinkedExpenses(propertyId: string) {
+    setExpensesLoading(true);
+    try {
+      const res = await fetch(`/api/property-expenses?propertyId=${encodeURIComponent(propertyId)}`);
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) {
+        setExpenseLines([]);
+        return;
+      }
+      setExpenseLines((json.lines ?? []) as ExpenseLine[]);
+    } catch {
+      setExpenseLines([]);
+    } finally {
+      setExpensesLoading(false);
+    }
+  }
+
   const [updatingFieldByRowId, setUpdatingFieldByRowId] = useState<Record<string, "corretor" | "premium" | null>>(
     {},
   );
@@ -311,6 +360,7 @@ export default function InventarioImoveisPage() {
     property_type: "Apartamento",
     purpose: "venda",
     price: "",
+    commission_percent: "",
     neighborhood: "",
     city: "",
     owner_whatsapp: "",
@@ -342,9 +392,13 @@ export default function InventarioImoveisPage() {
       const detectedPortalCol = portalColumn ?? (await detectPortalColumn());
       if (portalColumn == null) setPortalColumn(detectedPortalCol);
 
+      const detectedCommissionCol = commissionColumn ?? (await detectCommissionColumn());
+      if (commissionColumn == null) setCommissionColumn(detectedCommissionCol);
+
       const brokerCol = propertiesBrokerColumn;
       const portalsSelect = detectedPortalCol ? `, ${detectedPortalCol}` : "";
-      const baseSelect = `id, title, property_type, purpose, price, is_premium, ${brokerCol}, data_direcionamento, owner_whatsapp, last_owner_contact_at, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description${portalsSelect}, created_at`;
+      const commSelect = detectedCommissionCol ? `, ${detectedCommissionCol}` : "";
+      const baseSelect = `id, title, property_type, purpose, price, is_premium, ${brokerCol}, data_direcionamento, owner_whatsapp, last_owner_contact_at, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description${portalsSelect}${commSelect}, created_at`;
       const selectStr = supportsAssignedBrokerId ? `${baseSelect}, assigned_broker_id` : baseSelect;
       const { data, error } = await supabase
         .from("properties")
@@ -365,9 +419,13 @@ export default function InventarioImoveisPage() {
         const detectedPortalCol = portalColumn ?? (await detectPortalColumn());
         if (portalColumn == null) setPortalColumn(detectedPortalCol);
 
+        const detectedCommissionCol = commissionColumn ?? (await detectCommissionColumn());
+        if (commissionColumn == null) setCommissionColumn(detectedCommissionCol);
+
         const brokerCol = propertiesBrokerColumn;
         const portalsSelect = detectedPortalCol ? `, ${detectedPortalCol}` : "";
-        const baseSelect = `id, title, property_type, purpose, price, is_premium, ${brokerCol}, owner_whatsapp, last_owner_contact_at, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description${portalsSelect}, created_at`;
+        const commSelect = detectedCommissionCol ? `, ${detectedCommissionCol}` : "";
+        const baseSelect = `id, title, property_type, purpose, price, is_premium, ${brokerCol}, owner_whatsapp, last_owner_contact_at, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description${portalsSelect}${commSelect}, created_at`;
         const selectStr = supportsAssignedBrokerId ? `${baseSelect}, assigned_broker_id` : baseSelect;
         const { data, error } = await supabase
           .from("properties")
@@ -621,11 +679,13 @@ export default function InventarioImoveisPage() {
   function resetForm() {
     setSelectedId(null);
     setActiveTab("basicos");
+    setExpenseLines([]);
     setForm({
       title: "",
       property_type: "Apartamento",
       purpose: "venda",
       price: "",
+      commission_percent: "",
       neighborhood: "",
       city: "",
       owner_whatsapp: "",
@@ -646,12 +706,19 @@ export default function InventarioImoveisPage() {
   function editRow(row: PropertyRow) {
     setSelectedId(row.id);
     setActiveTab("basicos");
+    void loadLinkedExpenses(row.id);
+
+    const col = commissionColumn;
+    const raw = col ? (row as any)?.[col] : null;
+    const pctNum = raw != null ? Number(raw) : NaN;
+    const pctStr = Number.isFinite(pctNum) ? String(pctNum) : "";
     setForm({
       title: row.title ?? "",
       property_type: row.property_type ?? "Apartamento",
       purpose: (row.purpose ?? "venda") as PropertyPurpose,
       price:
         typeof row.price === "number" ? formatCurrencyBRL(row.price, { maximumFractionDigits: 2 }) : "",
+      commission_percent: pctStr,
       neighborhood: row.neighborhood ?? "",
       city: row.city ?? "",
       owner_whatsapp: String(row.owner_whatsapp ?? ""),
@@ -725,6 +792,14 @@ export default function InventarioImoveisPage() {
       property_type: form.property_type.trim() ? form.property_type.trim() : null,
       purpose: form.purpose,
       price: parseBRLInputToNumber(form.price),
+      ...(commissionColumn
+        ? { [commissionColumn]: (() => {
+            const raw = form.commission_percent.trim();
+            if (!raw) return null;
+            const n = Number(raw.replace(",", "."));
+            return Number.isFinite(n) ? n : null;
+          })() }
+        : null),
       owner_whatsapp: form.owner_whatsapp.trim() ? form.owner_whatsapp.trim() : null,
       ...(supportsAssignedBrokerId
         ? { assigned_broker_id: form.corretor_id.trim() ? form.corretor_id.trim() : null }
@@ -1307,6 +1382,18 @@ export default function InventarioImoveisPage() {
                         </label>
 
                         <label className="flex flex-col gap-2">
+                          <span className="text-xs font-semibold tracking-wide text-slate-600">Porcentagem de Comissão</span>
+                          <input
+                            value={form.commission_percent}
+                            onChange={(e) => setForm((s) => ({ ...s, commission_percent: e.target.value }))}
+                            className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 shadow-sm ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#2b6cff]/30"
+                            placeholder={commissionColumn ? "Ex: 5" : "Coluna não detectada"}
+                            inputMode="decimal"
+                            disabled={!commissionColumn}
+                          />
+                        </label>
+
+                        <label className="flex flex-col gap-2">
                           <span className="text-xs font-semibold tracking-wide text-slate-600">Cidade</span>
                           <div className="relative">
                             <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -1329,6 +1416,86 @@ export default function InventarioImoveisPage() {
                           placeholder="Ex: Moinhos de Vento"
                         />
                       </label>
+
+                      {selectedId ? (
+                        <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200/70">
+                          <div className="text-[10px] font-semibold tracking-wide text-slate-500">FINANCEIRO</div>
+                          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+                            {(() => {
+                              const price = parseBRLInputToNumber(form.price) ?? 0;
+                              const pctRaw = Number(String(form.commission_percent ?? "").replace(",", "."));
+                              const pct = Number.isFinite(pctRaw) && pctRaw > 0 ? pctRaw : 5;
+                              const commission = price > 0 ? (pct / 100) * price : 0;
+                              const expensesTotal = expenseLines.reduce((acc, l) => acc + (Number(l.amount ?? 0) || 0), 0);
+                              const net = Math.max(0, commission - expensesTotal);
+                              return (
+                                <>
+                                  <div className="rounded-xl bg-white px-4 py-3 ring-1 ring-slate-200/70">
+                                    <div className="text-xs font-semibold text-slate-600">Comissão Prevista</div>
+                                    <div className="mt-2 text-lg font-semibold text-slate-900">{formatCurrencyBRL(commission)}</div>
+                                  </div>
+                                  <div className="rounded-xl bg-white px-4 py-3 ring-1 ring-slate-200/70">
+                                    <div className="text-xs font-semibold text-slate-600">Gastos Vinculados</div>
+                                    <div className="mt-2 text-lg font-semibold text-slate-900">
+                                      {expensesLoading ? "Carregando..." : formatCurrencyBRL(expensesTotal)}
+                                    </div>
+                                  </div>
+                                  <div className="rounded-xl bg-emerald-50 px-4 py-3 ring-1 ring-emerald-200/70">
+                                    <div className="text-xs font-semibold text-emerald-800">Líquido</div>
+                                    <div className="mt-2 text-lg font-semibold text-slate-900">{formatCurrencyBRL(net)}</div>
+                                  </div>
+                                </>
+                              );
+                            })()}
+                          </div>
+
+                          <div className="mt-4 overflow-x-auto rounded-xl bg-white ring-1 ring-slate-200/70">
+                            <table className="min-w-full border-separate border-spacing-0">
+                              <thead>
+                                <tr className="bg-slate-50">
+                                  <th className="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Origem</th>
+                                  <th className="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Data</th>
+                                  <th className="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Descrição</th>
+                                  <th className="px-4 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">Valor</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {expensesLoading ? (
+                                  <tr>
+                                    <td className="px-4 py-6 text-sm text-slate-600" colSpan={4}>
+                                      Carregando gastos vinculados...
+                                    </td>
+                                  </tr>
+                                ) : expenseLines.length > 0 ? (
+                                  expenseLines.map((l, idx) => (
+                                    <tr
+                                      key={`${l.source}-${idx}`}
+                                      className={"border-t border-slate-100 " + (idx % 2 === 1 ? "bg-slate-50/50" : "bg-white")}
+                                    >
+                                      <td className="px-4 py-3 text-sm font-semibold text-slate-900">{l.source}</td>
+                                      <td className="px-4 py-3 text-sm text-slate-700">
+                                        {l.date ? new Date(l.date).toLocaleDateString("pt-BR") : "-"}
+                                      </td>
+                                      <td className="px-4 py-3 text-sm text-slate-700">
+                                        {(l.description ?? "").trim() || l.category || "-"}
+                                      </td>
+                                      <td className="px-4 py-3 text-right text-sm font-semibold text-slate-900">
+                                        {formatCurrencyBRL(Number(l.amount ?? 0) || 0)}
+                                      </td>
+                                    </tr>
+                                  ))
+                                ) : (
+                                  <tr>
+                                    <td className="px-4 py-6 text-sm text-slate-600" colSpan={4}>
+                                      Nenhum gasto vinculado a este imóvel.
+                                    </td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      ) : null}
 
                       <label className="flex flex-col gap-2">
                         <span className="text-xs font-semibold tracking-wide text-slate-600">WhatsApp do Proprietário</span>
