@@ -202,6 +202,10 @@ export default function InventarioImoveisPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
 
+  const [updatingFieldByRowId, setUpdatingFieldByRowId] = useState<Record<string, "corretor" | "premium" | null>>(
+    {},
+  );
+
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -215,6 +219,182 @@ export default function InventarioImoveisPage() {
   const [commissionColumn, setCommissionColumn] = useState<string | null>(null);
   const [expenseLines, setExpenseLines] = useState<ExpenseLine[]>([]);
   const [expensesLoading, setExpensesLoading] = useState(false);
+
+  const [brokers, setBrokers] = useState<BrokerProfile[]>([]);
+
+  const [form, setForm] = useState<FormState>({
+    title: "",
+    property_type: "Apartamento",
+    purpose: "venda",
+    price: "",
+    commission_percent: "",
+    neighborhood: "",
+    city: "",
+    owner_whatsapp: "",
+    corretor_id: "",
+    is_premium: false,
+    bedrooms: "",
+    suites: "",
+    bathrooms: "",
+    parking_spots: "",
+    area_m2: "",
+    photos_urls: "",
+    tour_url: "",
+    status: "disponivel",
+    description: "",
+  });
+
+  const commissionColumns = useMemo(
+    () =>
+      [
+        "commission_percent",
+        "comissao_percent",
+        "commission_pct",
+        "comissao_pct",
+        "percentual_comissao",
+        "porcentagem_comissao",
+      ] as const,
+    [],
+  );
+
+  async function detectPortalColumn() {
+    if (!supabase) return null;
+    for (const col of portalColumns) {
+      try {
+        const res = await supabase.from("properties").select(`id, ${col}`).limit(1);
+        if (!res?.error) return col;
+        const msg = String(res.error?.message ?? "");
+        const code = (res.error as any)?.code;
+        const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
+        const isMissing = /does not exist|not found|column/i.test(msg);
+        if (isSchemaMismatch || isMissing) continue;
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  }
+
+  async function detectCommissionColumn() {
+    if (!supabase) return null;
+    for (const col of commissionColumns) {
+      try {
+        const res = await supabase.from("properties").select(`id, ${col}`).limit(1);
+        if (!res?.error) return col;
+        const msg = String(res.error?.message ?? "");
+        const code = (res.error as any)?.code;
+        const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
+        const isMissing = /does not exist|not found|column/i.test(msg);
+        if (isSchemaMismatch || isMissing) continue;
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  }
+
+  async function loadLinkedExpenses(propertyId: string) {
+    setExpensesLoading(true);
+    try {
+      const res = await fetch(`/api/property-expenses?propertyId=${encodeURIComponent(propertyId)}`);
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) {
+        setExpenseLines([]);
+        return;
+      }
+      setExpenseLines((json.lines ?? []) as ExpenseLine[]);
+    } catch {
+      setExpenseLines([]);
+    } finally {
+      setExpensesLoading(false);
+    }
+  }
+
+  async function concludeExpense(line: ExpenseLine) {
+    if (!selectedId) return;
+    const ok = window.confirm("Marcar este lançamento como concluído/entregue?");
+    if (!ok) return;
+
+    setExpenseLines((cur) => cur.map((l) => (l.source === line.source && l.id === line.id ? { ...l, done: true } : l)));
+
+    try {
+      const res = await fetch("/api/property-expenses", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: line.source, id: line.id }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) {
+        setErrorMessage(String(json?.error ?? `Falha ao concluir (HTTP ${res.status})`));
+        await loadLinkedExpenses(selectedId);
+      }
+    } catch {
+      setErrorMessage("Não foi possível concluir o lançamento agora.");
+      await loadLinkedExpenses(selectedId);
+    }
+  }
+
+  async function deleteExpenseLine(line: ExpenseLine) {
+    if (!selectedId) return;
+    const ok = window.confirm("Tem certeza que deseja apagar este lançamento?");
+    if (!ok) return;
+
+    const prev = expenseLines;
+    setExpenseLines((cur) => cur.filter((l) => !(l.source === line.source && l.id === line.id)));
+
+    try {
+      const res = await fetch("/api/property-expenses", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: line.source, id: line.id }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) {
+        setExpenseLines(prev);
+        setErrorMessage(String(json?.error ?? `Falha ao excluir (HTTP ${res.status})`));
+      }
+    } catch {
+      setExpenseLines(prev);
+      setErrorMessage("Não foi possível excluir o lançamento agora.");
+    }
+  }
+
+  async function load() {
+    setErrorMessage(null);
+
+    if (!supabase) {
+      setRows([]);
+      setErrorMessage(
+        "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+      );
+      return;
+    }
+
+    try {
+      const detectedPortalCol = portalColumn ?? (await detectPortalColumn());
+      if (portalColumn == null) setPortalColumn(detectedPortalCol);
+
+      const detectedCommissionCol = commissionColumn ?? (await detectCommissionColumn());
+      if (commissionColumn == null) setCommissionColumn(detectedCommissionCol);
+
+      const brokerCol = propertiesBrokerColumn;
+      const portalsSelect = detectedPortalCol ? `, ${detectedPortalCol}` : "";
+      const commSelect = detectedCommissionCol ? `, ${detectedCommissionCol}` : "";
+      const baseSelect = `id, title, property_type, purpose, price, is_premium, ${brokerCol}, owner_whatsapp, last_owner_contact_at, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description${portalsSelect}${commSelect}, created_at`;
+      const selectStr = supportsAssignedBrokerId ? `${baseSelect}, assigned_broker_id` : baseSelect;
+
+      const { data, error } = await supabase.from("properties").select(selectStr).order("created_at", { ascending: false });
+      if (error) {
+        setRows([]);
+        setErrorMessage(error.message);
+        return;
+      }
+      setRows((data ?? []) as any);
+    } catch {
+      setRows([]);
+      setErrorMessage("Não foi possível carregar o inventário agora.");
+    }
+  }
 
   const expenseSourceLabel = useCallback((source: ExpenseLine["source"]) => {
     if (source === "materials") return "Insumos e Materiais";
@@ -508,251 +688,109 @@ export default function InventarioImoveisPage() {
     [portalColumn, rows, getPortalValue, setPortalValueLocal, showToast],
   );
 
-  async function detectPortalColumn() {
-    if (!supabase) return null;
-    for (const col of portalColumns) {
-      try {
-        const res = await (supabase as any).from("properties").select(`id, ${col}`).limit(1);
-        if (!res?.error) return col;
-        const msg = String(res.error?.message ?? "");
-        const code = (res.error as any)?.code;
-        const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
-        const isMissing = /does not exist|not found|column/i.test(msg);
-        if (isSchemaMismatch || isMissing) continue;
-      } catch {
-        continue;
-      }
-    }
-    return null;
+  function OlxLogo({ className }: { className?: string }) {
+    return (
+      <svg viewBox="0 0 64 64" className={className} aria-hidden="true">
+        <circle cx="32" cy="32" r="30" fill="currentColor" />
+        <text
+          x="32"
+          y="38"
+          textAnchor="middle"
+          fontSize="22"
+          fontFamily="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial"
+          fontWeight="900"
+          fill="#ffffff"
+        >
+          OLX
+        </text>
+      </svg>
+    );
   }
 
-  async function detectCommissionColumn() {
-    if (!supabase) return null;
-    const candidates = ["commission_percent", "commission_percentage", "commission_rate"];
-    for (const col of candidates) {
-      try {
-        const res = await (supabase as any).from("properties").select(`id, ${col}`).limit(1);
-        if (!res?.error) return col;
-        const msg = String(res.error?.message ?? "");
-        const code = (res.error as any)?.code;
-        const isSchemaMismatch = code === "PGRST204" || code === "PGRST301";
-        const isMissing = /does not exist|not found|column/i.test(msg);
-        if (isSchemaMismatch || isMissing) continue;
-      } catch {
-        continue;
-      }
-    }
-    return null;
+  function ZapLogo({ className }: { className?: string }) {
+    return (
+      <svg viewBox="0 0 64 64" className={className} aria-hidden="true">
+        <circle cx="32" cy="32" r="30" fill="currentColor" />
+        <text
+          x="32"
+          y="38"
+          textAnchor="middle"
+          fontSize="22"
+          fontFamily="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial"
+          fontWeight="900"
+          fill="#ffffff"
+        >
+          ZAP
+        </text>
+      </svg>
+    );
   }
 
-  async function loadLinkedExpenses(propertyId: string) {
-    setExpensesLoading(true);
-    try {
-      const res = await fetch(`/api/property-expenses?propertyId=${encodeURIComponent(propertyId)}`);
-      const json = await res.json().catch(() => null);
-      if (!res.ok || !json?.ok) {
-        setExpenseLines([]);
-        return;
-      }
-      setExpenseLines((json.lines ?? []) as ExpenseLine[]);
-    } catch {
-      setExpenseLines([]);
-    } finally {
-      setExpensesLoading(false);
-    }
+  function VivaLogo({ className }: { className?: string }) {
+    return (
+      <svg viewBox="0 0 64 64" className={className} aria-hidden="true">
+        <circle cx="32" cy="32" r="30" fill="currentColor" />
+        <text
+          x="32"
+          y="38"
+          textAnchor="middle"
+          fontSize="22"
+          fontFamily="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial"
+          fontWeight="900"
+          fill="#ffffff"
+        >
+          VR
+        </text>
+      </svg>
+    );
   }
 
-  async function concludeExpense(line: ExpenseLine) {
-    if (!selectedId) return;
-    const ok = window.confirm("Marcar este lançamento como concluído/entregue?");
-    if (!ok) return;
-
-    setExpenseLines((cur) => cur.map((l) => (l.source === line.source && l.id === line.id ? { ...l, done: true } : l)));
-
-    try {
-      const res = await fetch("/api/property-expenses", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source: line.source, id: line.id }),
-      });
-      const json = await res.json().catch(() => null);
-      if (!res.ok || !json?.ok) {
-        setErrorMessage(String(json?.error ?? `Falha ao concluir (HTTP ${res.status})`));
-        await loadLinkedExpenses(selectedId);
-      }
-    } catch {
-      setErrorMessage("Não foi possível concluir o lançamento agora.");
-      await loadLinkedExpenses(selectedId);
-    }
-  }
-
-  async function deleteExpenseLine(line: ExpenseLine) {
-    if (!selectedId) return;
-    const ok = window.confirm("Tem certeza que deseja apagar este lançamento?");
-    if (!ok) return;
-
-    const prev = expenseLines;
-    setExpenseLines((cur) => cur.filter((l) => !(l.source === line.source && l.id === line.id)));
-
-    try {
-      const res = await fetch("/api/property-expenses", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source: line.source, id: line.id }),
-      });
-      const json = await res.json().catch(() => null);
-      if (!res.ok || !json?.ok) {
-        setExpenseLines(prev);
-        setErrorMessage(String(json?.error ?? `Falha ao excluir (HTTP ${res.status})`));
-      }
-    } catch {
-      setExpenseLines(prev);
-      setErrorMessage("Não foi possível excluir o lançamento agora.");
-    }
-  }
-
-  const [updatingFieldByRowId, setUpdatingFieldByRowId] = useState<Record<string, "corretor" | "premium" | null>>(
-    {},
-  );
-
-  const [brokers, setBrokers] = useState<BrokerProfile[]>([]);
-
-  const [form, setForm] = useState<FormState>({
-    title: "",
-    property_type: "Apartamento",
-    purpose: "venda",
-    price: "",
-    commission_percent: "",
-    neighborhood: "",
-    city: "",
-    owner_whatsapp: "",
-    corretor_id: "",
-    is_premium: false,
-    bedrooms: "",
-    suites: "",
-    bathrooms: "",
-    parking_spots: "",
-    area_m2: "",
-    photos_urls: "",
-    tour_url: "",
-    status: "disponivel",
-    description: "",
-  });
-
-  async function load() {
-    setErrorMessage(null);
-
-    if (!supabase) {
-      setRows([]);
-      setErrorMessage(
-        "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
-      );
-      return;
-    }
-
-    try {
-      const detectedPortalCol = portalColumn ?? (await detectPortalColumn());
-      if (portalColumn == null) setPortalColumn(detectedPortalCol);
-
-      const detectedCommissionCol = commissionColumn ?? (await detectCommissionColumn());
-      if (commissionColumn == null) setCommissionColumn(detectedCommissionCol);
-
-      const brokerCol = propertiesBrokerColumn;
-      const portalsSelect = detectedPortalCol ? `, ${detectedPortalCol}` : "";
-      const commSelect = detectedCommissionCol ? `, ${detectedCommissionCol}` : "";
-      const baseSelect = `id, title, property_type, purpose, price, is_premium, ${brokerCol}, data_direcionamento, owner_whatsapp, last_owner_contact_at, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description${portalsSelect}${commSelect}, created_at`;
-      const selectStr = supportsAssignedBrokerId ? `${baseSelect}, assigned_broker_id` : baseSelect;
-      const { data, error } = await supabase
-        .from("properties")
-        .select(
-          selectStr,
-        )
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        setRows([]);
-        setErrorMessage(error.message);
-        return;
-      }
-
-      setRows((data ?? []) as any);
-    } catch {
-      try {
-        const detectedPortalCol = portalColumn ?? (await detectPortalColumn());
-        if (portalColumn == null) setPortalColumn(detectedPortalCol);
-
-        const detectedCommissionCol = commissionColumn ?? (await detectCommissionColumn());
-        if (commissionColumn == null) setCommissionColumn(detectedCommissionCol);
-
-        const brokerCol = propertiesBrokerColumn;
-        const portalsSelect = detectedPortalCol ? `, ${detectedPortalCol}` : "";
-        const commSelect = detectedCommissionCol ? `, ${detectedCommissionCol}` : "";
-        const baseSelect = `id, title, property_type, purpose, price, is_premium, ${brokerCol}, owner_whatsapp, last_owner_contact_at, neighborhood, city, bedrooms, suites, bathrooms, parking_spots, area_m2, photos_urls, tour_url, status, description${portalsSelect}${commSelect}, created_at`;
-        const selectStr = supportsAssignedBrokerId ? `${baseSelect}, assigned_broker_id` : baseSelect;
-        const { data, error } = await supabase
-          .from("properties")
-          .select(
-            selectStr,
-          )
-          .order("created_at", { ascending: false });
-        if (error) {
-          setRows([]);
-          setErrorMessage(error.message);
-          return;
-        }
-        setRows((data ?? []) as any);
-      } catch {
-        setRows([]);
-        setErrorMessage("Não foi possível carregar o inventário agora.");
-      }
-    }
-  }
-
-  function PortalSwitch({
-    label,
+  function PortalIconButton({
+    title,
     active,
     syncing,
     onToggle,
     brandOnCls,
     brandRingOffCls,
-    brandTextOffCls,
     brandGlowCls,
+    icon,
   }: {
-    label: string;
+    title: string;
     active: boolean;
     syncing: boolean;
     onToggle: () => void;
     brandOnCls: string;
     brandRingOffCls: string;
-    brandTextOffCls: string;
     brandGlowCls: string;
+    icon: React.ReactNode;
   }) {
     const cls = active
-      ? `${brandOnCls} ring-1 ring-white/20 shadow-[0_12px_28px_-18px_rgba(15,23,42,0.85)] ${brandGlowCls}`
-      : `bg-white ${brandTextOffCls} ring-1 ${brandRingOffCls} shadow-[0_8px_18px_-16px_rgba(15,23,42,0.35)]`;
+      ? `${brandOnCls} ring-1 ring-white/20 ${brandGlowCls}`
+      : `bg-white ring-1 ${brandRingOffCls}`;
+
+    const iconCls = active ? "opacity-100" : "opacity-60 grayscale";
 
     return (
       <button
         type="button"
         onClick={onToggle}
         disabled={syncing}
+        title={title}
+        aria-label={title}
         className={
-          "group inline-flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-xs font-semibold tracking-wide transition-all duration-300 hover:-translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 disabled:cursor-not-allowed disabled:opacity-80 " +
+          "relative inline-flex h-10 w-10 items-center justify-center rounded-2xl transition-all duration-300 hover:-translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-80 " +
           (syncing ? "animate-pulse" : "") +
           " " +
           cls +
-          (active
-            ? ""
-            : " hover:bg-slate-50")
+          (active ? "" : " hover:bg-slate-50")
         }
       >
-        <span className="whitespace-nowrap">{label}</span>
-        <span className="inline-flex items-center gap-1.5">
-          {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-          <span className="text-[10px] font-semibold">
-            {syncing ? "Sincronizando..." : active ? "Ativo" : "Off"}
+        <span className={"inline-flex h-7 w-7 items-center justify-center " + iconCls}>{icon}</span>
+        {syncing ? (
+          <span className="absolute inset-0 flex items-center justify-center rounded-2xl bg-white/35 backdrop-blur-sm">
+            <Loader2 className="h-4 w-4 animate-spin text-slate-700" />
           </span>
-        </span>
+        ) : null}
       </button>
     );
   }
@@ -1386,36 +1424,36 @@ export default function InventarioImoveisPage() {
 
                     <div className="mt-4 rounded-2xl bg-white p-3 ring-1 ring-slate-200/70">
                       <div className="text-[10px] font-semibold tracking-wide text-slate-500">Status nos Portais</div>
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <PortalSwitch
-                          label="OLX"
+                      <div className="mt-2 flex flex-wrap items-center gap-3">
+                        <PortalIconButton
+                          title="OLX"
                           active={olx}
                           syncing={syncOlx}
                           onToggle={() => void togglePortal(r.id, "olx")}
-                          brandOnCls="bg-gradient-to-r from-[#6E2594] to-[#8B2BD1] text-white"
-                          brandRingOffCls="ring-[rgba(110,37,148,0.30)]"
-                          brandTextOffCls="text-[#6E2594]"
-                          brandGlowCls="shadow-[0_0_22px_-12px_rgba(139,43,209,0.75)]"
+                          brandOnCls="bg-gradient-to-r from-[#6E2594] to-[#8B2BD1]"
+                          brandRingOffCls="ring-[rgba(110,37,148,0.22)]"
+                          brandGlowCls="shadow-[0_0_22px_-12px_rgba(139,43,209,0.85)]"
+                          icon={<OlxLogo className="h-7 w-7 text-white" />}
                         />
-                        <PortalSwitch
-                          label="Zap Imóveis"
+                        <PortalIconButton
+                          title="Zap Imóveis"
                           active={zap}
                           syncing={syncZap}
                           onToggle={() => void togglePortal(r.id, "zap")}
-                          brandOnCls="bg-gradient-to-r from-[#0057FF] to-[#003CFF] text-white"
-                          brandRingOffCls="ring-[rgba(0,87,255,0.30)]"
-                          brandTextOffCls="text-[#004BFF]"
-                          brandGlowCls="shadow-[0_0_22px_-12px_rgba(0,87,255,0.75)]"
+                          brandOnCls="bg-gradient-to-r from-[#0057FF] to-[#003CFF]"
+                          brandRingOffCls="ring-[rgba(0,87,255,0.22)]"
+                          brandGlowCls="shadow-[0_0_22px_-12px_rgba(0,87,255,0.85)]"
+                          icon={<ZapLogo className="h-7 w-7 text-white" />}
                         />
-                        <PortalSwitch
-                          label="Viva Real"
+                        <PortalIconButton
+                          title="Viva Real"
                           active={vivareal}
                           syncing={syncViva}
                           onToggle={() => void togglePortal(r.id, "vivareal")}
-                          brandOnCls="bg-gradient-to-r from-[#00AEEF] to-[#0077C8] text-white"
-                          brandRingOffCls="ring-[rgba(0,174,239,0.30)]"
-                          brandTextOffCls="text-[#008ED6]"
-                          brandGlowCls="shadow-[0_0_22px_-12px_rgba(0,174,239,0.75)]"
+                          brandOnCls="bg-gradient-to-r from-[#00AEEF] to-[#0077C8]"
+                          brandRingOffCls="ring-[rgba(0,174,239,0.22)]"
+                          brandGlowCls="shadow-[0_0_22px_-12px_rgba(0,174,239,0.85)]"
+                          icon={<VivaLogo className="h-7 w-7 text-white" />}
                         />
                       </div>
                     </div>

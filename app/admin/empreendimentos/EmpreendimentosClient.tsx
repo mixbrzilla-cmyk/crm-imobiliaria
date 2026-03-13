@@ -325,49 +325,109 @@ export default function EmpreendimentosClient() {
     }
   }
 
-  function PortalSwitch({
-    label,
+  function OlxLogo({ className }: { className?: string }) {
+    return (
+      <svg viewBox="0 0 64 64" className={className} aria-hidden="true">
+        <circle cx="32" cy="32" r="30" fill="currentColor" />
+        <text
+          x="32"
+          y="38"
+          textAnchor="middle"
+          fontSize="22"
+          fontFamily="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial"
+          fontWeight="900"
+          fill="#ffffff"
+        >
+          OLX
+        </text>
+      </svg>
+    );
+  }
+
+  function ZapLogo({ className }: { className?: string }) {
+    return (
+      <svg viewBox="0 0 64 64" className={className} aria-hidden="true">
+        <circle cx="32" cy="32" r="30" fill="currentColor" />
+        <text
+          x="32"
+          y="38"
+          textAnchor="middle"
+          fontSize="22"
+          fontFamily="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial"
+          fontWeight="900"
+          fill="#ffffff"
+        >
+          ZAP
+        </text>
+      </svg>
+    );
+  }
+
+  function VivaLogo({ className }: { className?: string }) {
+    return (
+      <svg viewBox="0 0 64 64" className={className} aria-hidden="true">
+        <circle cx="32" cy="32" r="30" fill="currentColor" />
+        <text
+          x="32"
+          y="38"
+          textAnchor="middle"
+          fontSize="22"
+          fontFamily="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial"
+          fontWeight="900"
+          fill="#ffffff"
+        >
+          VR
+        </text>
+      </svg>
+    );
+  }
+
+  function PortalIconButton({
+    title,
     active,
     syncing,
     onToggle,
     brandOnCls,
     brandRingOffCls,
-    brandTextOffCls,
     brandGlowCls,
+    icon,
   }: {
-    label: string;
+    title: string;
     active: boolean;
     syncing: boolean;
     onToggle: () => void;
     brandOnCls: string;
     brandRingOffCls: string;
-    brandTextOffCls: string;
     brandGlowCls: string;
+    icon: React.ReactNode;
   }) {
     const cls = active
-      ? `${brandOnCls} ring-1 ring-white/20 shadow-[0_12px_28px_-18px_rgba(15,23,42,0.85)] ${brandGlowCls}`
-      : `bg-white ${brandTextOffCls} ring-1 ${brandRingOffCls} shadow-[0_8px_18px_-16px_rgba(15,23,42,0.35)]`;
+      ? `${brandOnCls} ring-1 ring-white/20 ${brandGlowCls}`
+      : `bg-white ring-1 ${brandRingOffCls}`;
+
+    const iconCls = active ? "opacity-100" : "opacity-60 grayscale";
 
     return (
       <button
         type="button"
         onClick={onToggle}
         disabled={syncing}
+        title={title}
+        aria-label={title}
         className={
-          "group inline-flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-xs font-semibold tracking-wide transition-all duration-300 hover:-translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 disabled:cursor-not-allowed disabled:opacity-80 " +
+          "relative inline-flex h-10 w-10 items-center justify-center rounded-2xl transition-all duration-300 hover:-translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-80 " +
           (syncing ? "animate-pulse" : "") +
           " " +
           cls +
           (active ? "" : " hover:bg-slate-50")
         }
       >
-        <span className="whitespace-nowrap">{label}</span>
-        <span className="inline-flex items-center gap-1.5">
-          {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-          <span className="text-[10px] font-semibold">
-            {syncing ? "Sincronizando..." : active ? "Ativo" : "Off"}
+        <span className={"inline-flex h-7 w-7 items-center justify-center " + iconCls}>{icon}</span>
+        {syncing ? (
+          <span className="absolute inset-0 flex items-center justify-center rounded-2xl bg-white/35 backdrop-blur-sm">
+            <Loader2 className="h-4 w-4 animate-spin text-slate-700" />
           </span>
-        </span>
+        ) : null}
       </button>
     );
   }
@@ -1038,36 +1098,36 @@ export default function EmpreendimentosClient() {
 
                   <div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-slate-200/70">
                     <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">STATUS NOS PORTAIS</div>
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <PortalSwitch
-                        label="OLX"
+                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                      <PortalIconButton
+                        title="OLX"
                         active={olx}
                         syncing={syncOlx}
                         onToggle={() => void togglePortal(r.id, "olx")}
-                        brandOnCls="bg-[#6E2594] text-white"
-                        brandRingOffCls="ring-[rgba(110,37,148,0.35)]"
-                        brandTextOffCls="text-[#6E2594]"
-                        brandGlowCls="shadow-[0_0_22px_-12px_rgba(139,43,209,0.75)]"
+                        brandOnCls="bg-[#6E2594]"
+                        brandRingOffCls="ring-[rgba(110,37,148,0.22)]"
+                        brandGlowCls="shadow-[0_0_22px_-12px_rgba(139,43,209,0.85)]"
+                        icon={<OlxLogo className="h-7 w-7 text-white" />}
                       />
-                      <PortalSwitch
-                        label="Zap Imóveis"
+                      <PortalIconButton
+                        title="Zap Imóveis"
                         active={zap}
                         syncing={syncZap}
                         onToggle={() => void togglePortal(r.id, "zap")}
-                        brandOnCls="bg-[#0000FF] text-white"
-                        brandRingOffCls="ring-[rgba(0,0,255,0.28)]"
-                        brandTextOffCls="text-[#0000FF]"
-                        brandGlowCls="shadow-[0_0_22px_-12px_rgba(0,87,255,0.75)]"
+                        brandOnCls="bg-[#0000FF]"
+                        brandRingOffCls="ring-[rgba(0,0,255,0.22)]"
+                        brandGlowCls="shadow-[0_0_22px_-12px_rgba(0,87,255,0.85)]"
+                        icon={<ZapLogo className="h-7 w-7 text-white" />}
                       />
-                      <PortalSwitch
-                        label="Viva Real"
+                      <PortalIconButton
+                        title="Viva Real"
                         active={vivareal}
                         syncing={syncViva}
                         onToggle={() => void togglePortal(r.id, "vivareal")}
-                        brandOnCls="bg-gradient-to-r from-[#00AEEF] to-[#0094D4] text-white"
-                        brandRingOffCls="ring-[rgba(0,174,239,0.35)]"
-                        brandTextOffCls="text-[#00AEEF]"
-                        brandGlowCls="shadow-[0_0_22px_-12px_rgba(0,174,239,0.75)]"
+                        brandOnCls="bg-gradient-to-r from-[#00AEEF] to-[#0094D4]"
+                        brandRingOffCls="ring-[rgba(0,174,239,0.22)]"
+                        brandGlowCls="shadow-[0_0_22px_-12px_rgba(0,174,239,0.85)]"
+                        icon={<VivaLogo className="h-7 w-7 text-white" />}
                       />
                     </div>
                     {!portalColumn ? (
