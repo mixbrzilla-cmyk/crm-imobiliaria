@@ -12,6 +12,7 @@ import {
   Crown,
   Cuboid,
   FileText,
+  FileDown,
   Home,
   Layers,
   Loader2,
@@ -20,9 +21,11 @@ import {
   MessageCircle,
   Pencil,
   Plus,
+  Printer,
   RefreshCw,
   Ruler,
   SlidersHorizontal,
+  Share2,
   Trash2,
   BadgeCheck,
   Search,
@@ -219,6 +222,198 @@ export default function InventarioImoveisPage() {
     if (source === "marketing") return "Investimento em Marketing";
     return "Deslocamento e Veículos";
   }, []);
+
+  function safeDateBR(date: string | null) {
+    if (!date) return "-";
+    try {
+      return new Date(date).toLocaleDateString("pt-BR");
+    } catch {
+      return String(date);
+    }
+  }
+
+  function buildReportHtml(args: {
+    propertyTitle: string;
+    propertyRef: string;
+    propertyLocal: string;
+    lines: ExpenseLine[];
+  }) {
+    const total = args.lines.reduce((acc, l) => acc + (Number(l.amount ?? 0) || 0), 0);
+    const pending = args.lines.filter((l) => !l.done).length;
+    const status = args.lines.length > 0 && pending === 0 ? "Entregue" : "Pendente";
+
+    const rows = args.lines
+      .slice()
+      .sort((a, b) => String(a.date ?? "").localeCompare(String(b.date ?? "")))
+      .map((l) => {
+        const item = (l.description ?? "").trim() || l.category || "-";
+        const st = l.done ? "Entregue" : "Pendente";
+        return `
+          <tr>
+            <td>${safeDateBR(l.date)}</td>
+            <td>${item.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</td>
+            <td class="right">${formatCurrencyBRL(Number(l.amount ?? 0) || 0)}</td>
+            <td class="right"><span class="pill ${l.done ? "done" : "pending"}">${st}</span></td>
+          </tr>
+        `;
+      })
+      .join("\n");
+
+    const now = new Date().toLocaleString("pt-BR");
+    return `
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Relatório de Gastos do Imóvel</title>
+    <style>
+      :root { color-scheme: light; }
+      body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 0; background: #f1f5f9; color: #0f172a; }
+      .page { max-width: 980px; margin: 24px auto; padding: 24px; background: #fff; border: 1px solid #e2e8f0; border-radius: 18px; }
+      .top { display:flex; justify-content: space-between; gap: 16px; align-items: center; }
+      .brand { display:flex; gap: 12px; align-items:center; }
+      .logo { width: 56px; height: 56px; border-radius: 16px; background: linear-gradient(135deg,#2b6cff,#001f3f); display:flex; align-items:center; justify-content:center; color:#fff; font-weight: 800; }
+      .h1 { font-size: 20px; font-weight: 800; margin: 0; }
+      .meta { font-size: 12px; color: #475569; font-weight: 600; margin-top: 2px; }
+      .printbar { display:flex; gap: 10px; }
+      .btn { border: 1px solid #e2e8f0; background: #fff; padding: 10px 12px; border-radius: 14px; font-weight: 700; font-size: 12px; cursor:pointer; }
+      .btn.primary { background: #2b6cff; border-color: #2b6cff; color: #fff; }
+      .section { margin-top: 18px; padding-top: 18px; border-top: 1px solid #e2e8f0; }
+      .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+      .card { background:#f8fafc; border:1px solid #e2e8f0; border-radius: 16px; padding: 14px; }
+      .label { font-size: 10px; letter-spacing: .18em; font-weight: 800; color: #64748b; }
+      .value { margin-top: 6px; font-size: 13px; font-weight: 800; color:#0f172a; }
+      table { width:100%; border-collapse: separate; border-spacing: 0; margin-top: 10px; overflow: hidden; border: 1px solid #e2e8f0; border-radius: 14px; }
+      thead th { background: #f8fafc; font-size: 11px; text-transform: none; letter-spacing: .06em; color:#334155; padding: 10px 12px; text-align:left; border-bottom: 1px solid #e2e8f0; }
+      tbody td { padding: 10px 12px; font-size: 12px; color:#0f172a; border-bottom: 1px solid #f1f5f9; }
+      tbody tr:last-child td { border-bottom: none; }
+      .right { text-align:right; }
+      .pill { display:inline-block; padding: 6px 10px; border-radius: 999px; font-size: 11px; font-weight: 800; border:1px solid transparent; }
+      .pill.done { background:#ecfdf5; color:#065f46; border-color:#a7f3d0; }
+      .pill.pending { background:#fff7ed; color:#9a3412; border-color:#fed7aa; }
+      .footer { margin-top: 12px; font-size: 11px; color:#64748b; font-weight: 600; }
+      @media print { body { background:#fff; } .page { margin:0; border:none; border-radius:0; } .printbar { display:none; } }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="top">
+        <div class="brand">
+          <div class="logo">LOGO</div>
+          <div>
+            <p class="h1">Relatório de Gastos do Imóvel</p>
+            <div class="meta">Gerado em ${now}</div>
+          </div>
+        </div>
+        <div class="printbar">
+          <button class="btn" onclick="window.print()">Imprimir / Salvar PDF</button>
+          <button class="btn primary" onclick="window.close()">Fechar</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="grid">
+          <div class="card">
+            <div class="label">IMÓVEL</div>
+            <div class="value">${args.propertyTitle.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
+            <div class="meta">${args.propertyLocal.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
+          </div>
+          <div class="card">
+            <div class="label">REFERÊNCIA</div>
+            <div class="value">${args.propertyRef.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
+            <div class="meta">Status geral: <strong>${status}</strong> (${pending} pendente)</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="label">DETALHAMENTO DE GASTOS</div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 140px;">Data</th>
+              <th>Item</th>
+              <th style="width: 160px;" class="right">Valor</th>
+              <th style="width: 150px;" class="right">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows || `<tr><td colspan="4">Nenhum gasto vinculado.</td></tr>`}
+          </tbody>
+        </table>
+
+        <div class="section" style="border-top:none; padding-top: 0;">
+          <div class="grid">
+            <div class="card">
+              <div class="label">TOTAL GASTO</div>
+              <div class="value">${formatCurrencyBRL(total)}</div>
+            </div>
+            <div class="card">
+              <div class="label">STATUS FINAL</div>
+              <div class="value">${status}</div>
+              <div class="meta">Entregue = todos os itens concluídos</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">Observação: este relatório lista despesas vinculadas ao imóvel via lançamentos do sistema.</div>
+      </div>
+    </div>
+  </body>
+</html>
+    `.trim();
+  }
+
+  async function openTransparencyReport(args: {
+    propertyId: string;
+    propertyTitle: string;
+    propertyLocal: string;
+    lines?: ExpenseLine[];
+  }) {
+    let lines = args.lines;
+    if (!lines) {
+      const res = await fetch(`/api/property-expenses?propertyId=${encodeURIComponent(args.propertyId)}`);
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) throw new Error(String(json?.error ?? `Falha ao carregar gastos (HTTP ${res.status})`));
+      lines = (json.lines ?? []) as ExpenseLine[];
+    }
+
+    const html = buildReportHtml({
+      propertyTitle: args.propertyTitle,
+      propertyRef: `ID: ${args.propertyId}`,
+      propertyLocal: args.propertyLocal,
+      lines,
+    });
+
+    const w = window.open("", "_blank", "noopener,noreferrer");
+    if (!w) {
+      setErrorMessage("O navegador bloqueou o pop-up do relatório. Permita pop-ups para gerar o PDF.");
+      return;
+    }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+  }
+
+  function openWhatsappWithTransparencyText(phoneRaw: string, propertyTitle: string) {
+    const phone = String(phoneRaw ?? "").replace(/\D+/g, "");
+    if (!phone) {
+      setErrorMessage("Preencha o WhatsApp do proprietário para enviar a mensagem.");
+      return;
+    }
+
+    const total = expenseLines.reduce((acc, l) => acc + (Number(l.amount ?? 0) || 0), 0);
+    const pending = expenseLines.filter((l) => !l.done).length;
+    const status = expenseLines.length > 0 && pending === 0 ? "Entregue" : "Pendente";
+    const text =
+      `Olá, segue o extrato de gastos do seu imóvel (${propertyTitle}). ` +
+      `Total gasto: ${formatCurrencyBRL(total)}. Status: ${status}. ` +
+      `Vou anexar o PDF/imagem do relatório na sequência.`;
+    const url = `https://wa.me/${encodeURIComponent(phone)}?text=${encodeURIComponent(text)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
 
   const showToast = useCallback((message: string) => {
     setToastMessage(message);
@@ -1245,6 +1440,24 @@ export default function InventarioImoveisPage() {
                         </button>
                         <button
                           type="button"
+                          onClick={() =>
+                            void openTransparencyReport({
+                              propertyId: r.id,
+                              propertyTitle: String(r.title ?? r.property_type ?? "Imóvel"),
+                              propertyLocal:
+                                [String(r.neighborhood ?? "").trim(), String(r.city ?? "").trim()].filter(Boolean).join(" • ") || "-",
+                            }).catch((err) => {
+                              setErrorMessage(String((err as any)?.message ?? "Não foi possível gerar o relatório."));
+                            })
+                          }
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
+                          title="Gerar Relatório (PDF/Imagem)"
+                          aria-label="Gerar Relatório"
+                        >
+                          <FileDown className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => void removeRow(r.id)}
                           disabled={isDeletingId === r.id}
                           className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-rose-600 text-white shadow-sm transition-all duration-300 hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
@@ -1493,6 +1706,62 @@ export default function InventarioImoveisPage() {
                       {selectedId ? (
                         <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200/70">
                           <div className="text-[10px] font-semibold tracking-wide text-slate-500">FINANCEIRO</div>
+                          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                            <div className="text-xs font-semibold text-slate-700">Transparência</div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void openTransparencyReport({
+                                    propertyId: selectedId,
+                                    propertyTitle: form.title.trim() || form.property_type || "Imóvel",
+                                    propertyLocal: [form.neighborhood, form.city].filter(Boolean).join(" • ") || "-",
+                                    lines: expenseLines,
+                                  })
+                                }
+                                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
+                                title="Gerar Relatório (PDF/Imagem)"
+                              >
+                                <FileDown className="h-4 w-4" />
+                                Gerar Relatório
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!selectedId) return;
+                                  openWhatsappWithTransparencyText(
+                                    form.owner_whatsapp,
+                                    form.title.trim() || form.property_type || "Imóvel",
+                                  );
+                                }}
+                                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-semibold text-white shadow-sm transition-all duration-300 hover:bg-emerald-700"
+                                title="Enviar mensagem por WhatsApp"
+                              >
+                                <Share2 className="h-4 w-4" />
+                                Enviar WhatsApp
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!selectedId) return;
+                                  void openTransparencyReport({
+                                    propertyId: selectedId,
+                                    propertyTitle: form.title.trim() || form.property_type || "Imóvel",
+                                    propertyLocal: [form.neighborhood, form.city].filter(Boolean).join(" • ") || "-",
+                                    lines: expenseLines,
+                                  }).then(() => {
+                                    setToastMessage("Relatório aberto. Use \"Imprimir/Salvar PDF\" na nova aba.");
+                                    window.setTimeout(() => setToastMessage(null), 2600);
+                                  });
+                                }}
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
+                                aria-label="Abrir relatório para impressão"
+                                title="Abrir para impressão"
+                              >
+                                <Printer className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
                           <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
                             {(() => {
                               const price = parseBRLInputToNumber(form.price) ?? 0;
