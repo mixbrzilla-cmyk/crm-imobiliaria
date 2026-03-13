@@ -253,6 +253,46 @@ export default function WhatsAppPanelClient() {
     }
   }, []);
 
+  const recreateEvolutionInstance = useCallback(async () => {
+    setErrorMessage(null);
+    setEvolutionTestMessage(null);
+    setResetMessage(null);
+    setPairQrDataUrl(null);
+    setPairInstanceName(null);
+    setPairConnectionState(null);
+    setIsPairOpen(true);
+    setIsPairing(true);
+
+    try {
+      const res = await fetch("/api/whatsapp/evolution/recreate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) {
+        setErrorMessage(String(json?.error ?? `Falha ao recriar instância (HTTP ${res.status})`));
+        setIsPairing(false);
+        return;
+      }
+
+      const instanceName = json?.instanceName ? String(json.instanceName) : null;
+      const qrDataUrl = json?.qr?.dataUrl ? String(json.qr.dataUrl) : null;
+
+      setPairInstanceName(instanceName);
+      setPairQrDataUrl(qrDataUrl);
+
+      if (!qrDataUrl) {
+        setErrorMessage(
+          "Instância recriada, mas o QR Code não veio no connect. Verifique se a Evolution está liberando QR para a instância.",
+        );
+      }
+    } catch {
+      setErrorMessage("Não foi possível recriar a instância agora.");
+    } finally {
+      setIsPairing(false);
+    }
+  }, []);
+
   const ensureEvolutionWebhook = useCallback(async () => {
     setErrorMessage(null);
     setWebhookMessage(null);
@@ -1232,6 +1272,13 @@ export default function WhatsAppPanelClient() {
                   className="inline-flex h-11 items-center justify-center rounded-2xl bg-white px-5 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isEnsuringWebhook ? "Forçando..." : "Forçar Webhook"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void recreateEvolutionInstance()}
+                  className="inline-flex h-11 items-center justify-center rounded-2xl bg-white px-5 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
+                >
+                  Recriar Instância
                 </button>
                 <button
                   type="button"
