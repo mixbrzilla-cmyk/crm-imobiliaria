@@ -1460,10 +1460,10 @@ export default function InventarioImoveisPage() {
                             <table className="min-w-full border-separate border-spacing-0">
                               <thead>
                                 <tr className="bg-slate-50">
-                                  <th className="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Origem</th>
                                   <th className="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Data</th>
-                                  <th className="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Descrição</th>
-                                  <th className="px-4 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">Valor</th>
+                                  <th className="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Categoria</th>
+                                  <th className="px-4 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Descrição/Item</th>
+                                  <th className="px-4 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">Valor (R$)</th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -1479,15 +1479,11 @@ export default function InventarioImoveisPage() {
                                       key={`${l.source}-${idx}`}
                                       className={"border-t border-slate-100 " + (idx % 2 === 1 ? "bg-slate-50/50" : "bg-white")}
                                     >
-                                      <td className="px-4 py-3 text-sm font-semibold text-slate-900">
-                                        {expenseSourceLabel(l.source)}
-                                      </td>
                                       <td className="px-4 py-3 text-sm text-slate-700">
                                         {l.date ? new Date(l.date).toLocaleDateString("pt-BR") : "-"}
                                       </td>
-                                      <td className="px-4 py-3 text-sm text-slate-700">
-                                        {(l.description ?? "").trim() || l.category || "-"}
-                                      </td>
+                                      <td className="px-4 py-3 text-sm font-semibold text-slate-900">{expenseSourceLabel(l.source)}</td>
+                                      <td className="px-4 py-3 text-sm text-slate-700">{(l.description ?? "").trim() || l.category || "-"}</td>
                                       <td className="px-4 py-3 text-right text-sm font-semibold text-slate-900">
                                         {formatCurrencyBRL(Number(l.amount ?? 0) || 0)}
                                       </td>

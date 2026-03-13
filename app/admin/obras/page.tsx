@@ -254,6 +254,28 @@ export default function ObrasAdminPage() {
     return { target_type: type, target_id: id };
   }
 
+  async function deleteWorker(id: string) {
+    if (!supabase) return;
+    const ok = window.confirm("Tem certeza que deseja excluir este colaborador?");
+    if (!ok) return;
+    setErrorMessage(null);
+
+    try {
+      const res = await (supabase as any).from("obra_workers").delete().eq("id", id);
+      if (res.error) {
+        const fallback = await (supabase as any).from("obra_workers").update({ active: false }).eq("id", id);
+        if (fallback.error) {
+          setErrorMessage(res.error.message);
+          return;
+        }
+      }
+
+      await loadWorkersAndEntries();
+    } catch {
+      setErrorMessage("Não foi possível remover o colaborador agora.");
+    }
+  }
+
   async function loadTargets() {
     setTargetsError(null);
     if (!supabase) {
@@ -638,13 +660,11 @@ export default function ObrasAdminPage() {
         }
       }
 
-      if (entriesRes.status === "fulfilled") {
-        if (entriesRes.value.error) {
-          setErrorMessage(entriesRes.value.error.message);
-          setEntries([]);
-        } else {
-          setEntries((entriesRes.value.data ?? []) as ObraWorkerEntryRow[]);
-        }
+      if (entriesRes?.error) {
+        setErrorMessage(entriesRes.error.message);
+        setEntries([]);
+      } else {
+        setEntries((entriesRes.data ?? []) as ObraWorkerEntryRow[]);
       }
     } catch {
       setErrorMessage("Não foi possível carregar equipe/medições agora.");
@@ -1090,15 +1110,24 @@ export default function ObrasAdminPage() {
       }
 
       if (insertRes?.error) {
-        setErrorMessage(insertRes.error.message);
-        return;
+        const code = (insertRes.error as any)?.code;
+        const details = (insertRes.error as any)?.details;
+        const hint = (insertRes.error as any)?.hint;
+        const message = String(insertRes.error.message ?? "Erro ao salvar.");
+        const full = [message, code ? `code=${code}` : null, details ? `details=${details}` : null, hint ? `hint=${hint}` : null]
+          .filter(Boolean)
+          .join(" | ");
+        setErrorMessage(full);
+        return false;
       }
 
       setEntryForm((s) => ({ ...s, hours: "", notes: "" }));
       await loadWorkersAndEntries();
       void computeFinancials();
+      return true;
     } catch {
       setErrorMessage("Não foi possível salvar o lançamento.");
+      return false;
     } finally {
       setIsEntrySaving(false);
     }
@@ -1168,150 +1197,6 @@ export default function ObrasAdminPage() {
       {errorMessage ? (
         <div className="rounded-2xl bg-red-50 px-5 py-4 text-sm text-red-700 ring-1 ring-red-200/70">
           {errorMessage}
-        </div>
-      ) : null}
-
-      {isEntryModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 p-4 sm:items-center">
-          <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-[0_20px_60px_-24px_rgba(15,23,42,0.65)] ring-1 ring-slate-200/70">
-            <div className="flex items-start justify-between gap-6 border-b border-slate-100 px-6 py-5">
-              <div>
-                <div className="text-sm font-semibold text-slate-900">Lançar Medição</div>
-                <div className="mt-1 text-xs text-slate-500">Vincule o serviço ao imóvel/empreendimento para calcular comissão líquida.</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsEntryModalOpen(false)}
-                className="inline-flex h-10 items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
-              >
-                Fechar
-              </button>
-            </div>
-
-            <form
-              onSubmit={(e) => {
-                void addEntry(e);
-                setIsEntryModalOpen(false);
-              }}
-              className="px-6 py-6"
-            >
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <label className="flex flex-col gap-2 md:col-span-2">
-                  <span className="text-xs font-semibold tracking-wide text-slate-600">Destino (opcional)</span>
-                  <select
-                    value={entryForm.target}
-                    onChange={(e) => setEntryForm((s) => ({ ...s, target: e.target.value }))}
-                    className="h-11 rounded-xl bg-white px-3 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                  >
-                    <option value="">Sem vínculo</option>
-                    {targets.map((t) => (
-                      <option key={t.key} value={t.key}>
-                        {t.type === "property" ? "Imóvel: " : "Empreendimento: "}
-                        {t.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="flex flex-col gap-2">
-                  <span className="text-xs font-semibold tracking-wide text-slate-600">Colaborador</span>
-                  <select
-                    value={entryForm.worker_id}
-                    onChange={(e) => setEntryForm((s) => ({ ...s, worker_id: e.target.value }))}
-                    className="h-11 rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                    required
-                  >
-                    <option value="">Selecione</option>
-                    {workers.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.full_name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="flex flex-col gap-2">
-                  <span className="text-xs font-semibold tracking-wide text-slate-600">Data</span>
-                  <input
-                    type="date"
-                    value={entryForm.entry_date}
-                    onChange={(e) => setEntryForm((s) => ({ ...s, entry_date: e.target.value }))}
-                    className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                    required
-                  />
-                </label>
-
-                <label className="flex flex-col gap-2">
-                  <span className="text-xs font-semibold tracking-wide text-slate-600">Setor</span>
-                  <select
-                    value={entryForm.sector}
-                    onChange={(e) => setEntryForm((s) => ({ ...s, sector: e.target.value as EntryForm["sector"] }))}
-                    className="h-11 rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                  >
-                    <option value="fundacao">Fundação</option>
-                    <option value="alvenaria">Alvenaria</option>
-                    <option value="eletrica">Elétrica</option>
-                  </select>
-                </label>
-
-                <label className="flex flex-col gap-2">
-                  <span className="text-xs font-semibold tracking-wide text-slate-600">Tipo</span>
-                  <select
-                    value={entryForm.entry_type}
-                    onChange={(e) => setEntryForm((s) => ({ ...s, entry_type: e.target.value as EntryType }))}
-                    className="h-11 rounded-xl bg-white px-4 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                  >
-                    <option value="diaria">Diária</option>
-                    <option value="hora_homem">Hora-Homem</option>
-                    <option value="falta">Falta</option>
-                  </select>
-                </label>
-
-                {entryForm.entry_type === "hora_homem" ? (
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs font-semibold tracking-wide text-slate-600">Horas</span>
-                    <input
-                      value={entryForm.hours}
-                      onChange={(e) => setEntryForm((s) => ({ ...s, hours: e.target.value }))}
-                      className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                      placeholder="Ex: 8"
-                      inputMode="decimal"
-                      required
-                    />
-                  </label>
-                ) : (
-                  <div className="hidden md:block" />
-                )}
-
-                <label className="flex flex-col gap-2 md:col-span-2">
-                  <span className="text-xs font-semibold tracking-wide text-slate-600">Observações (opcional)</span>
-                  <input
-                    value={entryForm.notes}
-                    onChange={(e) => setEntryForm((s) => ({ ...s, notes: e.target.value }))}
-                    className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
-                    placeholder="Ex: Reparos na cozinha / Pintura"
-                  />
-                </label>
-              </div>
-
-              {targetsError ? (
-                <div className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200/70">
-                  {targetsError}
-                </div>
-              ) : null}
-
-              <div className="mt-5 flex justify-end">
-                <button
-                  type="submit"
-                  disabled={isEntrySaving}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#ff0000] px-6 text-sm font-semibold text-white shadow-sm transition-all duration-300 hover:bg-[#e60000] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <BadgeCheck className="h-4 w-4" />
-                  {isEntrySaving ? "Salvando..." : "Salvar"}
-                </button>
-              </div>
-            </form>
-          </div>
         </div>
       ) : null}
 
@@ -1449,6 +1334,12 @@ export default function ObrasAdminPage() {
                 <div className="text-sm font-semibold text-slate-900">Insumos</div>
                 <div className="mt-1 text-xs text-slate-500">Tabela de compras, entregas e custos.</div>
               </div>
+
+              {targetsError ? (
+                <div className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200/70">
+                  {targetsError}
+                </div>
+              ) : null}
               <div className="flex items-center gap-2">
                 <div className="text-xs text-slate-500">
                   {isMaterialsLoading ? "Atualizando..." : `${materials.length} itens`}
@@ -1561,6 +1452,53 @@ export default function ObrasAdminPage() {
                     <tr>
                       <td className="px-5 py-8 text-sm text-slate-600" colSpan={6}>
                         Nenhum insumo cadastrado.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mt-6 overflow-x-auto rounded-2xl bg-white ring-1 ring-slate-200/70">
+              <table className="min-w-full border-separate border-spacing-0">
+                <thead>
+                  <tr className="bg-slate-50">
+                    <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Colaborador</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide text-slate-700">Função</th>
+                    <th className="px-5 py-3 text-right text-xs font-semibold tracking-wide text-slate-700">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {workers.length > 0 ? (
+                    workers.map((w, idx) => (
+                      <tr
+                        key={w.id}
+                        className={"border-t border-slate-100 " + (idx % 2 === 1 ? "bg-slate-50/50" : "bg-white")}
+                      >
+                        <td className="px-5 py-4">
+                          <div className="text-sm font-semibold text-slate-900">{w.full_name}</div>
+                          <div className="mt-1 text-xs text-slate-500">{w.active ? "Ativo" : "Inativo"}</div>
+                        </td>
+                        <td className="px-5 py-4 text-sm text-slate-700">{w.role}</td>
+                        <td className="px-5 py-4">
+                          <div className="flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => void deleteWorker(w.id)}
+                              className="inline-flex h-9 items-center justify-center rounded-xl bg-red-50 px-3 text-xs font-semibold text-red-700 ring-1 ring-red-200/70 transition-all duration-300 hover:bg-red-100"
+                              title="Excluir"
+                              aria-label="Excluir"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td className="px-5 py-8 text-sm text-slate-600" colSpan={3}>
+                        Nenhum colaborador cadastrado.
                       </td>
                     </tr>
                   )}
@@ -2305,17 +2243,39 @@ export default function ObrasAdminPage() {
             </div>
 
             <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const prefix = `[${sectorLabel(entryForm.sector)}] `;
+              onSubmit={async (e) => {
+                const prefix =
+                  entryForm.sector === "fundacao"
+                    ? "[Fundação] "
+                    : entryForm.sector === "alvenaria"
+                      ? "[Alvenaria] "
+                      : "[Elétrica] ";
                 const nextNotes = String(entryForm.notes ?? "").trim();
-                setEntryForm((s) => ({ ...s, notes: prefix + nextNotes }));
-                void addEntry(e);
-                setIsEntryModalOpen(false);
+                const next = prefix + nextNotes;
+                setEntryForm((s) => ({ ...s, notes: next }));
+                const ok = await addEntry(e);
+                if (ok) setIsEntryModalOpen(false);
               }}
               className="px-6 py-6"
             >
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <label className="flex flex-col gap-2 md:col-span-2">
+                  <span className="text-xs font-semibold tracking-wide text-slate-600">Destino (opcional)</span>
+                  <select
+                    value={entryForm.target}
+                    onChange={(e) => setEntryForm((s) => ({ ...s, target: e.target.value }))}
+                    className="h-11 rounded-xl bg-white px-3 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
+                  >
+                    <option value="">Sem vínculo</option>
+                    {targets.map((t) => (
+                      <option key={t.key} value={t.key}>
+                        {t.type === "property" ? "Imóvel: " : "Empreendimento: "}
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
                 <label className="flex flex-col gap-2 md:col-span-2">
                   <span className="text-xs font-semibold tracking-wide text-slate-600">Setor</span>
                   <select
@@ -2337,12 +2297,14 @@ export default function ObrasAdminPage() {
                     className="h-11 rounded-xl bg-white px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#001f3f]/15"
                     required
                   >
-                    {workers.length > 0 ? (
-                      workers.map((w) => (
-                        <option key={w.id} value={w.id}>
-                          {w.full_name}
-                        </option>
-                      ))
+                    {workers.filter((w) => w.active).length > 0 ? (
+                      workers
+                        .filter((w) => w.active)
+                        .map((w) => (
+                          <option key={w.id} value={w.id}>
+                            {w.full_name}
+                          </option>
+                        ))
                     ) : (
                       <option value="">Sem colaboradores</option>
                     )}
