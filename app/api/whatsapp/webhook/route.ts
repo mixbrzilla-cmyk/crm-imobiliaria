@@ -1,22 +1,98 @@
 import { NextResponse } from "next/server";
 
-import { getSupabaseClient } from "@/lib/supabaseClient";
-import { normalizeZApiWebhookPayload, verifyWhatsappWebhookClientKey } from "@/lib/whatsapp";
+import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
 
-async function loadWhatsappSettings(supabase: any) {
-  try {
-    const res = await supabase
-      .from("whatsapp_settings")
-      .select("instance_id, token, client_key, webhook_url")
-      .limit(1)
-      .maybeSingle();
-    if (res.error) return null;
-    return res.data ?? null;
-  } catch {
-    return null;
-  }
+function safeString(value: unknown) {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  return null;
+}
+
+function normalizeEventName(raw: unknown) {
+  const v = safeString(raw);
+  if (!v) return null;
+  const upper = v.replace(/[.\-\s]+/g, "_").toUpperCase();
+  return upper;
+}
+
+function jidToPhone(jid: string | null) {
+  const raw = String(jid ?? "");
+  const beforeAt = raw.includes("@") ? raw.split("@")[0] : raw;
+  const digits = beforeAt.replace(/\D+/g, "").trim();
+  return digits || null;
+}
+
+function extractTextFromMessage(message: any) {
+  const direct = safeString(message?.conversation);
+  if (direct) return direct;
+  const ext = safeString(message?.extendedTextMessage?.text);
+  if (ext) return ext;
+  const imgCap = safeString(message?.imageMessage?.caption);
+  if (imgCap) return imgCap;
+  const vidCap = safeString(message?.videoMessage?.caption);
+  if (vidCap) return vidCap;
+  return "";
+}
+
+function normalizeEvolutionWebhookPayload(payload: any) {
+  if (!payload || typeof payload !== "object") return null;
+
+  const event = normalizeEventName(payload?.event ?? payload?.type ?? payload?.data?.event);
+  if (event && event !== "MESSAGES_UPSERT") return null;
+
+  const data = payload?.data ?? payload;
+  const msgContainer = data?.messages ?? data?.message ?? data;
+  const msg = Array.isArray(msgContainer) ? msgContainer[0] : msgContainer;
+
+  const key = msg?.key ?? data?.key ?? {};
+  const remoteJid = safeString(key?.remoteJid) ?? safeString(data?.remoteJid);
+  const fromMe = Boolean(key?.fromMe ?? data?.fromMe);
+  const message = msg?.message ?? data?.message ?? msg;
+
+  const phone = jidToPhone(remoteJid);
+  if (!phone) return null;
+
+  const timestampRaw = safeString(msg?.messageTimestamp ?? data?.messageTimestamp ?? msg?.timestamp ?? data?.timestamp);
+  const iso = timestampRaw && /^\d+$/.test(timestampRaw)
+    ? new Date(Number(timestampRaw) * 1000).toISOString()
+    : timestampRaw || new Date().toISOString();
+
+  const text = extractTextFromMessage(message);
+  if (!text) return null;
+
+  return {
+    threadExternalId: phone,
+    fromNumber: fromMe ? null : phone,
+    toNumber: fromMe ? phone : null,
+    messageText: text,
+    timestamp: iso,
+    contactName: safeString(data?.pushName ?? data?.senderName ?? msg?.pushName ?? msg?.senderName) ?? null,
+    direction: fromMe ? ("out" as const) : ("in" as const),
+    raw: payload,
+  };
+}
+
+function getServiceSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE ||
+    process.env.SUPABASE_SERVICE_KEY;
+
+  if (!url || !serviceKey) return null;
+
+  return createClient(url, serviceKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+    db: {
+      schema: "public",
+    },
+  });
 }
 
 function normalizeWhatsapp(value: string | null) {
@@ -98,39 +174,16 @@ async function insertMessage(args: {
 }
 
 export async function POST(req: Request) {
-  const supabase = getSupabaseClient();
+  const supabase = getServiceSupabase();
   if (!supabase) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
-      },
-      { status: 500 },
-    );
+    return NextResponse.json({ ok: false, error: "Service role não configurada." }, { status: 500 });
   }
 
   const payload = await req.json().catch(() => null);
-  const normalized = normalizeZApiWebhookPayload(payload);
+  const normalized = normalizeEvolutionWebhookPayload(payload);
 
   if (!normalized) {
     return NextResponse.json({ ok: true, ignored: true });
-  }
-
-  const settings = await loadWhatsappSettings(supabase);
-
-  const receivedClientKey =
-    req.headers.get("x-client-key") ??
-    req.headers.get("client-key") ??
-    req.headers.get("clientkey") ??
-    req.headers.get("x-zapi-clientkey");
-
-  const allowed = verifyWhatsappWebhookClientKey({
-    expectedClientKey: settings?.client_key ?? null,
-    receivedClientKey,
-  });
-
-  if (!allowed) {
-    return NextResponse.json({ ok: false, error: "client_key inválido" }, { status: 401 });
   }
 
   const threadId = await ensureThread({
@@ -148,7 +201,7 @@ export async function POST(req: Request) {
     supabase,
     threadId,
     brokerId: null,
-    direction: "in",
+    direction: normalized.direction,
     fromNumber: normalized.fromNumber,
     toNumber: normalized.toNumber,
     messageText: normalized.messageText,

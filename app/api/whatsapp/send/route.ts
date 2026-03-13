@@ -1,22 +1,91 @@
 import { NextResponse } from "next/server";
 
-import { getSupabaseClient } from "@/lib/supabaseClient";
-import { sendZApiTextMessage } from "@/lib/whatsapp";
+import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
 
-async function loadWhatsappSettings(supabase: any) {
+function normalizeBaseUrl(url: string) {
+  const raw = String(url ?? "").trim();
+  return raw.replace(/\/+$/, "");
+}
+
+function toAbsoluteBaseUrl(input: string) {
+  const raw = normalizeBaseUrl(input);
+  if (!raw) return null;
   try {
-    const res = await supabase
-      .from("whatsapp_settings")
-      .select("instance_id, token, client_key, webhook_url")
-      .limit(1)
-      .maybeSingle();
-    if (res.error) return null;
-    return res.data ?? null;
+    return new URL(raw);
   } catch {
-    return null;
+    try {
+      return new URL(`http://${raw}`);
+    } catch {
+      return null;
+    }
   }
+}
+
+function getServiceSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE ||
+    process.env.SUPABASE_SERVICE_KEY;
+
+  if (!url || !serviceKey) return null;
+
+  return createClient(url, serviceKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+    db: {
+      schema: "public",
+    },
+  });
+}
+
+async function loadEvolutionSettings() {
+  const supabase = getServiceSupabase();
+  if (!supabase) {
+    return {
+      ok: false as const,
+      error:
+        "Service role não configurada. Defina SUPABASE_SERVICE_ROLE_KEY no ambiente do servidor para bypass do RLS.",
+    };
+  }
+
+  const res = await (supabase as any)
+    .from("whatsapp_settings")
+    .select("evolution_api_url, evolution_global_api_key, created_at")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (res.error) {
+    return { ok: false as const, error: res.error.message };
+  }
+
+  const apiUrl = String((res.data as any)?.evolution_api_url ?? "").trim();
+  const apiKey = String((res.data as any)?.evolution_global_api_key ?? "").trim();
+
+  if (!apiUrl || !apiKey) {
+    return {
+      ok: false as const,
+      error: "Evolution não configurada. Preencha URL e Global API Key no Painel WhatsApp.",
+    };
+  }
+
+  return { ok: true as const, apiUrl, apiKey, supabase };
+}
+
+function buildAuthHeaders(globalKey: string) {
+  return {
+    apikey: globalKey,
+    "x-api-key": globalKey,
+    "X-Api-Key": globalKey,
+    Authorization: `Bearer ${globalKey}`,
+    "Content-Type": "application/json",
+  } as Record<string, string>;
 }
 
 function normalizeWhatsapp(value: string) {
@@ -39,15 +108,9 @@ async function touchOwnerLastContact(supabase: any, phone: string, iso: string) 
 }
 
 export async function POST(req: Request) {
-  const supabase = getSupabaseClient();
-  if (!supabase) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "Supabase não configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
-      },
-      { status: 500 },
-    );
+  const settings = await loadEvolutionSettings();
+  if (!settings.ok) {
+    return NextResponse.json({ ok: false, error: settings.error }, { status: 500 });
   }
 
   const body = await req.json().catch(() => null);
@@ -61,27 +124,41 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "phone e message são obrigatórios" }, { status: 400 });
   }
 
-  const settings = await loadWhatsappSettings(supabase);
-  if (!settings?.instance_id || !settings?.token) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "Z-API não configurada. Preencha a tela de Configuração do WhatsApp.",
-      },
-      { status: 400 },
-    );
+  const baseUrl = toAbsoluteBaseUrl(settings.apiUrl);
+  if (!baseUrl) {
+    return NextResponse.json({ ok: false, error: "URL da Evolution inválida." }, { status: 400 });
   }
 
+  const instanceName = "boss_imob";
+  const headers = buildAuthHeaders(settings.apiKey);
+
   try {
-    const apiRes = await sendZApiTextMessage({
-      settings,
-      phone,
-      message,
+    const url = new URL(`/message/sendText/${instanceName}`, baseUrl).toString();
+    const res = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ number: normalizeWhatsapp(phone), text: message }),
+      cache: "no-store",
     });
+
+    const apiText = await res.text().catch(() => "");
+    let apiRes: any = null;
+    try {
+      apiRes = apiText ? JSON.parse(apiText) : null;
+    } catch {
+      apiRes = apiText;
+    }
+
+    if (!res.ok) {
+      return NextResponse.json(
+        { ok: false, error: `Falha ao enviar mensagem. HTTP ${res.status}. ${apiText}` },
+        { status: 502 },
+      );
+    }
 
     if (threadId) {
       try {
-        await supabase.from("chat_messages").insert({
+        await (settings as any).supabase.from("chat_messages").insert({
           id: crypto.randomUUID(),
           thread_id: threadId,
           broker_id: asBoss ? null : brokerId,
@@ -93,7 +170,7 @@ export async function POST(req: Request) {
           raw_payload: apiRes,
         });
 
-        await supabase
+        await (settings as any).supabase
           .from("chat_threads")
           .update({ last_message_at: new Date().toISOString() })
           .eq("id", threadId);
@@ -103,7 +180,7 @@ export async function POST(req: Request) {
     }
 
     try {
-      await touchOwnerLastContact(supabase, phone, new Date().toISOString());
+      await touchOwnerLastContact((settings as any).supabase, phone, new Date().toISOString());
     } catch {
       // silent
     }

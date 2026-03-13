@@ -771,6 +771,20 @@ export default function WhatsAppPanelClient() {
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter") return;
+                    const digits = search.replace(/\D+/g, "").trim();
+                    if (digits.length < 8) return;
+                    e.preventDefault();
+                    void (async () => {
+                      const id = await ensureThreadByPhone(digits);
+                      if (id) {
+                        await loadThreads();
+                        setSelectedThreadId(id);
+                        setSearch("");
+                      }
+                    })();
+                  }}
                   placeholder="Pesquisar ou iniciar nova conversa"
                   className="h-11 w-full rounded-2xl bg-slate-50 pl-10 pr-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:bg-white focus:ring-2 focus:ring-[#001f3f]/10"
                 />

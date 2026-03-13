@@ -154,7 +154,7 @@ function extractQrFromConnectResponse(payload: any) {
   return null;
 }
 
-export async function POST() {
+export async function POST(req: Request) {
   const settings = await loadEvolutionSettings();
   if (!settings.ok) {
     return NextResponse.json({ ok: false, error: settings.error }, { status: 500 });
@@ -204,6 +204,49 @@ export async function POST() {
     connectJson = null;
   }
 
+  const reqHeaders = req.headers;
+  const forwardedProto = reqHeaders.get("x-forwarded-proto");
+  const proto = forwardedProto ? String(forwardedProto).split(",")[0].trim() : "https";
+  const forwardedHost = reqHeaders.get("x-forwarded-host");
+  const host = forwardedHost ? String(forwardedHost).split(",")[0].trim() : reqHeaders.get("host");
+  const webhookUrl = host ? `${proto}://${host}/api/whatsapp/webhook` : null;
+
+  let webhookSet: any = null;
+  if (webhookUrl) {
+    const setUrl = new URL(`/webhook/set/${instanceName}`, baseUrl).toString();
+    const setRes = await fetch(setUrl, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        enabled: true,
+        url: webhookUrl,
+        webhookByEvents: true,
+        webhookBase64: true,
+        events: ["MESSAGES_UPSERT", "CONNECTION_UPDATE"],
+      }),
+      cache: "no-store",
+    }).catch(
+      (e: any) =>
+        ({ ok: false, status: 0, json: async () => null, text: async () => String(e?.message ?? e) }) as any,
+    );
+
+    const setText = await setRes.text().catch(() => "");
+    let setJson: any = null;
+    try {
+      setJson = setText ? JSON.parse(setText) : null;
+    } catch {
+      setJson = null;
+    }
+
+    webhookSet = {
+      url: webhookUrl,
+      status: (setRes as any)?.status ?? null,
+      ok: Boolean((setRes as any)?.ok),
+      json: setJson,
+      text: setJson ? null : setText?.slice(0, 2000) ?? null,
+    };
+  }
+
   let qrRaw = connectJson ? extractQrFromConnectResponse(connectJson) : null;
 
   // 3) fallback: fetch instances and try to extract QR
@@ -249,6 +292,7 @@ export async function POST() {
   return NextResponse.json({
     ok: true,
     instanceName,
+    webhookSet,
     create: {
       status: (createRes as any)?.status ?? null,
       ok: Boolean((createRes as any)?.ok),
