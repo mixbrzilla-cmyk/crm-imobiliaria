@@ -1,8 +1,8 @@
 export const revalidate = 0;
 export const dynamic = "force-dynamic";
 
-import WhatsAppConfigClient from "./WhatsAppConfigClient";
+import { redirect } from "next/navigation";
 
 export default function WhatsAppConfigPage() {
-  return <WhatsAppConfigClient />;
+  redirect("/admin/whatsapp");
 }

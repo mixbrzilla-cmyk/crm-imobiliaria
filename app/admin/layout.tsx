@@ -10,12 +10,11 @@ import {
   ClipboardList,
   Gavel,
   FileSignature,
-  Home,
   LayoutDashboard,
   Layers,
   MessageCircle,
-  Settings,
   Users,
+  Home,
 } from "lucide-react";
 
 export default function AdminLayout({
@@ -105,22 +104,14 @@ export default function AdminLayout({
           </Link>
 
           <Link
-            href="/admin/whatsapp-config"
-            onClick={() => setIsNavOpen(false)}
-            className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-100/90 transition-all duration-300 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff0000]/40"
-          >
-            <Settings className="h-4 w-4 text-slate-200/80 transition-all duration-300 group-hover:text-white" />
-            WhatsApp (Config)
-          </Link>
-
-          <Link
             href="/admin/imoveis"
             onClick={() => setIsNavOpen(false)}
             className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-100/90 transition-all duration-300 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff0000]/40"
           >
             <Layers className="h-4 w-4 text-slate-200/80 transition-all duration-300 group-hover:text-white" />
-            Inventário (Imóveis)
+            Inventário
           </Link>
+
           <Link
             href="/admin/empreendimentos"
             onClick={() => setIsNavOpen(false)}
@@ -129,6 +120,16 @@ export default function AdminLayout({
             <Building2 className="h-4 w-4 text-slate-200/80 transition-all duration-300 group-hover:text-white" />
             Empreendimentos
           </Link>
+
+          <Link
+            href="/admin/portais"
+            onClick={() => setIsNavOpen(false)}
+            className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-100/90 transition-all duration-300 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff0000]/40"
+          >
+            <Home className="h-4 w-4 text-slate-200/80 transition-all duration-300 group-hover:text-white" />
+            Central de Portais
+          </Link>
+
           <Link
             href="/admin/corretores"
             onClick={() => setIsNavOpen(false)}
@@ -143,7 +144,7 @@ export default function AdminLayout({
             className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-100/90 transition-all duration-300 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff0000]/40"
           >
             <ClipboardList className="h-4 w-4 text-slate-200/80 transition-all duration-300 group-hover:text-white" />
-            Leads/Atendimento
+            Leads
           </Link>
 
           <Link
@@ -161,7 +162,7 @@ export default function AdminLayout({
             className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-100/90 transition-all duration-300 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff0000]/40"
           >
             <Construction className="h-4 w-4 text-slate-200/80 transition-all duration-300 group-hover:text-white" />
-            Gastos da Imobiliária
+            Gastos
           </Link>
           <Link
             href="/admin/avaliacoes"
