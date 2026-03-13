@@ -691,15 +691,14 @@ export default function InventarioImoveisPage() {
   function OlxLogo({ className }: { className?: string }) {
     return (
       <svg viewBox="0 0 64 64" className={className} aria-hidden="true">
-        <circle cx="32" cy="32" r="30" fill="currentColor" />
         <text
           x="32"
-          y="38"
+          y="40"
           textAnchor="middle"
-          fontSize="22"
+          fontSize="26"
           fontFamily="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial"
           fontWeight="900"
-          fill="#ffffff"
+          fill="currentColor"
         >
           OLX
         </text>
@@ -710,15 +709,14 @@ export default function InventarioImoveisPage() {
   function ZapLogo({ className }: { className?: string }) {
     return (
       <svg viewBox="0 0 64 64" className={className} aria-hidden="true">
-        <circle cx="32" cy="32" r="30" fill="currentColor" />
         <text
           x="32"
-          y="38"
+          y="40"
           textAnchor="middle"
-          fontSize="22"
+          fontSize="26"
           fontFamily="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial"
           fontWeight="900"
-          fill="#ffffff"
+          fill="currentColor"
         >
           ZAP
         </text>
@@ -729,15 +727,14 @@ export default function InventarioImoveisPage() {
   function VivaLogo({ className }: { className?: string }) {
     return (
       <svg viewBox="0 0 64 64" className={className} aria-hidden="true">
-        <circle cx="32" cy="32" r="30" fill="currentColor" />
         <text
           x="32"
-          y="38"
+          y="40"
           textAnchor="middle"
-          fontSize="22"
+          fontSize="26"
           fontFamily="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial"
           fontWeight="900"
-          fill="#ffffff"
+          fill="currentColor"
         >
           VR
         </text>
@@ -753,6 +750,8 @@ export default function InventarioImoveisPage() {
     brandOnCls,
     brandRingOffCls,
     brandGlowCls,
+    iconOnCls,
+    iconOffCls,
     icon,
   }: {
     title: string;
@@ -762,13 +761,15 @@ export default function InventarioImoveisPage() {
     brandOnCls: string;
     brandRingOffCls: string;
     brandGlowCls: string;
+    iconOnCls: string;
+    iconOffCls: string;
     icon: React.ReactNode;
   }) {
     const cls = active
       ? `${brandOnCls} ring-1 ring-white/20 ${brandGlowCls}`
       : `bg-white ring-1 ${brandRingOffCls}`;
 
-    const iconCls = active ? "opacity-100" : "opacity-60 grayscale";
+    const iconCls = active ? iconOnCls : `${iconOffCls} opacity-70 grayscale`;
 
     return (
       <button
@@ -778,14 +779,14 @@ export default function InventarioImoveisPage() {
         title={title}
         aria-label={title}
         className={
-          "relative inline-flex h-10 w-10 items-center justify-center rounded-2xl transition-all duration-300 hover:-translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-80 " +
+          "relative inline-flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-300 hover:-translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-80 " +
           (syncing ? "animate-pulse" : "") +
           " " +
           cls +
           (active ? "" : " hover:bg-slate-50")
         }
       >
-        <span className={"inline-flex h-7 w-7 items-center justify-center " + iconCls}>{icon}</span>
+        <span className={"inline-flex h-8 w-8 items-center justify-center " + iconCls}>{icon}</span>
         {syncing ? (
           <span className="absolute inset-0 flex items-center justify-center rounded-2xl bg-white/35 backdrop-blur-sm">
             <Loader2 className="h-4 w-4 animate-spin text-slate-700" />
@@ -1424,7 +1425,7 @@ export default function InventarioImoveisPage() {
 
                     <div className="mt-4 rounded-2xl bg-white p-3 ring-1 ring-slate-200/70">
                       <div className="text-[10px] font-semibold tracking-wide text-slate-500">Status nos Portais</div>
-                      <div className="mt-2 flex flex-wrap items-center gap-3">
+                      <div className="mt-2 flex flex-wrap items-center justify-center gap-4">
                         <PortalIconButton
                           title="OLX"
                           active={olx}
@@ -1433,7 +1434,9 @@ export default function InventarioImoveisPage() {
                           brandOnCls="bg-gradient-to-r from-[#6E2594] to-[#8B2BD1]"
                           brandRingOffCls="ring-[rgba(110,37,148,0.22)]"
                           brandGlowCls="shadow-[0_0_22px_-12px_rgba(139,43,209,0.85)]"
-                          icon={<OlxLogo className="h-7 w-7 text-white" />}
+                          iconOnCls="text-white"
+                          iconOffCls="text-[#6E2594]"
+                          icon={<OlxLogo className="h-8 w-8" />}
                         />
                         <PortalIconButton
                           title="Zap Imóveis"
@@ -1443,7 +1446,9 @@ export default function InventarioImoveisPage() {
                           brandOnCls="bg-gradient-to-r from-[#0057FF] to-[#003CFF]"
                           brandRingOffCls="ring-[rgba(0,87,255,0.22)]"
                           brandGlowCls="shadow-[0_0_22px_-12px_rgba(0,87,255,0.85)]"
-                          icon={<ZapLogo className="h-7 w-7 text-white" />}
+                          iconOnCls="text-white"
+                          iconOffCls="text-[#0057FF]"
+                          icon={<ZapLogo className="h-8 w-8" />}
                         />
                         <PortalIconButton
                           title="Viva Real"
@@ -1453,7 +1458,9 @@ export default function InventarioImoveisPage() {
                           brandOnCls="bg-gradient-to-r from-[#00AEEF] to-[#0077C8]"
                           brandRingOffCls="ring-[rgba(0,174,239,0.22)]"
                           brandGlowCls="shadow-[0_0_22px_-12px_rgba(0,174,239,0.85)]"
-                          icon={<VivaLogo className="h-7 w-7 text-white" />}
+                          iconOnCls="text-white"
+                          iconOffCls="text-[#00AEEF]"
+                          icon={<VivaLogo className="h-8 w-8" />}
                         />
                       </div>
                     </div>
