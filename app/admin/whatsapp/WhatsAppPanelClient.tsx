@@ -44,20 +44,12 @@ type MessageRow = {
 };
 
 type WhatsappSettingsRow = {
-  instance_id: string | null;
-  token: string | null;
-  client_key: string | null;
-  webhook_url: string | null;
   evolution_api_url?: string | null;
   evolution_global_api_key?: string | null;
   created_at?: string;
 };
 
 type SettingsFormState = {
-  instance_id: string;
-  token: string;
-  client_key: string;
-  webhook_url: string;
   evolution_api_url: string;
   evolution_global_api_key: string;
 };
@@ -136,19 +128,11 @@ export default function WhatsAppPanelClient() {
   const [supportsSettingsTable, setSupportsSettingsTable] = useState(true);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [settingsForm, setSettingsForm] = useState<SettingsFormState>({
-    instance_id: "",
-    token: "",
-    client_key: "",
-    webhook_url: "",
     evolution_api_url: "",
     evolution_global_api_key: "",
   });
 
   const [evolutionTestMessage, setEvolutionTestMessage] = useState<string | null>(null);
-
-  const hasZapiConfig = useMemo(() => {
-    return Boolean(settingsForm.instance_id.trim() && settingsForm.token.trim());
-  }, [settingsForm.instance_id, settingsForm.token]);
 
   const testProfilesConnection = useCallback(
     async (context: string, error: unknown) => {
@@ -424,7 +408,7 @@ export default function WhatsAppPanelClient() {
       let res: any = await supabase
         .from("whatsapp_settings")
         .select(
-          "id, instance_id, token, client_key, webhook_url, evolution_api_url, evolution_global_api_key, created_at",
+          "id, evolution_api_url, evolution_global_api_key, created_at",
         )
         .order("created_at", { ascending: false })
         .limit(1)
@@ -433,7 +417,7 @@ export default function WhatsAppPanelClient() {
       if (res.error) {
         res = await supabase
           .from("whatsapp_settings")
-          .select("id, instance_id, token, client_key, webhook_url, created_at")
+          .select("id, created_at")
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -453,15 +437,12 @@ export default function WhatsAppPanelClient() {
       const row = (res.data ?? null) as WhatsappSettingsRow | null;
       if (row) {
         setSettingsForm({
-          instance_id: row.instance_id ?? "",
-          token: row.token ?? "",
-          client_key: row.client_key ?? "",
-          webhook_url: row.webhook_url ?? "",
           evolution_api_url: (row as any)?.evolution_api_url ?? "",
           evolution_global_api_key: (row as any)?.evolution_global_api_key ?? "",
         });
       } else {
-        setInfoMessage("Aguardando configuração da Z-API. Preencha as credenciais para habilitar envios.");
+        setSettingsForm({ evolution_api_url: "", evolution_global_api_key: "" });
+        setInfoMessage("Configure a Estação WhatsApp (Evolution API) para habilitar o gerenciador e testes de conexão.");
       }
       setSupportsSettingsTable(true);
     } catch {
@@ -482,10 +463,6 @@ export default function WhatsAppPanelClient() {
     try {
       const payload = {
         id: SETTINGS_ID,
-        instance_id: settingsForm.instance_id.trim() ? settingsForm.instance_id.trim() : null,
-        token: settingsForm.token.trim() ? settingsForm.token.trim() : null,
-        client_key: settingsForm.client_key.trim() ? settingsForm.client_key.trim() : null,
-        webhook_url: settingsForm.webhook_url.trim() ? settingsForm.webhook_url.trim() : null,
         evolution_api_url: settingsForm.evolution_api_url.trim() ? settingsForm.evolution_api_url.trim() : null,
         evolution_global_api_key: settingsForm.evolution_global_api_key.trim()
           ? settingsForm.evolution_global_api_key.trim()
@@ -496,20 +473,6 @@ export default function WhatsAppPanelClient() {
         setErrorMessage("Preencha a Global API Key da Estação WhatsApp.");
         setIsSavingSettings(false);
         return;
-      }
-
-      if (payload.instance_id && payload.token) {
-        const validateRes = await fetch("/api/whatsapp/validate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ instance_id: payload.instance_id, token: payload.token }),
-        });
-        const validateJson = await validateRes.json().catch(() => null);
-        if (!validateRes.ok || !validateJson?.ok) {
-          setErrorMessage(validateJson?.error ?? "Z-API não conectada. Verifique instance_id e token.");
-          setIsSavingSettings(false);
-          return;
-        }
       }
 
       const res = await (supabase as any)
@@ -878,12 +841,6 @@ export default function WhatsAppPanelClient() {
                       </div>
                     </div>
                   </div>
-                </div>
-              ) : null}
-
-              {supportsTables && !hasZapiConfig ? (
-                <div className="mb-4 rounded-2xl bg-slate-50 px-5 py-4 text-sm text-slate-700 ring-1 ring-slate-200/70">
-                  Aguardando configuração da Z-API.
                 </div>
               ) : null}
 
