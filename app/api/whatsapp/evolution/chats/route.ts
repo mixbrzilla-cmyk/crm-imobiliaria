@@ -198,7 +198,6 @@ export async function GET() {
           name: extractChatName(c),
           lastMessage: extractLastMessagePreview(c),
           avatarUrl: proxiedAvatarUrl(avatar),
-          raw: c,
         };
       })
       .filter(Boolean);
