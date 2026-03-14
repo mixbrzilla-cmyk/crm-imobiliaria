@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   Search,
@@ -182,6 +182,8 @@ export default function WhatsAppPanelClient() {
   >([]);
   const [isLoadingEvolutionMessages, setIsLoadingEvolutionMessages] = useState(false);
 
+  const currentEvolutionChatKeyRef = useRef<string>("");
+
   const [isResetting, setIsResetting] = useState(false);
   const [resetMessage, setResetMessage] = useState<string | null>(null);
 
@@ -311,7 +313,10 @@ export default function WhatsAppPanelClient() {
   const loadEvolutionMessages = useCallback(async (phone: string) => {
     const normalized = String(phone ?? "").replace(/\D+/g, "").trim();
     if (!normalized) return;
-    if (isLoadingEvolutionMessages) return;
+
+    const requestKey = `evo:${normalized}`;
+    currentEvolutionChatKeyRef.current = requestKey;
+
     setIsLoadingEvolutionMessages(true);
     try {
       const res = await fetch(`/api/whatsapp/evolution/messages?phone=${encodeURIComponent(normalized)}`, {
@@ -320,6 +325,11 @@ export default function WhatsAppPanelClient() {
         cache: "no-store",
       });
       const json = await res.json().catch(() => null);
+
+      if (currentEvolutionChatKeyRef.current !== requestKey) {
+        return;
+      }
+
       if (!res.ok || !json?.ok) {
         setEvolutionMessages([]);
         return;
@@ -336,11 +346,16 @@ export default function WhatsAppPanelClient() {
           .filter((m: any) => Boolean(m.message)),
       );
     } catch {
+      if (currentEvolutionChatKeyRef.current !== requestKey) {
+        return;
+      }
       setEvolutionMessages([]);
     } finally {
-      setIsLoadingEvolutionMessages(false);
+      if (currentEvolutionChatKeyRef.current === requestKey) {
+        setIsLoadingEvolutionMessages(false);
+      }
     }
-  }, [isLoadingEvolutionMessages]);
+  }, []);
 
   const checkEvolutionWebhook = useCallback(async () => {
     setErrorMessage(null);
@@ -1006,6 +1021,7 @@ export default function WhatsAppPanelClient() {
     setDraft("");
     setMessages([]);
     setEvolutionMessages([]);
+    currentEvolutionChatKeyRef.current = activeChatKey;
   }, [activeChatKey]);
 
   useEffect(() => {

@@ -116,6 +116,14 @@ function extractAvatarUrl(chat: any) {
   return null;
 }
 
+function proxiedAvatarUrl(avatarUrl: string | null) {
+  const raw = safeString(avatarUrl);
+  if (!raw) return null;
+  if (raw.startsWith("data:image/")) return raw;
+  if (!raw.startsWith("http")) return null;
+  return `/api/whatsapp/evolution/avatar?url=${encodeURIComponent(raw)}`;
+}
+
 export async function GET() {
   const envApiUrl = String(
     process.env.EVOLUTION_API_URL ??
@@ -184,11 +192,12 @@ export async function GET() {
       .map((c: any) => {
         const number = extractChatNumber(c);
         if (!number) return null;
+        const avatar = extractAvatarUrl(c);
         return {
           number,
           name: extractChatName(c),
           lastMessage: extractLastMessagePreview(c),
-          avatarUrl: extractAvatarUrl(c),
+          avatarUrl: proxiedAvatarUrl(avatar),
           raw: c,
         };
       })
