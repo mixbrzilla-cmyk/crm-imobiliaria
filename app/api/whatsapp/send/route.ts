@@ -137,6 +137,16 @@ function normalizeWhatsapp(value: string) {
     .trim();
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function randomInt(min: number, max: number) {
+  const a = Math.ceil(min);
+  const b = Math.floor(max);
+  return Math.floor(Math.random() * (b - a + 1)) + a;
+}
+
 async function touchOwnerLastContact(supabase: any, phone: string, iso: string) {
   const normalized = normalizeWhatsapp(phone);
   if (!normalized) return;
@@ -176,6 +186,7 @@ export async function POST(req: Request) {
   const headers = buildAuthHeaders(settings.apiKey);
 
   try {
+    await sleep(randomInt(3000, 8000));
     const url = new URL(`/message/sendText/${instanceName}`, baseUrl).toString();
     const res = await fetch(url, {
       method: "POST",

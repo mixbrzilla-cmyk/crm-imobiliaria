@@ -41,6 +41,8 @@ type MessageRow = {
 type WhatsappSettingsRow = {
   evolution_api_url?: string | null;
   evolution_global_api_key?: string | null;
+  evolution_instance_is_open?: boolean | null;
+  evolution_instance_state?: string | null;
   created_at?: string;
 };
 
@@ -241,15 +243,40 @@ export default function WhatsAppPanelClient() {
       }
 
       const rows = Array.isArray(json?.chats) ? json.chats : [];
+      const normalized = rows
+        .map((c: any) => ({
+          number: String(c?.number ?? "").replace(/\D+/g, "").trim(),
+          name: c?.name ? String(c.name) : null,
+          lastMessage: c?.lastMessage ? String(c.lastMessage) : null,
+          avatarUrl: c?.avatarUrl ? String(c.avatarUrl) : null,
+        }))
+        .filter((c: any) => Boolean(c.number));
+
+      const needsName = normalized.filter((c: any) => !String(c?.name ?? "").trim()).map((c: any) => c.number);
+
+      let namesByNumber: Record<string, string> = {};
+      if (needsName.length > 0) {
+        try {
+          const r = await fetch("/api/whatsapp/leads/resolve-names", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ numbers: needsName.slice(0, 250) }),
+          });
+          const j = await r.json().catch(() => null);
+          if (r.ok && j?.ok && j?.namesByNumber && typeof j.namesByNumber === "object") {
+            namesByNumber = j.namesByNumber as Record<string, string>;
+          }
+        } catch {
+          // silent
+        }
+      }
+
       setEvolutionChats(
-        rows
-          .map((c: any) => ({
-            number: String(c?.number ?? "").replace(/\D+/g, "").trim(),
-            name: c?.name ? String(c.name) : null,
-            lastMessage: c?.lastMessage ? String(c.lastMessage) : null,
-            avatarUrl: c?.avatarUrl ? String(c.avatarUrl) : null,
-          }))
-          .filter((c: any) => Boolean(c.number)),
+        normalized.map((c: any) => {
+          const leadName = namesByNumber[c.number];
+          const name = String(c?.name ?? "").trim() ? c.name : leadName ? leadName : null;
+          return { ...c, name };
+        }),
       );
     } catch {
       setEvolutionChats([]);
@@ -291,26 +318,6 @@ export default function WhatsAppPanelClient() {
       setIsLoadingEvolutionMessages(false);
     }
   }, [isLoadingEvolutionMessages]);
-
-  useEffect(() => {
-    if (!selectedEvolutionChat?.number) return;
-    if (evolutionIsOpen !== true) return;
-
-    let cancelled = false;
-    const tick = async () => {
-      if (cancelled) return;
-      await loadEvolutionMessages(selectedEvolutionChat.number);
-    };
-
-    const t = setInterval(() => {
-      void tick();
-    }, 5000);
-
-    return () => {
-      cancelled = true;
-      clearInterval(t);
-    };
-  }, [evolutionIsOpen, loadEvolutionMessages, selectedEvolutionChat?.number]);
 
   const checkEvolutionWebhook = useCallback(async () => {
     setErrorMessage(null);
@@ -645,7 +652,7 @@ export default function WhatsAppPanelClient() {
       let res: any = await supabase
         .from("whatsapp_settings")
         .select(
-          "id, evolution_api_url, evolution_global_api_key, created_at",
+          "id, evolution_api_url, evolution_global_api_key, evolution_instance_is_open, evolution_instance_state, created_at",
         )
         .order("created_at", { ascending: false })
         .limit(1)
@@ -680,6 +687,11 @@ export default function WhatsAppPanelClient() {
           evolution_api_url: (row as any)?.evolution_api_url ?? "",
           evolution_global_api_key: (row as any)?.evolution_global_api_key ?? "",
         });
+
+        if (typeof (row as any)?.evolution_instance_is_open === "boolean") {
+          setEvolutionIsOpen(Boolean((row as any).evolution_instance_is_open));
+        }
+        setEvolutionState((row as any)?.evolution_instance_state ? String((row as any).evolution_instance_state) : null);
       } else {
         setSettingsRowId(null);
         setSettingsForm({ evolution_api_url: "", evolution_global_api_key: "" });
@@ -690,6 +702,36 @@ export default function WhatsAppPanelClient() {
       setSupportsSettingsTable(false);
     }
   }, [supabase]);
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    const channel = (supabase as any)
+      .channel("admin-whatsapp-settings-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "whatsapp_settings" },
+        (payload: any) => {
+          const row = (payload?.new ?? payload?.record ?? null) as any;
+          if (!row) return;
+          if (typeof row?.evolution_instance_is_open === "boolean") setEvolutionIsOpen(Boolean(row.evolution_instance_is_open));
+          setEvolutionState(row?.evolution_instance_state ? String(row.evolution_instance_state) : null);
+
+          if (row?.evolution_instance_is_open === true) {
+            void syncEvolutionChats();
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      try {
+        void (supabase as any).removeChannel(channel);
+      } catch {
+        // ignore
+      }
+    };
+  }, [supabase, syncEvolutionChats]);
 
   const saveSettings = useCallback(async () => {
     setErrorMessage(null);
@@ -812,47 +854,7 @@ export default function WhatsAppPanelClient() {
       setIsPollingPairStatus(false);
       return;
     }
-
-    let cancelled = false;
-    let timer: any = null;
-
-    async function tick() {
-      if (cancelled) return;
-      setIsPollingPairStatus(true);
-      try {
-        const res = await fetch("/api/whatsapp/evolution/status", {
-          method: "GET",
-          headers: { "Content-Type": "application/json" },
-          cache: "no-store",
-        });
-        const json = await res.json().catch(() => null);
-        if (!cancelled && json) {
-          setPairConnectionState(json?.state ? String(json.state) : null);
-
-          if (json?.isOpen) {
-            setIsPairOpen(false);
-            setPairQrDataUrl(null);
-            setPairInstanceName(null);
-            setPairConnectionState(null);
-            setIsPollingPairStatus(false);
-            return;
-          }
-        }
-      } catch {
-        // silent
-      }
-
-      if (!cancelled) {
-        timer = setTimeout(tick, 2500);
-      }
-    }
-
-    timer = setTimeout(tick, 800);
-
-    return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-    };
+    setIsPollingPairStatus(false);
   }, [isPairOpen]);
 
   const resetEvolutionInstance = useCallback(async () => {
@@ -970,39 +972,10 @@ export default function WhatsAppPanelClient() {
   }, [loadBrokers, loadSettings, loadThreads]);
 
   useEffect(() => {
-    let cancelled = false;
-    let timer: any = null;
-
-    async function poll() {
-      if (cancelled) return;
-      try {
-        const res = await fetch("/api/whatsapp/evolution/status", {
-          method: "GET",
-          headers: { "Content-Type": "application/json" },
-          cache: "no-store",
-        });
-        const json = await res.json().catch(() => null);
-        if (cancelled || !json) return;
-        if (typeof json?.isOpen === "boolean") setEvolutionIsOpen(Boolean(json.isOpen));
-        setEvolutionState(json?.state ? String(json.state) : null);
-
-        if (json?.isOpen === true) {
-          void syncEvolutionChats();
-        }
-      } catch {
-        // silent
-      }
-
-      timer = setTimeout(poll, 8000);
+    if (evolutionIsOpen) {
+      void syncEvolutionChats();
     }
-
-    void poll();
-
-    return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-    };
-  }, [syncEvolutionChats]);
+  }, [evolutionIsOpen, syncEvolutionChats]);
 
   useEffect(() => {
     if (!selectedThreadId) return;
@@ -1124,7 +1097,13 @@ export default function WhatsAppPanelClient() {
                     .slice(0, 200)
                     .map((c) => {
                       const isActive = selectedEvolutionChat?.number === c.number;
-                      const title = c.name && c.name.trim() ? c.name.trim() : "Contato";
+                      const leadMatch = ownerByWhatsapp[c.number] ?? null;
+                      const title =
+                        c.name && c.name.trim()
+                          ? c.name.trim()
+                          : leadMatch?.title
+                            ? leadMatch.title
+                            : "Contato";
                       return (
                         <button
                           key={c.number}
@@ -1132,6 +1111,7 @@ export default function WhatsAppPanelClient() {
                           onClick={() => {
                             setSelectedThreadId(null);
                             setEvolutionMessages([]);
+                            setDraft("");
                             setSelectedEvolutionChat(c);
                             void loadEvolutionMessages(c.number);
                           }}

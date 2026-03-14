@@ -72,6 +72,9 @@ function normalizeEvolutionWebhookPayload(payload: any): EvolutionWebhookEvent |
   const fromMe = Boolean(key?.fromMe ?? data?.fromMe);
   const message = msg?.message ?? data?.message ?? msg;
 
+  // Ignore groups to reduce noise and protect the chip
+  if (remoteJid && remoteJid.includes("@g.us")) return null;
+
   const phone = jidToPhone(remoteJid);
   if (!phone) return null;
 
@@ -280,6 +283,23 @@ async function ensureThread(args: {
   }
 }
 
+async function refreshThreadContactName(args: {
+  supabase: any;
+  threadExternalId: string;
+  contactName: string | null;
+}) {
+  const name = safeString(args.contactName)?.trim() ?? "";
+  if (!name) return;
+  try {
+    await args.supabase
+      .from("chat_threads")
+      .update({ contact_name: name })
+      .eq("external_id", args.threadExternalId);
+  } catch {
+    // silent
+  }
+}
+
 async function insertMessage(args: {
   supabase: any;
   threadId: string;
@@ -360,6 +380,12 @@ export async function POST(req: Request) {
     supabase,
     threadExternalId: msg.threadExternalId,
     contactNumber: msg.fromNumber,
+    contactName: msg.contactName,
+  });
+
+  await refreshThreadContactName({
+    supabase,
+    threadExternalId: msg.threadExternalId,
     contactName: msg.contactName,
   });
 

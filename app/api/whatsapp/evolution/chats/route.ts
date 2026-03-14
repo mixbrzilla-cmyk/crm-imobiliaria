@@ -65,6 +65,7 @@ function extractChatNumber(chat: any) {
     safeString(chat?.contact?.id) ||
     safeString(chat?.contact?.jid) ||
     null;
+  if (jid && String(jid).includes("@g.us")) return null;
   return jidToPhone(jid);
 }
 
