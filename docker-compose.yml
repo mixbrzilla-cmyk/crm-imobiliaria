@@ -1,0 +1,89 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: crm_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-crm}
+      POSTGRES_USER: ${POSTGRES_USER:-crm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crm}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - crm_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: crm_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - crm_net
+
+  evolution:
+    image: atendai/evolution-api:latest
+    container_name: crm_evolution
+    restart: unless-stopped
+    environment:
+      AUTHENTICATION_TYPE: apikey
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
+      SERVER_PORT: 8080
+    ports:
+      - "8080:8080"
+    volumes:
+      - evolution_instances:/evolution/instances
+    networks:
+      - crm_net
+
+  crm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: crm_app
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - redis
+      - evolution
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+
+      # Supabase (se você ainda usar Supabase para auth/realtime)
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+
+      # Evolution (rede interna docker)
+      EVOLUTION_API_URL: http://evolution:8080
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
+      EVOLUTION_GLOBAL_API_KEY: ${EVOLUTION_API_KEY}
+      EVOLUTION_INSTANCE_API_KEY: ${EVOLUTION_API_KEY}
+
+      # Banco interno (caso vá migrar do Supabase)
+      DATABASE_URL: postgresql://${POSTGRES_USER:-crm}:${POSTGRES_PASSWORD:-crm}@postgres:5432/${POSTGRES_DB:-crm}
+      REDIS_URL: redis://redis:6379
+
+      # Para o endpoint de ensure webhook conseguir inferir URL pública (ajuste para seu domínio/IP)
+      NEXT_PUBLIC_SITE_URL: ${SITE_URL:-http://187.77.240.10:3000}
+      SITE_URL: ${SITE_URL:-http://187.77.240.10:3000}
+
+    ports:
+      - "3000:3000"
+    networks:
+      - crm_net
+
+networks:
+  crm_net:
+    name: crm_net
+
+volumes:
+  postgres_data:
+  redis_data:
+  evolution_instances:
