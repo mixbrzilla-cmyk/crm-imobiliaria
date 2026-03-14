@@ -70,7 +70,7 @@ function extractChatNumber(chat: any) {
 }
 
 function extractChatName(chat: any) {
-  return (
+  const raw = (
     safeString(chat?.name) ||
     safeString(chat?.profileName) ||
     safeString(chat?.profile_name) ||
@@ -81,6 +81,11 @@ function extractChatName(chat: any) {
     safeString(chat?.contact?.pushName) ||
     null
   );
+
+  const cleaned = String(raw ?? "").trim();
+  if (!cleaned) return null;
+  if (/^\d+$/.test(cleaned)) return null;
+  return cleaned;
 }
 
 function extractLastMessagePreview(chat: any) {

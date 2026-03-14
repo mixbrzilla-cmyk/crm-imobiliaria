@@ -89,6 +89,29 @@ function initials(name: string | null) {
   return (first + last).toUpperCase();
 }
 
+function avatarColorClass(seed: string) {
+  const s = String(seed ?? "");
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  const palette = [
+    "bg-slate-900",
+    "bg-emerald-600",
+    "bg-indigo-600",
+    "bg-rose-600",
+    "bg-amber-600",
+    "bg-sky-600",
+  ];
+  return palette[h % palette.length] ?? "bg-slate-900";
+}
+
+function fallbackAvatarText(name: string | null, number: string) {
+  const n = String(name ?? "").trim();
+  if (n) return initials(n);
+  const digits = String(number ?? "").replace(/\D+/g, "");
+  if (digits.length >= 2) return digits.slice(-2);
+  return "?";
+}
+
 export default function WhatsAppPanelClient() {
   const supabase = useMemo(() => getSupabaseClient(), []);
 
@@ -971,6 +994,20 @@ export default function WhatsAppPanelClient() {
     return () => clearTimeout(t);
   }, [loadBrokers, loadSettings, loadThreads]);
 
+  const activeChatKey = useMemo(() => {
+    if (selectedThreadId) return `thread:${selectedThreadId}`;
+    const num = String(selectedEvolutionChat?.number ?? "").replace(/\D+/g, "").trim();
+    if (num) return `evo:${num}`;
+    return "";
+  }, [selectedEvolutionChat?.number, selectedThreadId]);
+
+  useEffect(() => {
+    if (!activeChatKey) return;
+    setDraft("");
+    setMessages([]);
+    setEvolutionMessages([]);
+  }, [activeChatKey]);
+
   useEffect(() => {
     if (evolutionIsOpen) {
       void syncEvolutionChats();
@@ -1129,8 +1166,13 @@ export default function WhatsAppPanelClient() {
                               className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-slate-200/70"
                             />
                           ) : (
-                            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-900 text-xs font-semibold text-white">
-                              {initials(title)}
+                            <div
+                              className={
+                                "grid h-10 w-10 shrink-0 place-items-center rounded-full text-xs font-semibold text-white " +
+                                avatarColorClass(c.number)
+                              }
+                            >
+                              {fallbackAvatarText(title, c.number)}
                             </div>
                           )}
 
