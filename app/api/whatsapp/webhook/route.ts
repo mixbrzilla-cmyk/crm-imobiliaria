@@ -330,98 +330,62 @@ async function insertMessage(args: {
 }
 
 export async function POST(req: Request) {
-  const supabase = getServiceSupabase();
-  if (!supabase) {
-    return NextResponse.json({ ok: false, error: "Service role não configurada." }, { status: 500 });
-  }
-
-  const payload = await req.json().catch(() => null);
-  const normalized = normalizeEvolutionWebhookPayload(payload);
-
-  if (!normalized) {
-    return NextResponse.json({ ok: true, ignored: true });
-  }
-
-  if (normalized.kind === "event") {
-    try {
-      const instanceName = extractEvolutionInstanceFromWebhook(payload);
-      const state = extractEvolutionStateFromWebhook(payload);
-      const instanceApiKey = extractEvolutionInstanceApiKeyFromWebhook(payload);
-
-      if (instanceName || state || instanceApiKey) {
-        await persistEvolutionConnectionStatusFromWebhook({
-          supabase,
-          instanceName,
-          state,
-          instanceApiKey,
-        });
-      }
-    } catch {
-      // silent
-    }
-
-    try {
-      console.log("[WhatsApp Webhook] CONNECTION_UPDATE/other event:", {
-        event: normalized.event,
-        instance: payload?.instance ?? payload?.data?.instance ?? payload?.data?.instanceName ?? null,
-        status: payload?.data?.state ?? payload?.data?.status ?? payload?.data?.connection ?? payload?.data?.connectionState ?? null,
-      });
-    } catch {
-      // silent
-    }
-
-    return NextResponse.json({ ok: true, event: normalized.event, ignored: true });
-  }
-
-  // From here on it's a message payload
-  const msg = normalized;
-
-  const threadId = await ensureThread({
-    supabase,
-    threadExternalId: msg.threadExternalId,
-    contactNumber: msg.fromNumber,
-    contactName: msg.contactName,
-  });
-
-  await refreshThreadContactName({
-    supabase,
-    threadExternalId: msg.threadExternalId,
-    contactName: msg.contactName,
-  });
-
-  if (!threadId) {
-    return NextResponse.json({ ok: true, degraded: true });
-  }
-
-  const inserted = await insertMessage({
-    supabase,
-    threadId,
-    brokerId: null,
-    direction: msg.direction,
-    fromNumber: msg.fromNumber,
-    toNumber: msg.toNumber,
-    messageText: msg.messageText,
-    timestamp: msg.timestamp,
-    raw: msg.raw,
-  });
-
   try {
-    const phone = normalizeWhatsapp(msg.fromNumber) || normalizeWhatsapp(msg.toNumber);
-    if (phone) {
-      await touchOwnerLastContact(supabase, phone, msg.timestamp);
+    const supabase = getServiceSupabase();
+    if (!supabase) {
+      return NextResponse.json({ ok: false, error: "Service role não configurada." }, { status: 500 });
     }
-  } catch {
-    // silent
-  }
 
-  try {
-    await supabase
+    const body = await req.json();
+    if (body?.event !== "MESSAGES_UPSERT") return NextResponse.json({ ok: true });
+
+    const data = body.data;
+    const phone = String(data?.key?.remoteJid ?? "").split("@")[0];
+    const name = data?.pushName || "Lead WhatsApp";
+    const content = data?.message?.conversation || data?.message?.extendedTextMessage?.text || "";
+
+    if (!content) return NextResponse.json({ ok: true });
+
+    const { data: contact, error: cErr } = await (supabase as any)
+      .from("contacts")
+      .upsert({ phone, name }, { onConflict: "phone" })
+      .select()
+      .single();
+    if (cErr) throw cErr;
+
+    let { data: thread } = await (supabase as any)
       .from("chat_threads")
-      .update({ last_message_at: new Date().toISOString() })
-      .eq("id", threadId);
-  } catch {
-    // silent
-  }
+      .select("id")
+      .eq("contact_id", contact.id)
+      .maybeSingle();
 
-  return NextResponse.json({ ok: true, inserted });
+    if (!thread) {
+      const { data: nt, error: tErr } = await (supabase as any)
+        .from("chat_threads")
+        .insert({
+          contact_id: contact.id,
+          status: "open",
+          customer_phone: phone,
+          contact_name: name,
+        })
+        .select()
+        .single();
+      if (tErr) throw tErr;
+      thread = nt;
+    }
+
+    const { error: mErr } = await (supabase as any).from("chat_messages").insert({
+      thread_id: thread.id,
+      message: content,
+      direction: "in",
+      from_number: phone,
+      sent_at: new Date().toISOString(),
+    });
+    if (mErr) throw mErr;
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("[ERRO_CRITICO_WEBHOOK]:", err);
+    return NextResponse.json({ error: "Internal Error" }, { status: 500 });
+  }
 }

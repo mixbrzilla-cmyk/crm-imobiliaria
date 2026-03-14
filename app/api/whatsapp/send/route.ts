@@ -137,6 +137,36 @@ function normalizeWhatsapp(value: string) {
     .trim();
 }
 
+async function ensureThreadForPhone(supabase: any, phone: string) {
+  const normalized = normalizeWhatsapp(phone);
+  if (!normalized) return null;
+
+  try {
+    const existing = await (supabase as any)
+      .from("chat_threads")
+      .select("id")
+      .eq("external_id", normalized)
+      .maybeSingle();
+
+    if (!existing.error && existing.data?.id) return String(existing.data.id);
+
+    const id = crypto.randomUUID();
+    const insert = await (supabase as any).from("chat_threads").insert({
+      id,
+      external_id: normalized,
+      contact_number: normalized,
+      contact_name: null,
+      status: "active",
+      last_message_at: new Date().toISOString(),
+    });
+
+    if (insert.error) return null;
+    return id;
+  } catch {
+    return null;
+  }
+}
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -192,7 +222,7 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const phone = (body?.phone ?? "").toString().trim();
   const message = (body?.message ?? "").toString();
-  const threadId = (body?.thread_id ?? "").toString().trim();
+  const threadIdRaw = (body?.thread_id ?? "").toString().trim();
   const brokerId = body?.broker_id ? String(body.broker_id) : null;
   const asBoss = Boolean(body?.as_boss);
 
@@ -209,6 +239,9 @@ export async function POST(req: Request) {
   const headers = buildAuthHeaders(settings.apiKey);
 
   try {
+    const nowIso = new Date().toISOString();
+    const ensuredThreadId = threadIdRaw || (await ensureThreadForPhone((settings as any).supabase, phone));
+
     await safeSendComposingPresence(baseUrl, headers, instanceName, phone);
     await sleep(2000);
     await sleep(randomInt(3000, 7000));
@@ -241,24 +274,24 @@ export async function POST(req: Request) {
       );
     }
 
-    if (threadId) {
+    if (ensuredThreadId) {
       try {
         await (settings as any).supabase.from("chat_messages").insert({
           id: crypto.randomUUID(),
-          thread_id: threadId,
+          thread_id: ensuredThreadId,
           broker_id: asBoss ? null : brokerId,
           direction: "out",
           from_number: null,
           to_number: phone,
           message,
-          sent_at: new Date().toISOString(),
+          sent_at: nowIso,
           raw_payload: apiRes,
         });
 
         await (settings as any).supabase
           .from("chat_threads")
-          .update({ last_message_at: new Date().toISOString() })
-          .eq("id", threadId);
+          .update({ last_message_at: nowIso })
+          .eq("id", ensuredThreadId);
       } catch {
         // silent
       }
@@ -270,7 +303,7 @@ export async function POST(req: Request) {
       // silent
     }
 
-    return NextResponse.json({ ok: true, data: apiRes });
+    return NextResponse.json({ ok: true, data: apiRes, threadId: ensuredThreadId || null });
   } catch (e: any) {
     return NextResponse.json(
       {

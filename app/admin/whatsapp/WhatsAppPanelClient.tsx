@@ -987,9 +987,15 @@ export default function WhatsAppPanelClient() {
       }
 
       setDraft("");
+      const returnedThreadId = json?.threadId ? String(json.threadId).trim() : "";
       if (selectedThreadId) {
         await loadMessages(selectedThreadId);
         await loadThreads();
+      } else if (returnedThreadId) {
+        setSelectedEvolutionChat(null);
+        setSelectedThreadId(returnedThreadId);
+        await loadThreads();
+        await loadMessages(returnedThreadId);
       } else {
         await loadEvolutionMessages(phone);
       }
@@ -999,6 +1005,54 @@ export default function WhatsAppPanelClient() {
       setIsSending(false);
     }
   }
+
+  const loadMessagesRef = useRef<any>(null);
+
+  useEffect(() => {
+    loadMessagesRef.current = loadMessages;
+  }, [loadMessages]);
+
+  const chatMessagesReloadTimerRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!supabase) return;
+    if (!selectedThreadId) return;
+
+    const channel = (supabase as any)
+      .channel(`admin-chat-messages-realtime-${selectedThreadId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "chat_messages", filter: `thread_id=eq.${selectedThreadId}` },
+        () => {
+          if (chatMessagesReloadTimerRef.current) {
+            clearTimeout(chatMessagesReloadTimerRef.current);
+          }
+          chatMessagesReloadTimerRef.current = setTimeout(() => {
+            try {
+              const fn = loadMessagesRef.current;
+              if (typeof fn === "function") {
+                void fn(selectedThreadId);
+              }
+            } catch {
+              // ignore
+            }
+          }, 250);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      try {
+        if (chatMessagesReloadTimerRef.current) {
+          clearTimeout(chatMessagesReloadTimerRef.current);
+          chatMessagesReloadTimerRef.current = null;
+        }
+        void (supabase as any).removeChannel(channel);
+      } catch {
+        // ignore
+      }
+    };
+  }, [selectedThreadId, supabase]);
 
   useEffect(() => {
     console.log("CONEXÃO TESTE:", {
