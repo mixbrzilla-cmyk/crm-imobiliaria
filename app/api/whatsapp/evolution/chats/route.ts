@@ -32,6 +32,21 @@ function getServiceSupabase() {
 }
 
 async function loadEvolutionSettings() {
+  const envApiUrl = String(
+    process.env.EVOLUTION_API_URL ??
+      process.env.EVOLUTION_BASE_URL ??
+      process.env.EVOLUTION_URL ??
+      "",
+  ).trim();
+  const envGlobalKey = String(
+    process.env.EVOLUTION_API_KEY ?? process.env.EVOLUTION_GLOBAL_API_KEY ?? "",
+  ).trim();
+  const envInstanceKey = String(process.env.EVOLUTION_INSTANCE_API_KEY ?? "").trim();
+
+  if (envApiUrl && (envInstanceKey || envGlobalKey)) {
+    return { ok: true as const, apiUrl: envApiUrl, apiKey: envInstanceKey || envGlobalKey };
+  }
+
   const supabase = getServiceSupabase();
   if (!supabase) {
     return {
@@ -54,17 +69,6 @@ async function loadEvolutionSettings() {
 
   const dbApiUrl = String((res.data as any)?.evolution_api_url ?? "").trim();
   const dbApiKey = String((res.data as any)?.evolution_global_api_key ?? "").trim();
-  const envApiUrl = String(
-    process.env.EVOLUTION_API_URL ??
-      process.env.EVOLUTION_BASE_URL ??
-      process.env.EVOLUTION_URL ??
-      "",
-  ).trim();
-  const envGlobalKey = String(
-    process.env.EVOLUTION_API_KEY ?? process.env.EVOLUTION_GLOBAL_API_KEY ?? "",
-  ).trim();
-  const envInstanceKey = String(process.env.EVOLUTION_INSTANCE_API_KEY ?? "").trim();
-
   const apiUrl = envApiUrl || dbApiUrl;
   const apiKey = envInstanceKey || envGlobalKey || dbApiKey;
 
