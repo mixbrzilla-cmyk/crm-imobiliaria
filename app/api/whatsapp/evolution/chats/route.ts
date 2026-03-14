@@ -71,9 +71,12 @@ function extractChatNumber(chat: any) {
 function extractChatName(chat: any) {
   return (
     safeString(chat?.name) ||
+    safeString(chat?.profileName) ||
+    safeString(chat?.profile_name) ||
     safeString(chat?.pushName) ||
     safeString(chat?.subject) ||
     safeString(chat?.contact?.name) ||
+    safeString(chat?.contact?.profileName) ||
     safeString(chat?.contact?.pushName) ||
     null
   );
@@ -87,10 +90,12 @@ function extractLastMessagePreview(chat: any) {
 
 function extractAvatarUrl(chat: any) {
   const candidates = [
+    chat?.profilePic,
     chat?.profilePicUrl,
     chat?.profilePictureUrl,
     chat?.pictureUrl,
     chat?.avatarUrl,
+    chat?.contact?.profilePic,
     chat?.contact?.profilePicUrl,
     chat?.contact?.profilePictureUrl,
     chat?.contact?.pictureUrl,
@@ -98,7 +103,9 @@ function extractAvatarUrl(chat: any) {
   ];
   for (const c of candidates) {
     const s = safeString(c);
-    if (s && s.startsWith("http")) return s;
+    if (!s) continue;
+    if (s.startsWith("http")) return s;
+    if (s.startsWith("data:image/")) return s;
   }
   return null;
 }

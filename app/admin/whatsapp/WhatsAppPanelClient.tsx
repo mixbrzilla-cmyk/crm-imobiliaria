@@ -292,6 +292,26 @@ export default function WhatsAppPanelClient() {
     }
   }, [isLoadingEvolutionMessages]);
 
+  useEffect(() => {
+    if (!selectedEvolutionChat?.number) return;
+    if (evolutionIsOpen !== true) return;
+
+    let cancelled = false;
+    const tick = async () => {
+      if (cancelled) return;
+      await loadEvolutionMessages(selectedEvolutionChat.number);
+    };
+
+    const t = setInterval(() => {
+      void tick();
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [evolutionIsOpen, loadEvolutionMessages, selectedEvolutionChat?.number]);
+
   const checkEvolutionWebhook = useCallback(async () => {
     setErrorMessage(null);
     setWebhookMessage(null);
@@ -1104,18 +1124,22 @@ export default function WhatsAppPanelClient() {
                     .slice(0, 200)
                     .map((c) => {
                       const isActive = selectedEvolutionChat?.number === c.number;
+                      const title = c.name && c.name.trim() ? c.name.trim() : "Contato";
                       return (
                         <button
                           key={c.number}
                           type="button"
                           onClick={() => {
                             setSelectedThreadId(null);
+                            setEvolutionMessages([]);
                             setSelectedEvolutionChat(c);
                             void loadEvolutionMessages(c.number);
                           }}
                           className={
                             "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-all " +
-                            (isActive ? "bg-white ring-1 ring-slate-200/70" : "hover:bg-white/70")
+                            (isActive
+                              ? "bg-white shadow-sm ring-1 ring-slate-200/70"
+                              : "bg-white/30 hover:bg-white hover:shadow-sm")
                           }
                         >
                           {c.avatarUrl ? (
@@ -1126,17 +1150,16 @@ export default function WhatsAppPanelClient() {
                             />
                           ) : (
                             <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-900 text-xs font-semibold text-white">
-                              {initials(c.name ?? c.number)}
+                              {initials(title)}
                             </div>
                           )}
 
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-sm font-semibold text-slate-900">
-                              {c.name ? c.name : c.number}
+                              {title}
                             </div>
-                            <div className="truncate text-xs text-slate-600">
-                              {c.lastMessage ? c.lastMessage : c.number}
-                            </div>
+                            <div className="truncate text-xs text-slate-500">{c.number}</div>
+                            <div className="truncate text-xs text-slate-600">{c.lastMessage ? c.lastMessage : ""}</div>
                           </div>
                         </button>
                       );
