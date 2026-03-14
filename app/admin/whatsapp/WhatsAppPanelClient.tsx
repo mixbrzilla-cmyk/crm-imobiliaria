@@ -145,6 +145,14 @@ export default function WhatsAppPanelClient() {
   const [evolutionIsOpen, setEvolutionIsOpen] = useState<boolean | null>(null);
   const [evolutionState, setEvolutionState] = useState<string | null>(null);
 
+  const [manualPhone, setManualPhone] = useState("");
+  const [manualName, setManualName] = useState<string | null>(null);
+
+  const [evolutionChats, setEvolutionChats] = useState<
+    { number: string; name: string | null; lastMessage: string | null }[]
+  >([]);
+  const [isSyncingChats, setIsSyncingChats] = useState(false);
+
   const [isResetting, setIsResetting] = useState(false);
   const [resetMessage, setResetMessage] = useState<string | null>(null);
 
@@ -211,6 +219,39 @@ export default function WhatsAppPanelClient() {
       return null;
     }
   }
+
+  const syncEvolutionChats = useCallback(async () => {
+    if (isSyncingChats) return;
+    setIsSyncingChats(true);
+    try {
+      const res = await fetch("/api/whatsapp/evolution/chats", {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+      });
+
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) {
+        setEvolutionChats([]);
+        return;
+      }
+
+      const rows = Array.isArray(json?.chats) ? json.chats : [];
+      setEvolutionChats(
+        rows
+          .map((c: any) => ({
+            number: String(c?.number ?? "").replace(/\D+/g, "").trim(),
+            name: c?.name ? String(c.name) : null,
+            lastMessage: c?.lastMessage ? String(c.lastMessage) : null,
+          }))
+          .filter((c: any) => Boolean(c.number)),
+      );
+    } catch {
+      setEvolutionChats([]);
+    } finally {
+      setIsSyncingChats(false);
+    }
+  }, [isSyncingChats]);
 
   const checkEvolutionWebhook = useCallback(async () => {
     setErrorMessage(null);
@@ -806,14 +847,11 @@ export default function WhatsAppPanelClient() {
       return;
     }
 
-    if (!selectedThread || !selectedThreadId) {
-      setErrorMessage("Selecione um chat.");
-      return;
-    }
-
-    const phone = (selectedThread.contact_number ?? "").trim();
+    const phone = selectedThreadId
+      ? String(selectedThread?.contact_number ?? "").trim()
+      : manualPhone.replace(/\D+/g, "").trim();
     if (!phone) {
-      setErrorMessage("Número do contato não disponível.");
+      setErrorMessage(selectedThreadId ? "Número do contato não disponível." : "Digite um telefone.");
       return;
     }
 
@@ -831,9 +869,9 @@ export default function WhatsAppPanelClient() {
         body: JSON.stringify({
           phone,
           message: msg,
-          thread_id: selectedThreadId,
-          broker_id: selectedThread.assigned_broker_profile_id,
-          as_boss: bossMode,
+          thread_id: selectedThreadId || undefined,
+          broker_id: selectedThread?.assigned_broker_profile_id ?? null,
+          as_boss: selectedThread?.assigned_broker_profile_id ? false : true,
         }),
       });
 
@@ -846,8 +884,10 @@ export default function WhatsAppPanelClient() {
       }
 
       setDraft("");
-      await loadMessages(selectedThreadId);
-      await loadThreads();
+      if (selectedThreadId) {
+        await loadMessages(selectedThreadId);
+        await loadThreads();
+      }
     } catch {
       setErrorMessage("Não foi possível enviar a mensagem agora.");
     } finally {
@@ -884,6 +924,10 @@ export default function WhatsAppPanelClient() {
         if (cancelled || !json) return;
         if (typeof json?.isOpen === "boolean") setEvolutionIsOpen(Boolean(json.isOpen));
         setEvolutionState(json?.state ? String(json.state) : null);
+
+        if (json?.isOpen === true) {
+          void syncEvolutionChats();
+        }
       } catch {
         // silent
       }
@@ -897,7 +941,7 @@ export default function WhatsAppPanelClient() {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, []);
+  }, [syncEvolutionChats]);
 
   useEffect(() => {
     if (!selectedThreadId) return;
@@ -952,13 +996,62 @@ export default function WhatsAppPanelClient() {
       ) : null}
 
       <section className="overflow-hidden rounded-3xl bg-white shadow-[0_20px_45px_-45px_rgba(0,0,0,0.55)] ring-1 ring-slate-200/70">
-        <div className="grid h-[calc(100vh-260px)] grid-cols-1 lg:grid-cols-12">
-          <aside className="flex h-full flex-col border-b border-slate-200/70 lg:col-span-4 lg:border-b-0 lg:border-r">
+        <div className="grid min-h-0 flex-1 grid-cols-[320px_minmax(0,1fr)] overflow-hidden">
+          <aside className="flex min-h-0 flex-col border-r border-slate-200/70 bg-white">
             <div className="flex items-center justify-between gap-3 bg-[#001f3f] px-4 py-3 text-white">
               <div className="flex items-center gap-3">
                 <div className="grid h-10 w-10 place-items-center rounded-full bg-white/10 text-sm font-semibold">
                   B
                 </div>
+
+                {evolutionIsOpen && evolutionChats.length > 0 ? (
+                  <div className="border-b border-slate-200/70 bg-slate-50 px-4 py-3">
+                    <div className="text-xs font-semibold text-slate-700">Chats (Evolution)</div>
+                    <div className="mt-2 max-h-44 space-y-1 overflow-auto">
+                      {evolutionChats.slice(0, 40).map((c) => (
+                        <button
+                          key={c.number}
+                          type="button"
+                          onClick={() => {
+                            setManualPhone(c.number);
+                            setManualName(c.name);
+                          }}
+                          className="w-full rounded-xl bg-white px-3 py-2 text-left text-xs text-slate-800 ring-1 ring-slate-200/70 transition-all hover:bg-slate-100"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0 truncate font-semibold">
+                              {c.name ? c.name : c.number}
+                            </div>
+                            <div className="shrink-0 text-[11px] text-slate-500">{c.number}</div>
+                          </div>
+                          {c.lastMessage ? (
+                            <div className="mt-1 truncate text-[11px] text-slate-500">{c.lastMessage}</div>
+                          ) : null}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void syncEvolutionChats()}
+                        disabled={isSyncingChats}
+                        className="rounded-xl bg-white px-3 py-2 text-xs font-semibold text-slate-800 ring-1 ring-slate-200/70 transition-all hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {isSyncingChats ? "Sincronizando..." : "Atualizar"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setManualPhone("");
+                          setManualName(null);
+                        }}
+                        className="rounded-xl bg-white px-3 py-2 text-xs font-semibold text-slate-800 ring-1 ring-slate-200/70 transition-all hover:bg-slate-100"
+                      >
+                        Limpar
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
                 <div>
                   <div className="text-sm font-semibold">Boss Central</div>
                   <div className="text-xs text-white/70">{supportsTables ? "Online" : "Verifique Supabase"}</div>
@@ -971,7 +1064,7 @@ export default function WhatsAppPanelClient() {
                   setIsConfigOpen(true);
                   void loadSettings();
                 }}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white transition-all duration-300 hover:bg-white/15"
+                className="inline-flex h-10 items-center justify-center rounded-xl bg-white/10 text-white transition-all duration-300 hover:bg-white/15"
                 aria-label="Configurar WhatsApp"
                 title="Configurar"
               >
@@ -1084,7 +1177,7 @@ export default function WhatsAppPanelClient() {
             </div>
           </aside>
 
-          <main className="flex h-full flex-col lg:col-span-8">
+          <main className="flex min-h-0 flex-col">
             <div className="flex items-center justify-between gap-4 border-b border-slate-200/70 bg-white px-5 py-3">
               <div className="flex min-w-0 items-center gap-3">
                 <div className="grid h-10 w-10 place-items-center rounded-full bg-slate-900 text-sm font-semibold text-white">
@@ -1109,7 +1202,7 @@ export default function WhatsAppPanelClient() {
               </div>
 
               <div className="flex items-center gap-2">
-                <div className="hidden items-center gap-2 rounded-full bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200/70 sm:flex">
+                <div className="flex items-center gap-2 border-b border-slate-200/70 px-4 py-3">
                   <span
                     className={
                       "h-2 w-2 rounded-full " +
@@ -1208,6 +1301,22 @@ export default function WhatsAppPanelClient() {
             </div>
 
             <div className="border-t border-slate-200/70 bg-white px-5 py-3">
+              {!selectedThreadId ? (
+                <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <input
+                    value={manualPhone}
+                    onChange={(e) => setManualPhone(e.target.value)}
+                    placeholder="Telefone (DDD + número)"
+                    className="h-11 rounded-2xl bg-slate-50 px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:bg-white focus:ring-2 focus:ring-[#001f3f]/10"
+                  />
+                  <input
+                    value={manualName ?? ""}
+                    onChange={(e) => setManualName(e.target.value)}
+                    placeholder="Nome (opcional)"
+                    className="h-11 rounded-2xl bg-slate-50 px-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:bg-white focus:ring-2 focus:ring-[#001f3f]/10"
+                  />
+                </div>
+              ) : null}
               <div className="flex items-end gap-3">
                 <button
                   type="button"
@@ -1232,12 +1341,17 @@ export default function WhatsAppPanelClient() {
                 <button
                   type="button"
                   onClick={() => void sendMessage()}
-                  disabled={!selectedThreadId || isSending || !draft.trim() || evolutionIsOpen === false}
+                  disabled={
+                    isSending ||
+                    !draft.trim() ||
+                    evolutionIsOpen === false ||
+                    (!selectedThreadId && !manualPhone.replace(/\D+/g, "").trim())
+                  }
                   title={
-                    !selectedThreadId
-                      ? "Selecione ou inicie uma conversa para enviar"
-                      : evolutionIsOpen === false
+                    evolutionIsOpen === false
                         ? "WhatsApp desconectado. Pareie a instância."
+                        : !selectedThreadId && !manualPhone.replace(/\D+/g, "").trim()
+                          ? "Digite um telefone"
                         : !draft.trim()
                           ? "Digite uma mensagem"
                           : ""
