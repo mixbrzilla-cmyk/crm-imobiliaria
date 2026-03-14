@@ -12,13 +12,22 @@ import { getSupabaseClient } from "@/lib/supabaseClient";
 
 type ThreadRow = {
   id: string;
-  external_id: string | null;
-  contact_number: string | null;
+  contact_id: string | null;
+  customer_phone: string | null;
   contact_name: string | null;
   assigned_broker_profile_id: string | null;
   status: string | null;
   last_message_at: string | null;
   created_at?: string;
+};
+
+type ContactRow = {
+  id: string;
+  phone: string | null;
+  name: string | null;
+  avatar: string | null;
+  last_message: string | null;
+  last_message_time: string | null;
 };
 
 type OwnerMatch = {
@@ -123,6 +132,8 @@ export default function WhatsAppPanelClient() {
 
   const [threads, setThreads] = useState<ThreadRow[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+
+  const [contactsById, setContactsById] = useState<Record<string, ContactRow>>({});
 
   const [ownerByWhatsapp, setOwnerByWhatsapp] = useState<Record<string, OwnerMatch>>({});
 
@@ -229,11 +240,17 @@ export default function WhatsAppPanelClient() {
     [selectedThreadId, threads],
   );
 
+  const selectedContact = useMemo(() => {
+    const id = String(selectedThread?.contact_id ?? "").trim();
+    if (!id) return null;
+    return contactsById[id] ?? null;
+  }, [contactsById, selectedThread?.contact_id]);
+
   const selectedOwnerMatch = useMemo(() => {
-    const num = String(selectedThread?.contact_number ?? "").replace(/\D+/g, "").trim();
+    const num = String(selectedThread?.customer_phone ?? "").replace(/\D+/g, "").trim();
     if (!num) return null;
     return ownerByWhatsapp[num] ?? null;
-  }, [ownerByWhatsapp, selectedThread?.contact_number]);
+  }, [ownerByWhatsapp, selectedThread?.customer_phone]);
 
   async function ensureThreadByPhone(phone: string) {
     const normalized = phone.replace(/\D+/g, "").trim();
@@ -488,10 +505,12 @@ export default function WhatsAppPanelClient() {
     const q = search.trim().toLowerCase();
     if (!q) return threads;
     return threads.filter((t) => {
-      const hay = `${t.contact_name ?? ""} ${t.contact_number ?? ""} ${t.external_id ?? ""}`.toLowerCase();
+      const contact = t.contact_id ? contactsById[String(t.contact_id)] : null;
+      const phone = String(t.customer_phone ?? "").replace(/\D+/g, "");
+      const hay = `${t.contact_name ?? ""} ${contact?.name ?? ""} ${phone}`.toLowerCase();
       return hay.includes(q);
     });
-  }, [search, threads]);
+  }, [contactsById, search, threads]);
 
   const loadBrokers = useCallback(async () => {
     if (!supabase) return;
@@ -532,7 +551,7 @@ export default function WhatsAppPanelClient() {
       const res = await supabase
         .from("chat_threads")
         .select(
-          "id, external_id, contact_number, contact_name, assigned_broker_profile_id, status, last_message_at, created_at",
+          "id, contact_id, customer_phone, contact_name, assigned_broker_profile_id, status, last_message_at, created_at",
         )
         .order("last_message_at", { ascending: false });
 
@@ -552,10 +571,49 @@ export default function WhatsAppPanelClient() {
       setSupportsTables(true);
 
       try {
+        const contactIds = Array.from(
+          new Set(
+            rows
+              .map((r) => String((r as any)?.contact_id ?? "").trim())
+              .filter(Boolean),
+          ),
+        );
+
+        if (contactIds.length === 0) {
+          setContactsById({});
+        } else {
+          const cRes = await (supabase as any)
+            .from("contacts")
+            .select("id, phone, name, avatar, last_message, last_message_time")
+            .in("id", contactIds.slice(0, 500));
+          if (!cRes.error) {
+            const map: Record<string, ContactRow> = {};
+            for (const c of (cRes.data ?? []) as Array<any>) {
+              const id = String(c?.id ?? "").trim();
+              if (!id) continue;
+              map[id] = {
+                id,
+                phone: c?.phone ? String(c.phone) : null,
+                name: c?.name ? String(c.name) : null,
+                avatar: c?.avatar ? String(c.avatar) : null,
+                last_message: c?.last_message ? String(c.last_message) : null,
+                last_message_time: c?.last_message_time ? String(c.last_message_time) : null,
+              };
+            }
+            setContactsById(map);
+          } else {
+            setContactsById({});
+          }
+        }
+      } catch {
+        setContactsById({});
+      }
+
+      try {
         const numbers = Array.from(
           new Set(
             rows
-              .map((r) => String(r.contact_number ?? "").replace(/\D+/g, "").trim())
+              .map((r) => String(r.customer_phone ?? "").replace(/\D+/g, "").trim())
               .filter(Boolean),
           ),
         );
@@ -760,6 +818,13 @@ export default function WhatsAppPanelClient() {
           setEvolutionState(row?.evolution_instance_state ? String(row.evolution_instance_state) : null);
 
           if (row?.evolution_instance_is_open === true) {
+            setIsPairOpen(false);
+            setIsPairing(false);
+            setPairQrDataUrl(null);
+            setPairConnectionState(null);
+          }
+
+          if (row?.evolution_instance_is_open === true) {
             void syncEvolutionChats();
           }
         },
@@ -950,9 +1015,7 @@ export default function WhatsAppPanelClient() {
       return;
     }
 
-    const phone = selectedThreadId
-      ? String(selectedThread?.contact_number ?? "").trim()
-      : String(selectedEvolutionChat?.number ?? "").replace(/\D+/g, "").trim();
+    const phone = selectedThreadId ? String(selectedThread?.customer_phone ?? "").trim() : "";
     if (!phone) {
       setErrorMessage("Selecione uma conversa.");
       return;
@@ -1221,38 +1284,32 @@ export default function WhatsAppPanelClient() {
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-2">
-              {evolutionIsOpen && evolutionChats.length > 0 ? (
+              {filteredThreads.length > 0 ? (
                 <div className="space-y-1">
-                  {evolutionChats
-                    .filter((c) => {
-                      if (!search.trim()) return true;
-                      const q = search.trim().toLowerCase();
-                      return (
-                        c.number.includes(q.replace(/\D+/g, "")) ||
-                        (c.name ? c.name.toLowerCase().includes(q) : false) ||
-                        (c.lastMessage ? c.lastMessage.toLowerCase().includes(q) : false)
-                      );
-                    })
-                    .slice(0, 200)
-                    .map((c) => {
-                      const isActive = selectedEvolutionChat?.number === c.number;
-                      const leadMatch = ownerByWhatsapp[c.number] ?? null;
+                  {filteredThreads.slice(0, 200).map((t) => {
+                      const isActive = selectedThreadId === t.id;
+                      const contact = t.contact_id ? contactsById[String(t.contact_id)] : null;
+                      const number = String(t.customer_phone ?? "").replace(/\D+/g, "").trim();
+
                       const title =
-                        c.name && c.name.trim()
-                          ? c.name.trim()
-                          : leadMatch?.title
-                            ? leadMatch.title
+                        String(contact?.name ?? "").trim()
+                          ? String(contact?.name ?? "").trim()
+                          : t.contact_name && String(t.contact_name).trim()
+                            ? String(t.contact_name).trim()
                             : "Contato";
+
+                      const subtitle =
+                        String(contact?.last_message ?? "").trim()
+                          ? String(contact?.last_message ?? "")
+                          : "";
+
                       return (
                         <button
-                          key={c.number}
+                          key={t.id}
                           type="button"
                           onClick={() => {
-                            setSelectedThreadId(null);
-                            setEvolutionMessages([]);
-                            setDraft("");
-                            setSelectedEvolutionChat(c);
-                            void loadEvolutionMessages(c.number);
+                            setSelectedEvolutionChat(null);
+                            setSelectedThreadId(t.id);
                           }}
                           className={
                             "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-all " +
@@ -1261,20 +1318,20 @@ export default function WhatsAppPanelClient() {
                               : "bg-white/30 hover:bg-white hover:shadow-sm")
                           }
                         >
-                          {c.avatarUrl ? (
+                          {String(contact?.avatar ?? "").trim() ? (
                             <img
-                              src={c.avatarUrl}
-                              alt={c.name ? c.name : c.number}
+                              src={String(contact?.avatar ?? "")}
+                              alt={title}
                               className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-slate-200/70"
                             />
                           ) : (
                             <div
                               className={
                                 "grid h-10 w-10 shrink-0 place-items-center rounded-full text-xs font-semibold text-white " +
-                                avatarColorClass(c.number)
+                                avatarColorClass(number || t.id)
                               }
                             >
-                              {fallbackAvatarText(title, c.number)}
+                              {fallbackAvatarText(title, number || t.id)}
                             </div>
                           )}
 
@@ -1282,8 +1339,8 @@ export default function WhatsAppPanelClient() {
                             <div className="truncate text-sm font-semibold text-slate-900">
                               {title}
                             </div>
-                            <div className="truncate text-xs text-slate-500">{c.number}</div>
-                            <div className="truncate text-xs text-slate-600">{c.lastMessage ? c.lastMessage : ""}</div>
+                            <div className="truncate text-xs text-slate-500">{number}</div>
+                            <div className="truncate text-xs text-slate-600">{subtitle}</div>
                           </div>
                         </button>
                       );
@@ -1291,7 +1348,7 @@ export default function WhatsAppPanelClient() {
                 </div>
               ) : (
                 <div className="px-3 py-6 text-sm text-slate-600">
-                  {evolutionIsOpen ? "Nenhuma conversa." : "WhatsApp desconectado."}
+                  Nenhuma conversa.
                 </div>
               )}
             </div>
@@ -1301,28 +1358,26 @@ export default function WhatsAppPanelClient() {
             <div className="flex items-center justify-between border-b border-slate-200/70 px-4 py-3">
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold text-slate-900">
-                  {selectedEvolutionChat
-                    ? selectedEvolutionChat.name ?? selectedEvolutionChat.number
-                    : selectedThread
-                      ? selectedThread.contact_name ?? selectedThread.contact_number ?? selectedThread.external_id ?? "-"
-                      : "Selecione uma conversa"}
+                  {selectedThread
+                    ? selectedContact?.name ?? selectedThread.contact_name ?? selectedThread.customer_phone ?? "-"
+                    : "Selecione uma conversa"}
                 </div>
                 <div className="truncate text-xs text-slate-500">
-                  {selectedEvolutionChat?.number ?? selectedThread?.contact_number ?? ""}
+                  {selectedThread?.customer_phone ?? ""}
                 </div>
               </div>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-4">
-              {isLoadingEvolutionMessages || isLoadingMessages ? (
+              {isLoadingMessages ? (
                 <div className="text-sm text-slate-600">Carregando mensagens...</div>
-              ) : (selectedEvolutionChat ? evolutionMessages : messages).length === 0 ? (
+              ) : messages.length === 0 ? (
                 <div className="mx-auto mt-10 w-full max-w-md rounded-2xl bg-slate-50 px-5 py-4 text-center text-sm text-slate-600 ring-1 ring-slate-200/70">
                   Selecione uma conversa para começar.
                 </div>
               ) : (
                 <div className="flex flex-col gap-2">
-                  {(selectedEvolutionChat ? evolutionMessages : messages).map((m: any) => (
+                  {messages.map((m: any) => (
                     <div
                       key={m.id}
                       className={
@@ -1343,7 +1398,7 @@ export default function WhatsAppPanelClient() {
                 <textarea
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
-                  placeholder={selectedEvolutionChat || selectedThreadId ? "Mensagem" : "Selecione uma conversa"}
+                  placeholder={selectedThreadId ? "Mensagem" : "Selecione uma conversa"}
                   disabled={isSending}
                   className="min-h-11 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-slate-900 outline-none disabled:cursor-not-allowed"
                 />
@@ -1355,12 +1410,12 @@ export default function WhatsAppPanelClient() {
                     isSending ||
                     !draft.trim() ||
                     evolutionIsOpen === false ||
-                    (!selectedThreadId && !selectedEvolutionChat)
+                    !selectedThreadId
                   }
                   title={
                     evolutionIsOpen === false
                       ? "WhatsApp desconectado. Pareie a instância."
-                      : !selectedThreadId && !selectedEvolutionChat
+                      : !selectedThreadId
                         ? "Selecione uma conversa"
                         : !draft.trim()
                           ? "Digite uma mensagem"

@@ -81,31 +81,49 @@ export async function POST(req: Request) {
   }
 
   try {
+    const name = String(body?.name ?? "").trim() || "Lead WhatsApp";
+
+    const { data: contact, error: cErr } = await (supabase as any)
+      .from("contacts")
+      .upsert({ phone, name }, { onConflict: "phone" })
+      .select("id")
+      .single();
+    if (cErr) {
+      return NextResponse.json({ ok: false, error: cErr.message }, { status: 500 });
+    }
+
+    const contactId = contact?.id ? String(contact.id) : "";
+    if (!contactId) {
+      return NextResponse.json({ ok: false, error: "Contato inválido." }, { status: 500 });
+    }
+
     const existing = await (supabase as any)
       .from("chat_threads")
       .select("id")
-      .eq("external_id", phone)
+      .eq("contact_id", contactId)
       .maybeSingle();
 
     if (!existing.error && existing.data?.id) {
       return NextResponse.json({ ok: true, threadId: String(existing.data.id) });
     }
 
-    const id = crypto.randomUUID();
-    const insert = await (supabase as any).from("chat_threads").insert({
-      id,
-      external_id: phone,
-      contact_number: phone,
-      contact_name: null,
-      status: "active",
-      last_message_at: new Date().toISOString(),
-    });
+    const insert = await (supabase as any)
+      .from("chat_threads")
+      .insert({
+        contact_id: contactId,
+        status: "open",
+        customer_phone: phone,
+        contact_name: name,
+        last_message_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single();
 
     if (insert.error) {
       return NextResponse.json({ ok: false, error: insert.error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, threadId: id });
+    return NextResponse.json({ ok: true, threadId: String(insert.data?.id ?? "") });
   } catch {
     return NextResponse.json({ ok: false, error: "Falha ao criar conversa." }, { status: 500 });
   }

@@ -141,27 +141,40 @@ async function ensureThreadForPhone(supabase: any, phone: string) {
   const normalized = normalizeWhatsapp(phone);
   if (!normalized) return null;
 
+  const name = "Lead WhatsApp";
+
   try {
+    const { data: contact, error: cErr } = await (supabase as any)
+      .from("contacts")
+      .upsert({ phone: normalized, name }, { onConflict: "phone" })
+      .select("id")
+      .single();
+    if (cErr) return null;
+    const contactId = contact?.id ? String(contact.id) : "";
+    if (!contactId) return null;
+
     const existing = await (supabase as any)
       .from("chat_threads")
       .select("id")
-      .eq("external_id", normalized)
+      .eq("contact_id", contactId)
       .maybeSingle();
 
     if (!existing.error && existing.data?.id) return String(existing.data.id);
 
-    const id = crypto.randomUUID();
-    const insert = await (supabase as any).from("chat_threads").insert({
-      id,
-      external_id: normalized,
-      contact_number: normalized,
-      contact_name: null,
-      status: "active",
-      last_message_at: new Date().toISOString(),
-    });
+    const insert = await (supabase as any)
+      .from("chat_threads")
+      .insert({
+        contact_id: contactId,
+        status: "open",
+        customer_phone: normalized,
+        contact_name: name,
+        last_message_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single();
 
     if (insert.error) return null;
-    return id;
+    return insert.data?.id ? String(insert.data.id) : null;
   } catch {
     return null;
   }

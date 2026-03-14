@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Check, Search, SendHorizonal } from "lucide-react";
 
@@ -192,6 +192,30 @@ export default function CorretorWhatsAppPage() {
     }
   }, [brokerId, selectedThreadId, supabase]);
 
+  useEffect(() => {
+    if (!supabase) return;
+    if (!brokerId) return;
+
+    const channel = (supabase as any)
+      .channel("corretor-chat-threads-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "chat_threads" },
+        () => {
+          void loadThreads();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      try {
+        void (supabase as any).removeChannel(channel);
+      } catch {
+        // ignore
+      }
+    };
+  }, [brokerId, loadThreads, supabase]);
+
   const loadMessages = useCallback(
     async (threadId: string) => {
       if (!supabase) return;
@@ -222,6 +246,54 @@ export default function CorretorWhatsAppPage() {
     },
     [supabase],
   );
+
+  const loadMessagesRef = useRef<any>(null);
+
+  useEffect(() => {
+    loadMessagesRef.current = loadMessages;
+  }, [loadMessages]);
+
+  const chatMessagesReloadTimerRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!supabase) return;
+    if (!selectedThreadId) return;
+
+    const channel = (supabase as any)
+      .channel(`corretor-chat-messages-realtime-${selectedThreadId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "chat_messages", filter: `thread_id=eq.${selectedThreadId}` },
+        () => {
+          if (chatMessagesReloadTimerRef.current) {
+            clearTimeout(chatMessagesReloadTimerRef.current);
+          }
+          chatMessagesReloadTimerRef.current = setTimeout(() => {
+            try {
+              const fn = loadMessagesRef.current;
+              if (typeof fn === "function") {
+                void fn(selectedThreadId);
+              }
+            } catch {
+              // ignore
+            }
+          }, 250);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      try {
+        if (chatMessagesReloadTimerRef.current) {
+          clearTimeout(chatMessagesReloadTimerRef.current);
+          chatMessagesReloadTimerRef.current = null;
+        }
+        void (supabase as any).removeChannel(channel);
+      } catch {
+        // ignore
+      }
+    };
+  }, [selectedThreadId, supabase]);
 
   const sendMessage = useCallback(async () => {
     setErrorMessage(null);
