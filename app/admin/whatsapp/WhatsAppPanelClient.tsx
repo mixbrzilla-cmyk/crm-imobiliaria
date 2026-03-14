@@ -1673,6 +1673,14 @@ export default function WhatsAppPanelClient() {
                   disabled={isResetting}
                   className="inline-flex h-11 items-center justify-center rounded-2xl bg-white px-5 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                 >
+                  {isResetting ? "Desconectando..." : "Desconectar"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void resetEvolutionInstance()}
+                  disabled={isResetting}
+                  className="inline-flex h-11 items-center justify-center rounded-2xl bg-white px-5 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
                   {isResetting ? "Limpando..." : "Limpar Conexão"}
                 </button>
                 <button

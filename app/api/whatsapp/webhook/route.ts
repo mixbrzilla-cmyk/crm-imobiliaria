@@ -337,6 +337,9 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json().catch(() => null);
+
+    console.log("WEBHOOK BATEU AQUI:", body);
+
     const event = normalizeEventName(body?.event ?? body?.type ?? body?.data?.event);
     if (event !== "MESSAGES_UPSERT") {
       try {
