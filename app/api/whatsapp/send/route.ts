@@ -147,6 +147,29 @@ function randomInt(min: number, max: number) {
   return Math.floor(Math.random() * (b - a + 1)) + a;
 }
 
+async function safeSendComposingPresence(baseUrl: URL, headers: Record<string, string>, instanceName: string, phone: string) {
+  const number = normalizeWhatsapp(phone);
+  if (!number) return;
+  try {
+    const url = new URL(`/chat/sendPresence/${instanceName}`, baseUrl).toString();
+    await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        number,
+        options: {
+          delay: 0,
+          presence: "composing",
+          number,
+        },
+      }),
+      cache: "no-store",
+    });
+  } catch {
+    // ignore
+  }
+}
+
 async function touchOwnerLastContact(supabase: any, phone: string, iso: string) {
   const normalized = normalizeWhatsapp(phone);
   if (!normalized) return;
@@ -186,7 +209,9 @@ export async function POST(req: Request) {
   const headers = buildAuthHeaders(settings.apiKey);
 
   try {
-    await sleep(randomInt(3000, 8000));
+    await safeSendComposingPresence(baseUrl, headers, instanceName, phone);
+    await sleep(2000);
+    await sleep(randomInt(3000, 7000));
     const url = new URL(`/message/sendText/${instanceName}`, baseUrl).toString();
     const res = await fetch(url, {
       method: "POST",

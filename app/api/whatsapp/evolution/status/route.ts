@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
 
-import { createClient } from "@supabase/supabase-js";
-
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -25,73 +23,36 @@ function toAbsoluteBaseUrl(input: string) {
   }
 }
 
-function getServiceSupabase() {
-  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SERVICE_ROLE ||
-    process.env.SUPABASE_SERVICE_KEY;
-
-  if (!url || !serviceKey) return null;
-
-  return createClient(url, serviceKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-    db: {
-      schema: "public",
-    },
-  });
-}
-
 async function loadEvolutionSettings() {
-  const supabase = getServiceSupabase();
-  if (!supabase) {
-    return {
-      ok: false as const,
-      error:
-        "Service role não configurada. Defina SUPABASE_SERVICE_ROLE_KEY no ambiente do servidor para bypass do RLS.",
-    };
-  }
-
-  const res = await (supabase as any)
-    .from("whatsapp_settings")
-    .select("id, evolution_api_url, evolution_global_api_key, created_at")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (res.error) {
-    return { ok: false as const, error: res.error.message };
-  }
-
-  const dbApiUrl = String((res.data as any)?.evolution_api_url ?? "").trim();
-  const dbApiKey = String((res.data as any)?.evolution_global_api_key ?? "").trim();
   const envApiUrl = String(
     process.env.EVOLUTION_API_URL ??
       process.env.EVOLUTION_BASE_URL ??
       process.env.EVOLUTION_URL ??
       "",
   ).trim();
-  const envApiKey = String(
+
+  const envGlobalKey = String(
     process.env.EVOLUTION_API_KEY ?? process.env.EVOLUTION_GLOBAL_API_KEY ?? "",
   ).trim();
-  const apiUrl = envApiUrl || dbApiUrl;
-  const apiKey = envApiKey || dbApiKey;
-  const rowId = (res.data as any)?.id ? String((res.data as any).id) : null;
-  const apiUrlSource = envApiUrl ? ("env" as const) : ("db" as const);
-  const apiKeySource = envApiKey ? ("env" as const) : ("db" as const);
+  const envInstanceKey = String(process.env.EVOLUTION_INSTANCE_API_KEY ?? "").trim();
+  const apiKey = envInstanceKey || envGlobalKey;
 
-  if (!apiUrl || !apiKey) {
+  if (!envApiUrl || !apiKey) {
     return {
       ok: false as const,
-      error: "Evolution não configurada. Preencha URL e Global API Key no Painel WhatsApp.",
+      error: "Evolution não configurada no ambiente do servidor.",
+      missing: {
+        apiUrl: !envApiUrl,
+        apiKey: !apiKey,
+      },
     };
   }
 
-  return { ok: true as const, apiUrl, apiKey, rowId, apiUrlSource, apiKeySource };
+  return {
+    ok: true as const,
+    apiUrl: envApiUrl,
+    apiKey,
+  };
 }
 
 function buildAuthHeaders(globalKey: string) {
@@ -163,24 +124,10 @@ function normalizeInstanceName(value: string | null) {
     .toLowerCase();
 }
 
-function getMigrationSql() {
-  return `alter table public.whatsapp_settings
-  add column if not exists evolution_instance_name text,
-  add column if not exists evolution_instance_state text,
-  add column if not exists evolution_instance_is_open boolean,
-  add column if not exists evolution_instance_updated_at timestamptz,
-  add column if not exists evolution_instance_api_key text;`;
-}
-
 export async function GET() {
   const settings = await loadEvolutionSettings();
   if (!settings.ok) {
-    return NextResponse.json({ ok: false, error: settings.error }, { status: 500 });
-  }
-
-  const supabase = getServiceSupabase();
-  if (!supabase) {
-    return NextResponse.json({ ok: false, error: "Service role não configurada." }, { status: 500 });
+    return NextResponse.json({ ok: false, error: settings.error, missing: (settings as any).missing ?? null }, { status: 500 });
   }
 
   const baseUrl = toAbsoluteBaseUrl(settings.apiUrl);
@@ -236,50 +183,11 @@ export async function GET() {
   const stateNormalized = state ? state.toLowerCase() : null;
   const isOpen = stateNormalized ? ["open", "opened", "connected", "online"].includes(stateNormalized) : false;
 
-  let persisted = false;
-  let persistError: string | null = null;
-  let needsMigration = false;
-  if (settings.rowId) {
-    try {
-      const payload = {
-        evolution_instance_name: instanceName,
-        evolution_instance_state: state,
-        evolution_instance_is_open: isOpen,
-        evolution_instance_updated_at: new Date().toISOString(),
-        evolution_instance_api_key: instanceApiKey,
-      };
-
-      const up = await (supabase as any)
-        .from("whatsapp_settings")
-        .update(payload)
-        .eq("id", settings.rowId);
-
-      if (up?.error) {
-        // If the DB doesn't have these columns, don't fail the status endpoint.
-        persisted = false;
-        persistError = String(up.error.message ?? "Falha ao persistir status.");
-        const msg = persistError.toLowerCase();
-        if (msg.includes("column") && msg.includes("does not exist")) {
-          needsMigration = true;
-        }
-      } else {
-        persisted = true;
-      }
-    } catch (e: any) {
-      persisted = false;
-      persistError = e?.message ? String(e.message) : "Falha ao persistir status.";
-      const msg = String(persistError ?? "").toLowerCase();
-      if (msg.includes("column") && msg.includes("does not exist")) {
-        needsMigration = true;
-      }
-    }
-  }
-
   return NextResponse.json({
     ok: res.ok,
     status: res.status,
-    apiUrlSource: (settings as any).apiUrlSource ?? null,
-    apiKeySource: (settings as any).apiKeySource ?? null,
+    apiUrlSource: "env",
+    apiKeySource: "env",
     resolvedBaseUrl: baseUrl.toString().replace(/\/+$/, ""),
     resolvedFetchInstancesUrl: fetchInstancesUrl,
     targetInstanceName: instanceName,
@@ -290,10 +198,6 @@ export async function GET() {
     found: Boolean(found),
     rawCount: Array.isArray(listArray) ? listArray.length : null,
     availableInstances,
-    persisted,
-    persistError,
-    needsMigration,
-    migrationSql: needsMigration ? getMigrationSql() : null,
     raw: found ?? null,
     error: res.ok ? null : text?.slice(0, 2000) ?? null,
   });

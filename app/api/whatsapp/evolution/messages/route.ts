@@ -56,6 +56,41 @@ function extractTextFromMessage(message: any) {
   return "";
 }
 
+function extractSenderNameFromMessage(m: any) {
+  const candidates = [
+    m?.pushName,
+    m?.senderName,
+    m?.participantName,
+    m?.notifyName,
+    m?.message?.pushName,
+    m?.message?.senderName,
+  ];
+
+  for (const c of candidates) {
+    const s = safeString(c);
+    if (s && s.trim()) return s.trim();
+  }
+
+  return null;
+}
+
+function extractSenderAvatarUrlFromMessage(m: any) {
+  const candidates = [
+    m?.avatarUrl,
+    m?.profilePicUrl,
+    m?.profilePictureUrl,
+    m?.senderAvatarUrl,
+    m?.message?.avatarUrl,
+  ];
+
+  for (const c of candidates) {
+    const s = safeString(c);
+    if (s && s.trim()) return s.trim();
+  }
+
+  return null;
+}
+
 function unwrapEvolutionList(json: any) {
   if (!json) return [];
   if (Array.isArray(json)) return json;
@@ -152,14 +187,25 @@ export async function GET(req: Request) {
         return {
           id: safeString(key?.id) ?? crypto.randomUUID(),
           direction: fromMe ? ("out" as const) : ("in" as const),
-          message: msgText,
+          name: extractSenderNameFromMessage(m),
+          photo: extractSenderAvatarUrlFromMessage(m),
+          text: msgText,
           sent_at: iso,
-          raw: m,
         };
       })
       .filter(Boolean);
 
-    return NextResponse.json({ ok: true, phone, remoteJid, count: messages.length, messages });
+    return NextResponse.json({
+      ok: true,
+      contact: {
+        phone,
+        name: null,
+        photo: null,
+      },
+      remoteJid,
+      count: messages.length,
+      messages,
+    });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? "Falha ao buscar mensagens." }, { status: 500 });
   }
