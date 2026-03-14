@@ -149,7 +149,20 @@ async function ensureThreadForPhone(supabase: any, phone: string) {
       .upsert({ phone: normalized, name }, { onConflict: "phone" })
       .select("id")
       .single();
-    if (cErr) return null;
+    if (cErr) {
+      try {
+        console.log("[WhatsApp Send] failed upsert contacts", {
+          phone: normalized,
+          message: cErr.message,
+          code: (cErr as any)?.code,
+          details: (cErr as any)?.details,
+          hint: (cErr as any)?.hint,
+        });
+      } catch {
+        // ignore
+      }
+      return null;
+    }
     const contactId = contact?.id ? String(contact.id) : "";
     if (!contactId) return null;
 
@@ -161,20 +174,54 @@ async function ensureThreadForPhone(supabase: any, phone: string) {
 
     if (!existing.error && existing.data?.id) return String(existing.data.id);
 
-    const insert = await (supabase as any)
+    if (existing.error) {
+      try {
+        console.log("[WhatsApp Send] failed select chat_threads", {
+          phone: normalized,
+          contact_id: contactId,
+          message: existing.error.message,
+          code: (existing.error as any)?.code,
+          details: (existing.error as any)?.details,
+          hint: (existing.error as any)?.hint,
+        });
+      } catch {
+        // ignore
+      }
+    }
+
+    const upsert = await (supabase as any)
       .from("chat_threads")
-      .insert({
-        contact_id: contactId,
-        status: "open",
-        customer_phone: normalized,
-        contact_name: name,
-        last_message_at: new Date().toISOString(),
-      })
+      .upsert(
+        {
+          contact_id: contactId,
+          status: "open",
+          customer_phone: normalized,
+          contact_name: name,
+          last_message: null,
+          last_message_at: new Date().toISOString(),
+        },
+        { onConflict: "contact_id" },
+      )
       .select("id")
       .single();
 
-    if (insert.error) return null;
-    return insert.data?.id ? String(insert.data.id) : null;
+    if (upsert.error) {
+      try {
+        console.log("[WhatsApp Send] failed upsert chat_threads", {
+          phone: normalized,
+          contact_id: contactId,
+          message: upsert.error.message,
+          code: (upsert.error as any)?.code,
+          details: (upsert.error as any)?.details,
+          hint: (upsert.error as any)?.hint,
+        });
+      } catch {
+        // ignore
+      }
+      return null;
+    }
+
+    return upsert.data?.id ? String(upsert.data.id) : null;
   } catch {
     return null;
   }
@@ -255,6 +302,17 @@ export async function POST(req: Request) {
     const nowIso = new Date().toISOString();
     const ensuredThreadId = threadIdRaw || (await ensureThreadForPhone((settings as any).supabase, phone));
 
+    if (!ensuredThreadId) {
+      try {
+        console.log("[WhatsApp Send] could not ensure thread before sending", {
+          phone: normalizeWhatsapp(phone),
+          providedThreadId: threadIdRaw || null,
+        });
+      } catch {
+        // ignore
+      }
+    }
+
     await safeSendComposingPresence(baseUrl, headers, instanceName, phone);
     await sleep(2000);
     await sleep(randomInt(3000, 7000));
@@ -289,7 +347,7 @@ export async function POST(req: Request) {
 
     if (ensuredThreadId) {
       try {
-        await (settings as any).supabase.from("chat_messages").insert({
+        const ins = await (settings as any).supabase.from("chat_messages").insert({
           id: crypto.randomUUID(),
           thread_id: ensuredThreadId,
           broker_id: asBoss ? null : brokerId,
@@ -301,13 +359,52 @@ export async function POST(req: Request) {
           raw_payload: apiRes,
         });
 
-        await (settings as any).supabase
+        if (ins?.error) {
+          try {
+            console.log("[WhatsApp Send] failed insert chat_messages", {
+              thread_id: ensuredThreadId,
+              phone: normalizeWhatsapp(phone),
+              message: ins.error.message,
+              code: (ins.error as any)?.code,
+              details: (ins.error as any)?.details,
+              hint: (ins.error as any)?.hint,
+            });
+          } catch {
+            // ignore
+          }
+
+          return NextResponse.json(
+            { ok: false, error: `Mensagem enviada na Evolution, mas falhou persistência no Supabase: ${ins.error.message}` },
+            { status: 500 },
+          );
+        }
+
+        const upd = await (settings as any).supabase
           .from("chat_threads")
-          .update({ last_message_at: nowIso })
+          .update({ last_message: message, last_message_at: nowIso })
           .eq("id", ensuredThreadId);
+
+        if (upd?.error) {
+          try {
+            console.log("[WhatsApp Send] failed update chat_threads.last_message_at", {
+              thread_id: ensuredThreadId,
+              message: upd.error.message,
+              code: (upd.error as any)?.code,
+              details: (upd.error as any)?.details,
+              hint: (upd.error as any)?.hint,
+            });
+          } catch {
+            // ignore
+          }
+        }
       } catch {
         // silent
       }
+    } else {
+      return NextResponse.json(
+        { ok: false, error: "Mensagem enviada na Evolution, mas não foi possível garantir a thread no Supabase." },
+        { status: 500 },
+      );
     }
 
     try {

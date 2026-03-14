@@ -336,52 +336,169 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "Service role não configurada." }, { status: 500 });
     }
 
-    const body = await req.json();
-    if (body?.event !== "MESSAGES_UPSERT") return NextResponse.json({ ok: true });
+    const body = await req.json().catch(() => null);
+    const event = normalizeEventName(body?.event ?? body?.type ?? body?.data?.event);
+    if (event !== "MESSAGES_UPSERT") {
+      try {
+        console.log("[WhatsApp Webhook] ignored event", {
+          event: event ?? null,
+        });
+      } catch {
+        // ignore
+      }
+      return NextResponse.json({ ok: true });
+    }
 
-    const data = body.data;
-    const phone = String(data?.key?.remoteJid ?? "").split("@")[0];
-    const name = data?.pushName || "Lead WhatsApp";
-    const content = data?.message?.conversation || data?.message?.extendedTextMessage?.text || "";
+    const data = (body as any)?.data ?? body;
 
-    if (!content) return NextResponse.json({ ok: true });
+    const remoteJidRaw =
+      safeString(data?.key?.remoteJid) ??
+      safeString(data?.message?.key?.remoteJid) ??
+      safeString(data?.messages?.[0]?.key?.remoteJid) ??
+      safeString(data?.remoteJid) ??
+      safeString((body as any)?.data?.key?.remoteJid) ??
+      null;
+
+    const phone = jidToPhone(remoteJidRaw);
+    const name = safeString(data?.pushName) ?? safeString(data?.senderName) ?? "Lead WhatsApp";
+    const messageObj = data?.message ?? data?.messages?.[0]?.message ?? (body as any)?.data?.message ?? null;
+    const content =
+      safeString(messageObj?.conversation) ||
+      safeString(messageObj?.extendedTextMessage?.text) ||
+      safeString(messageObj?.imageMessage?.caption) ||
+      safeString(messageObj?.videoMessage?.caption) ||
+      "";
+
+    if (!phone) {
+      try {
+        console.log("[WhatsApp Webhook] missing phone from remoteJid", {
+          remoteJid: remoteJidRaw,
+        });
+      } catch {
+        // ignore
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    if (!content) {
+      try {
+        console.log("[WhatsApp Webhook] missing content", {
+          phone,
+        });
+      } catch {
+        // ignore
+      }
+      return NextResponse.json({ ok: true });
+    }
 
     const { data: contact, error: cErr } = await (supabase as any)
       .from("contacts")
-      .upsert({ phone, name }, { onConflict: "phone" })
+      .upsert({ phone: phone, name: name }, { onConflict: "phone" })
       .select()
       .single();
-    if (cErr) throw cErr;
+    if (cErr) {
+      try {
+        console.log("[WhatsApp Webhook] failed upsert contacts", {
+          phone,
+          message: cErr.message,
+          code: (cErr as any)?.code,
+          details: (cErr as any)?.details,
+          hint: (cErr as any)?.hint,
+        });
+      } catch {
+        // ignore
+      }
+      throw cErr;
+    }
 
-    let { data: thread } = await (supabase as any)
+    try {
+      const leadUpsert = await (supabase as any)
+        .from("leads")
+        .upsert({ phone, name }, { onConflict: "phone" });
+      if (leadUpsert?.error) {
+        console.log("[WhatsApp Webhook] failed upsert leads", {
+          phone,
+          message: leadUpsert.error.message,
+          code: (leadUpsert.error as any)?.code,
+          details: (leadUpsert.error as any)?.details,
+          hint: (leadUpsert.error as any)?.hint,
+        });
+      }
+    } catch (e: any) {
+      try {
+        console.log("[WhatsApp Webhook] leads upsert skipped/failed", {
+          phone,
+          message: e?.message ?? String(e ?? ""),
+        });
+      } catch {
+        // ignore
+      }
+    }
+
+    const threadUpsert = await (supabase as any)
       .from("chat_threads")
-      .select("id")
-      .eq("contact_id", contact.id)
-      .maybeSingle();
-
-    if (!thread) {
-      const { data: nt, error: tErr } = await (supabase as any)
-        .from("chat_threads")
-        .insert({
+      .upsert(
+        {
           contact_id: contact.id,
           status: "open",
           customer_phone: phone,
           contact_name: name,
-        })
-        .select()
-        .single();
-      if (tErr) throw tErr;
-      thread = nt;
+          last_message: content,
+          last_message_at: new Date(),
+        },
+        { onConflict: "contact_id" },
+      )
+      .select()
+      .single();
+    if (threadUpsert.error) {
+      try {
+        console.log("[WhatsApp Webhook] failed upsert chat_threads", {
+          phone,
+          contact_id: contact.id,
+          message: threadUpsert.error.message,
+          code: (threadUpsert.error as any)?.code,
+          details: (threadUpsert.error as any)?.details,
+          hint: (threadUpsert.error as any)?.hint,
+        });
+      } catch {
+        // ignore
+      }
+      throw threadUpsert.error;
     }
 
-    const { error: mErr } = await (supabase as any).from("chat_messages").insert({
-      thread_id: thread.id,
+    const threadId = String(threadUpsert.data?.id ?? "");
+    if (!threadId) {
+      try {
+        console.log("[WhatsApp Webhook] invalid thread id", { phone, contact_id: contact.id });
+      } catch {
+        // ignore
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    const msgInsert = await (supabase as any).from("chat_messages").insert({
+      thread_id: threadId,
       message: content,
       direction: "in",
       from_number: phone,
       sent_at: new Date().toISOString(),
+      raw_payload: body,
     });
-    if (mErr) throw mErr;
+    if (msgInsert?.error) {
+      try {
+        console.log("[WhatsApp Webhook] failed insert chat_messages", {
+          thread_id: threadId,
+          phone,
+          message: msgInsert.error.message,
+          code: (msgInsert.error as any)?.code,
+          details: (msgInsert.error as any)?.details,
+          hint: (msgInsert.error as any)?.hint,
+        });
+      } catch {
+        // ignore
+      }
+      throw msgInsert.error;
+    }
 
     return NextResponse.json({ ok: true });
   } catch (err) {

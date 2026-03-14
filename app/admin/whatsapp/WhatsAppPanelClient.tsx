@@ -135,6 +135,8 @@ export default function WhatsAppPanelClient() {
 
   const [contactsById, setContactsById] = useState<Record<string, ContactRow>>({});
 
+  const [fallbackContacts, setFallbackContacts] = useState<ContactRow[]>([]);
+
   const [ownerByWhatsapp, setOwnerByWhatsapp] = useState<Record<string, OwnerMatch>>({});
 
   const [messages, setMessages] = useState<MessageRow[]>([]);
@@ -569,6 +571,35 @@ export default function WhatsAppPanelClient() {
       const rows = (res.data ?? []) as ThreadRow[];
       setThreads(rows);
       setSupportsTables(true);
+
+      if (rows.length === 0) {
+        try {
+          const cRes = await (supabase as any)
+            .from("contacts")
+            .select("id, phone, name, avatar, last_message, last_message_time")
+            .order("last_message_time", { ascending: false })
+            .limit(80);
+          if (!cRes.error) {
+            setFallbackContacts((cRes.data ?? []) as ContactRow[]);
+          } else {
+            try {
+              console.log("[WhatsApp] fallback contacts failed", {
+                message: cRes.error.message,
+                code: (cRes.error as any)?.code,
+                details: (cRes.error as any)?.details,
+                hint: (cRes.error as any)?.hint,
+              });
+            } catch {
+              // ignore
+            }
+            setFallbackContacts([]);
+          }
+        } catch {
+          setFallbackContacts([]);
+        }
+      } else {
+        setFallbackContacts([]);
+      }
 
       try {
         const contactIds = Array.from(
@@ -1345,6 +1376,49 @@ export default function WhatsAppPanelClient() {
                         </button>
                       );
                     })}
+                </div>
+              ) : fallbackContacts.length > 0 ? (
+                <div className="space-y-1">
+                  {fallbackContacts.slice(0, 200).map((c) => {
+                    const number = String(c.phone ?? "").replace(/\D+/g, "").trim();
+                    const title = String(c.name ?? "").trim() ? String(c.name ?? "").trim() : "Contato";
+                    const subtitle = String(c.last_message ?? "").trim() ? String(c.last_message ?? "") : "";
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={async () => {
+                          if (!number) return;
+                          const id = await ensureThreadByPhone(number);
+                          if (id) setSelectedThreadId(id);
+                        }}
+                        className="flex w-full items-center gap-3 rounded-xl bg-white/30 px-3 py-2 text-left transition-all hover:bg-white hover:shadow-sm"
+                      >
+                        {String(c.avatar ?? "").trim() ? (
+                          <img
+                            src={String(c.avatar ?? "")}
+                            alt={title}
+                            className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-slate-200/70"
+                          />
+                        ) : (
+                          <div
+                            className={
+                              "grid h-10 w-10 shrink-0 place-items-center rounded-full text-xs font-semibold text-white " +
+                              avatarColorClass(number || c.id)
+                            }
+                          >
+                            {fallbackAvatarText(title, number || c.id)}
+                          </div>
+                        )}
+
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-semibold text-slate-900">{title}</div>
+                          <div className="truncate text-xs text-slate-500">{number}</div>
+                          <div className="truncate text-xs text-slate-600">{subtitle}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="px-3 py-6 text-sm text-slate-600">
