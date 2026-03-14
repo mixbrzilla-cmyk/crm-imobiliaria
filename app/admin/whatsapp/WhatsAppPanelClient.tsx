@@ -184,6 +184,10 @@ export default function WhatsAppPanelClient() {
 
   const currentEvolutionChatKeyRef = useRef<string>("");
 
+  const didInitialChatsLoadRef = useRef(false);
+  const didRetryChatsLoadRef = useRef(false);
+  const retryChatsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [isResetting, setIsResetting] = useState(false);
   const [resetMessage, setResetMessage] = useState<string | null>(null);
 
@@ -1025,10 +1029,38 @@ export default function WhatsAppPanelClient() {
   }, [activeChatKey]);
 
   useEffect(() => {
-    if (evolutionIsOpen) {
-      void syncEvolutionChats();
-    }
+    if (didInitialChatsLoadRef.current) return;
+    didInitialChatsLoadRef.current = true;
+    void syncEvolutionChats();
   }, [evolutionIsOpen, syncEvolutionChats]);
+
+  useEffect(() => {
+    if (retryChatsTimeoutRef.current) {
+      clearTimeout(retryChatsTimeoutRef.current);
+      retryChatsTimeoutRef.current = null;
+    }
+
+    if (evolutionIsOpen !== true) {
+      didRetryChatsLoadRef.current = false;
+      return;
+    }
+
+    if (isSyncingChats) return;
+    if (evolutionChats.length > 0) return;
+    if (didRetryChatsLoadRef.current) return;
+
+    didRetryChatsLoadRef.current = true;
+    retryChatsTimeoutRef.current = setTimeout(() => {
+      void syncEvolutionChats();
+    }, 3000);
+
+    return () => {
+      if (retryChatsTimeoutRef.current) {
+        clearTimeout(retryChatsTimeoutRef.current);
+        retryChatsTimeoutRef.current = null;
+      }
+    };
+  }, [evolutionChats.length, evolutionIsOpen, isSyncingChats, syncEvolutionChats]);
 
   useEffect(() => {
     if (!selectedThreadId) return;
