@@ -1327,7 +1327,7 @@ export default function WhatsAppPanelClient() {
                           ? String(contact?.name ?? "").trim()
                           : t.contact_name && String(t.contact_name).trim()
                             ? String(t.contact_name).trim()
-                            : "Contato";
+                            : number || "Contato";
 
                       const subtitle =
                         String(contact?.last_message ?? "").trim()
@@ -1381,7 +1381,7 @@ export default function WhatsAppPanelClient() {
                 <div className="space-y-1">
                   {fallbackContacts.slice(0, 200).map((c) => {
                     const number = String(c.phone ?? "").replace(/\D+/g, "").trim();
-                    const title = String(c.name ?? "").trim() ? String(c.name ?? "").trim() : "Contato";
+                    const title = String(c.name ?? "").trim() ? String(c.name ?? "").trim() : number || "Contato";
                     const subtitle = String(c.last_message ?? "").trim() ? String(c.last_message ?? "") : "";
                     return (
                       <button

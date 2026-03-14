@@ -391,24 +391,57 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    const { data: contact, error: cErr } = await (supabase as any)
-      .from("contacts")
-      .upsert({ phone: phone, name: name }, { onConflict: "phone" })
-      .select()
-      .single();
-    if (cErr) {
+    let contact: any = null;
+    try {
+      const r1 = await (supabase as any)
+        .from("contacts")
+        .upsert({ phone: phone, name: name }, { onConflict: "phone" })
+        .select()
+        .single();
+      if (r1?.error) throw r1.error;
+      contact = r1?.data ?? null;
+    } catch (cErr: any) {
       try {
-        console.log("[WhatsApp Webhook] failed upsert contacts", {
+        console.log("[WhatsApp Webhook] failed upsert contacts (full payload), retrying with phone only", {
           phone,
-          message: cErr.message,
-          code: (cErr as any)?.code,
-          details: (cErr as any)?.details,
-          hint: (cErr as any)?.hint,
+          message: cErr?.message ?? String(cErr ?? ""),
+          code: cErr?.code,
+          details: cErr?.details,
+          hint: cErr?.hint,
         });
       } catch {
         // ignore
       }
-      throw cErr;
+
+      const r2 = await (supabase as any)
+        .from("contacts")
+        .upsert({ phone: phone, name: null }, { onConflict: "phone" })
+        .select()
+        .single();
+      if (r2?.error) {
+        try {
+          console.log("[WhatsApp Webhook] failed upsert contacts (phone only)", {
+            phone,
+            message: r2.error.message,
+            code: (r2.error as any)?.code,
+            details: (r2.error as any)?.details,
+            hint: (r2.error as any)?.hint,
+          });
+        } catch {
+          // ignore
+        }
+        throw r2.error;
+      }
+      contact = r2?.data ?? null;
+    }
+
+    if (!contact?.id) {
+      try {
+        console.log("[WhatsApp Webhook] contact missing id after upsert", { phone });
+      } catch {
+        // ignore
+      }
+      return NextResponse.json({ ok: true });
     }
 
     try {
