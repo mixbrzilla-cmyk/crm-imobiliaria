@@ -3,13 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
-  Check,
-  MessageCircle,
-  Paperclip,
   Search,
-  SendHorizonal,
   Settings,
-  ShieldAlert,
   User,
 } from "lucide-react";
 
@@ -1018,16 +1013,13 @@ export default function WhatsAppPanelClient() {
   }, [loadThreads]);
 
   return (
-    <div className="flex w-full flex-col gap-8">
-      <header className="flex flex-col gap-2">
-        <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">
-          WHATSAPP BUSINESS CENTRAL
+    <div className="flex w-full flex-col gap-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">WHATSAPP</div>
+          <div className="text-2xl font-semibold tracking-tight text-slate-900">Painel WhatsApp</div>
         </div>
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Painel WhatsApp</h1>
-        <p className="text-sm leading-relaxed text-slate-600">
-          Custódia do Boss, distribuição para corretores e histórico auditável.
-        </p>
-      </header>
+      </div>
 
       {errorMessage ? (
         <div className="rounded-2xl bg-red-50 px-5 py-4 text-sm text-red-700 ring-1 ring-red-200/70">
@@ -1041,17 +1033,22 @@ export default function WhatsAppPanelClient() {
         </div>
       ) : null}
 
-      <section className="overflow-hidden rounded-3xl bg-white shadow-[0_20px_45px_-45px_rgba(0,0,0,0.55)] ring-1 ring-slate-200/70">
-        <div className="grid min-h-0 flex-1 grid-cols-[360px_minmax(0,1fr)_360px] overflow-hidden">
-          <aside className="flex min-h-0 flex-col border-r border-slate-200/70 bg-white">
-            <div className="flex items-center justify-between gap-3 bg-[#001f3f] px-4 py-3 text-white">
-              <div className="flex items-center gap-3">
-                <div className="grid h-10 w-10 place-items-center rounded-full bg-white/10 text-sm font-semibold">
-                  B
+      <section className="h-[calc(100vh-100px)] overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70">
+        <div className="flex h-full min-h-0 overflow-hidden">
+          <aside className="flex h-full w-80 min-h-0 flex-col border-r border-slate-200/70 bg-slate-50">
+            <div className="flex items-center justify-between border-b border-slate-200/70 px-4 py-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={
+                      "h-2 w-2 rounded-full " +
+                      (evolutionIsOpen ? "bg-emerald-500" : evolutionIsOpen === false ? "bg-amber-500" : "bg-slate-300")
+                    }
+                  />
+                  <div className="truncate text-sm font-semibold text-slate-900">Boss Central</div>
                 </div>
-                <div>
-                  <div className="text-sm font-semibold">Boss Central</div>
-                  <div className="text-xs text-white/70">{supportsTables ? "Online" : "Verifique Supabase"}</div>
+                <div className="truncate text-xs text-slate-500">
+                  {evolutionState ? String(evolutionState) : "WhatsApp: -"}
                 </div>
               </div>
 
@@ -1061,218 +1058,120 @@ export default function WhatsAppPanelClient() {
                   setIsConfigOpen(true);
                   void loadSettings();
                 }}
-                className="inline-flex h-10 items-center justify-center rounded-xl bg-white/10 text-white transition-all duration-300 hover:bg-white/15"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white text-slate-700 ring-1 ring-slate-200/70 transition-all hover:bg-slate-50"
                 aria-label="Configurar WhatsApp"
                 title="Configurar"
               >
-                <Settings className="h-5 w-5" />
+                <Settings className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="px-4 py-3">
+            <div className="border-b border-slate-200/70 px-4 py-3">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Pesquisar conversas"
-                  className="h-11 w-full rounded-2xl bg-slate-50 pl-10 pr-4 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:bg-white focus:ring-2 focus:ring-[#001f3f]/10"
+                  placeholder="Pesquisar"
+                  className="h-10 w-full rounded-xl bg-white pl-10 pr-3 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none focus:ring-2 focus:ring-slate-900/10"
                 />
               </div>
-              <div className="mt-3 flex items-center justify-between gap-2">
+
+              <div className="mt-3">
                 <button
                   type="button"
                   onClick={() => setIsNewChatOpen(true)}
-                  className="inline-flex h-10 items-center justify-center rounded-2xl bg-[#001f3f] px-4 text-xs font-semibold text-white transition-all hover:bg-[#001a33]"
+                  className="inline-flex h-10 w-full items-center justify-center rounded-xl bg-[#001f3f] px-4 text-sm font-semibold text-white transition-all hover:bg-[#001a33]"
                 >
                   Nova conversa
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void syncEvolutionChats()}
-                  disabled={isSyncingChats}
-                  className="inline-flex h-10 items-center justify-center rounded-2xl bg-white px-4 text-xs font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isSyncingChats ? "Sincronizando..." : "Atualizar"}
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto p-2">
               {evolutionIsOpen && evolutionChats.length > 0 ? (
-                <div className="p-3">
-                  <div className="space-y-2">
-                    {evolutionChats
-                      .filter((c) => {
-                        if (!search.trim()) return true;
-                        const q = search.trim().toLowerCase();
-                        return (
-                          c.number.includes(q.replace(/\D+/g, "")) ||
-                          (c.name ? c.name.toLowerCase().includes(q) : false) ||
-                          (c.lastMessage ? c.lastMessage.toLowerCase().includes(q) : false)
-                        );
-                      })
-                      .slice(0, 120)
-                      .map((c) => {
-                        const isActive = selectedEvolutionChat?.number === c.number;
-                        return (
-                          <button
-                            key={c.number}
-                            type="button"
-                            onClick={() => {
-                              setSelectedThreadId(null);
-                              setSelectedEvolutionChat(c);
-                              void loadEvolutionMessages(c.number);
-                            }}
-                            className={
-                              "w-full rounded-2xl border px-3 py-3 text-left shadow-sm transition-all " +
-                              (isActive
-                                ? "border-slate-300 bg-slate-100"
-                                : "border-slate-200/70 bg-white hover:bg-slate-50")
-                            }
-                          >
-                            <div className="flex items-center gap-3">
-                              {c.avatarUrl ? (
-                                <img
-                                  src={c.avatarUrl}
-                                  alt={c.name ? c.name : c.number}
-                                  className="h-11 w-11 shrink-0 rounded-full object-cover ring-1 ring-slate-200/70"
-                                />
-                              ) : (
-                                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#001f3f] text-sm font-semibold text-white">
-                                  {initials(c.name ?? c.number)}
-                                </div>
-                              )}
-
-                              <div className="min-w-0 flex-1">
-                                <div className="truncate text-sm font-semibold text-slate-900">
-                                  {c.name ? c.name : c.number}
-                                </div>
-                                <div className="truncate text-xs text-slate-500">{c.number}</div>
-                                {c.lastMessage ? (
-                                  <div className="mt-1 truncate text-xs text-slate-600">{c.lastMessage}</div>
-                                ) : null}
-                              </div>
+                <div className="space-y-1">
+                  {evolutionChats
+                    .filter((c) => {
+                      if (!search.trim()) return true;
+                      const q = search.trim().toLowerCase();
+                      return (
+                        c.number.includes(q.replace(/\D+/g, "")) ||
+                        (c.name ? c.name.toLowerCase().includes(q) : false) ||
+                        (c.lastMessage ? c.lastMessage.toLowerCase().includes(q) : false)
+                      );
+                    })
+                    .slice(0, 200)
+                    .map((c) => {
+                      const isActive = selectedEvolutionChat?.number === c.number;
+                      return (
+                        <button
+                          key={c.number}
+                          type="button"
+                          onClick={() => {
+                            setSelectedThreadId(null);
+                            setSelectedEvolutionChat(c);
+                            void loadEvolutionMessages(c.number);
+                          }}
+                          className={
+                            "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-all " +
+                            (isActive ? "bg-white ring-1 ring-slate-200/70" : "hover:bg-white/70")
+                          }
+                        >
+                          {c.avatarUrl ? (
+                            <img
+                              src={c.avatarUrl}
+                              alt={c.name ? c.name : c.number}
+                              className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-slate-200/70"
+                            />
+                          ) : (
+                            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-900 text-xs font-semibold text-white">
+                              {initials(c.name ?? c.number)}
                             </div>
-                          </button>
-                        );
-                      })}
-                  </div>
+                          )}
+
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-semibold text-slate-900">
+                              {c.name ? c.name : c.number}
+                            </div>
+                            <div className="truncate text-xs text-slate-600">
+                              {c.lastMessage ? c.lastMessage : c.number}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
                 </div>
               ) : (
-                <div className="px-4 py-6 text-sm text-slate-600">
-                  {evolutionIsOpen ? "Nenhuma conversa encontrada na Evolution." : "Conecte o WhatsApp para carregar as conversas."}
+                <div className="px-3 py-6 text-sm text-slate-600">
+                  {evolutionIsOpen ? "Nenhuma conversa." : "WhatsApp desconectado."}
                 </div>
               )}
             </div>
           </aside>
 
-          <main className="flex min-h-0 flex-col">
-            <div className="flex items-center justify-between gap-4 border-b border-slate-200/70 bg-white px-5 py-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="grid h-10 w-10 place-items-center rounded-full bg-slate-900 text-sm font-semibold text-white">
-                  {initials(
-                    selectedEvolutionChat?.name ??
-                      selectedEvolutionChat?.number ??
-                      selectedThread?.contact_name ??
-                      selectedThread?.contact_number ??
-                      null,
-                  )}
+          <main className="flex h-full min-h-0 flex-1 flex-col bg-white">
+            <div className="flex items-center justify-between border-b border-slate-200/70 px-4 py-3">
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-slate-900">
+                  {selectedEvolutionChat
+                    ? selectedEvolutionChat.name ?? selectedEvolutionChat.number
+                    : selectedThread
+                      ? selectedThread.contact_name ?? selectedThread.contact_number ?? selectedThread.external_id ?? "-"
+                      : "Selecione uma conversa"}
                 </div>
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-slate-900">
-                    {selectedEvolutionChat
-                      ? selectedEvolutionChat.name ?? selectedEvolutionChat.number
-                      : selectedThread
-                        ? selectedThread.contact_name ??
-                          selectedThread.contact_number ??
-                          selectedThread.external_id ??
-                          "-"
-                        : "Selecione uma conversa"}
-                  </div>
-                  <div className="truncate text-xs text-slate-500">
-                    {selectedEvolutionChat?.number ?? selectedThread?.contact_number ?? ""}
-                  </div>
-                  {selectedOwnerMatch ? (
-                    <div className="mt-1 text-[11px] font-semibold text-amber-700">
-                      [PROPRIETÁRIO] {selectedOwnerMatch.title}
-                    </div>
-                  ) : null}
+                <div className="truncate text-xs text-slate-500">
+                  {selectedEvolutionChat?.number ?? selectedThread?.contact_number ?? ""}
                 </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2 border-b border-slate-200/70 px-4 py-3">
-                  <span
-                    className={
-                      "h-2 w-2 rounded-full " +
-                      (evolutionIsOpen ? "bg-emerald-500" : evolutionIsOpen === false ? "bg-amber-500" : "bg-slate-300")
-                    }
-                  />
-                  {evolutionState ? `WhatsApp: ${evolutionState}` : "WhatsApp: -"}
-                </div>
-                <div className="hidden text-xs font-semibold text-slate-600 sm:block">Enviar para Corretor</div>
-                <select
-                  value={selectedThread?.assigned_broker_profile_id ?? ""}
-                  onChange={(e) =>
-                    selectedThreadId ? void assignThreadToBroker(selectedThreadId, e.target.value) : null
-                  }
-                  disabled={!selectedThreadId}
-                  className="hidden h-10 rounded-xl bg-white px-3 text-xs font-semibold text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:ring-2 focus:ring-slate-900/10 disabled:cursor-not-allowed disabled:bg-slate-100 sm:block"
-                >
-                  <option value="">Boss</option>
-                  {brokers.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.full_name ?? b.id}
-                    </option>
-                  ))}
-                </select>
-
-                <button
-                  type="button"
-                  onClick={() => void toggleBossMode()}
-                  className={
-                    "inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-xs font-semibold ring-1 transition-all duration-300 hover:-translate-y-[1px] " +
-                    (bossMode
-                      ? "bg-[#ff0000] text-white ring-[#ff0000] hover:bg-[#e60000]"
-                      : "bg-white text-slate-900 ring-slate-200/70 hover:bg-slate-50")
-                  }
-                  title="O Boss pode ler e enviar em qualquer conversa"
-                >
-                  <ShieldAlert className="h-4 w-4" />
-                  {bossMode ? "Intervindo" : "Intervir"}
-                </button>
               </div>
             </div>
 
-            <div
-              className="flex-1 overflow-y-auto px-5 py-5"
-              style={{
-                backgroundImage:
-                  "radial-gradient(circle at 10px 10px, rgba(15, 23, 42, 0.04) 0, rgba(15, 23, 42, 0.04) 2px, transparent 2px), radial-gradient(circle at 30px 30px, rgba(15, 23, 42, 0.035) 0, rgba(15, 23, 42, 0.035) 2px, transparent 2px)",
-                backgroundSize: "48px 48px",
-              }}
-            >
-              {!supportsTables ? (
-                <div className="mb-4 rounded-2xl bg-amber-50 px-5 py-4 text-sm text-amber-900 ring-1 ring-amber-200/70">
-                  <div className="flex items-start gap-3">
-                    <ShieldAlert className="mt-0.5 h-4 w-4" />
-                    <div>
-                      <div className="font-semibold">Conexão com Supabase / tabelas</div>
-                      <div className="mt-1 text-sm">
-                        Não foi possível carregar <span className="font-semibold">chat_threads</span> e{" "}
-                        <span className="font-semibold">chat_messages</span>.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-
+            <div className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-4">
               {isLoadingEvolutionMessages || isLoadingMessages ? (
                 <div className="text-sm text-slate-600">Carregando mensagens...</div>
               ) : (selectedEvolutionChat ? evolutionMessages : messages).length === 0 ? (
-                <div className="mx-auto mt-8 w-full max-w-md rounded-3xl bg-white/70 px-6 py-5 text-center text-sm text-slate-700 ring-1 ring-slate-200/70 backdrop-blur">
-                  Selecione uma conversa à esquerda para visualizar.
+                <div className="mx-auto mt-10 w-full max-w-md rounded-2xl bg-slate-50 px-5 py-4 text-center text-sm text-slate-600 ring-1 ring-slate-200/70">
+                  Selecione uma conversa para começar.
                 </div>
               ) : (
                 <div className="flex flex-col gap-2">
@@ -1280,46 +1179,26 @@ export default function WhatsAppPanelClient() {
                     <div
                       key={m.id}
                       className={
-                        "w-fit max-w-[86%] rounded-2xl px-4 py-2.5 text-sm shadow-[0_2px_6px_-4px_rgba(0,0,0,0.25)] " +
+                        "w-fit max-w-[82%] rounded-2xl px-4 py-2.5 text-sm " +
                         bubbleCls(m.direction)
                       }
                     >
                       <div className="whitespace-pre-wrap leading-relaxed">{m.message}</div>
-                      <div className="mt-1 flex items-center justify-end gap-2 text-[11px] font-medium text-slate-500">
-                        <span>{formatTime(m.sent_at)}</span>
-                        {m.direction === "out" ? (
-                          <span className="inline-flex items-center gap-1 text-emerald-600">
-                            <Check className="h-3.5 w-3.5" />
-                            <Check className="h-3.5 w-3.5 -ml-2" />
-                          </span>
-                        ) : null}
-                      </div>
+                      <div className="mt-1 text-right text-[11px] font-medium text-slate-500">{formatTime(m.sent_at)}</div>
                     </div>
                   ))}
                 </div>
               )}
             </div>
 
-            <div className="border-t border-slate-200/70 bg-white px-5 py-3">
-              <div className="flex items-end gap-3">
-                <button
-                  type="button"
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-slate-700 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50"
-                  title="Anexar (em breve)"
-                >
-                  <Paperclip className="h-5 w-5" />
-                </button>
-
+            <div className="border-t border-slate-200/70 bg-white p-3">
+              <div className="flex items-end gap-2 rounded-2xl bg-slate-50 p-2 ring-1 ring-slate-200/70">
                 <textarea
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
-                  placeholder={
-                    selectedThreadId
-                      ? "Digite uma mensagem"
-                      : "Digite uma mensagem (selecione ou inicie uma conversa para enviar)"
-                  }
+                  placeholder={selectedEvolutionChat || selectedThreadId ? "Mensagem" : "Selecione uma conversa"}
                   disabled={isSending}
-                  className="min-h-11 flex-1 resize-none rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-900 ring-1 ring-slate-200/70 outline-none transition-all duration-300 focus:bg-white focus:ring-2 focus:ring-[#001f3f]/10 disabled:cursor-not-allowed disabled:bg-slate-100"
+                  className="min-h-11 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-slate-900 outline-none disabled:cursor-not-allowed"
                 />
 
                 <button
@@ -1333,46 +1212,23 @@ export default function WhatsAppPanelClient() {
                   }
                   title={
                     evolutionIsOpen === false
-                        ? "WhatsApp desconectado. Pareie a instância."
-                        : !selectedThreadId && !selectedEvolutionChat
-                          ? "Selecione uma conversa"
+                      ? "WhatsApp desconectado. Pareie a instância."
+                      : !selectedThreadId && !selectedEvolutionChat
+                        ? "Selecione uma conversa"
                         : !draft.trim()
                           ? "Digite uma mensagem"
                           : ""
                   }
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-[#001f3f] px-5 text-sm font-semibold text-white shadow-[0_6px_14px_-10px_rgba(15,23,42,0.45)] transition-all duration-300 hover:-translate-y-[1px] hover:bg-[#001a33] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-11 items-center justify-center rounded-xl bg-[#001f3f] px-4 text-sm font-semibold text-white transition-all hover:bg-[#001a33] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <SendHorizonal className="h-4 w-4" />
                   Enviar
                 </button>
               </div>
             </div>
           </main>
-
-          <aside className="flex min-h-0 flex-col border-l border-slate-200/70 bg-white">
-            <div className="border-b border-slate-200/70 px-5 py-4">
-              <div className="text-xs font-semibold tracking-[0.18em] text-slate-500">DETALHES</div>
-              <div className="mt-2 text-lg font-semibold text-slate-900">Lead</div>
-              <div className="mt-1 text-sm text-slate-600">
-                {selectedOwnerMatch ? selectedOwnerMatch.title : "Selecione um chat para ver detalhes."}
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-5 py-4">
-              <div className="rounded-2xl bg-slate-50 px-4 py-4 ring-1 ring-slate-200/70">
-                <div className="text-xs font-semibold text-slate-700">Contato</div>
-                <div className="mt-2 text-sm text-slate-900">
-                  {selectedEvolutionChat?.name ?? selectedThread?.contact_name ?? "-"}
-                </div>
-                <div className="mt-1 text-xs text-slate-600">
-                  {selectedEvolutionChat?.number ?? selectedThread?.contact_number ?? "-"}
-                </div>
-              </div>
-            </div>
-          </aside>
         </div>
-
-        {isNewChatOpen ? (
+      </section>
+      {isNewChatOpen ? (
           <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 px-4 py-10">
             <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-[0_25px_60px_-45px_rgba(0,0,0,0.55)] ring-1 ring-slate-200/70">
               <div className="flex items-start justify-between gap-4">
@@ -1421,16 +1277,13 @@ export default function WhatsAppPanelClient() {
                       return;
                     }
 
-                    const next = {
+                    setSelectedThreadId(null);
+                    setSelectedEvolutionChat({
                       number: digits,
                       name: newChatName.trim() ? newChatName.trim() : null,
                       lastMessage: null,
                       avatarUrl: null,
-                    };
-
-                    setSelectedThreadId(null);
-                    setSelectedEvolutionChat(next);
-                    setEvolutionChats((cur) => (cur.some((c) => c.number === digits) ? cur : [next, ...cur]));
+                    });
                     setIsNewChatOpen(false);
                     setNewChatPhone("");
                     setNewChatName("");
@@ -1642,7 +1495,6 @@ export default function WhatsAppPanelClient() {
             </div>
           </div>
         ) : null}
-      </section>
-    </div>
+      </div>
   );
 }
