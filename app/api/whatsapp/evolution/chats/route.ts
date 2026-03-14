@@ -85,6 +85,24 @@ function extractLastMessagePreview(chat: any) {
   return text;
 }
 
+function extractAvatarUrl(chat: any) {
+  const candidates = [
+    chat?.profilePicUrl,
+    chat?.profilePictureUrl,
+    chat?.pictureUrl,
+    chat?.avatarUrl,
+    chat?.contact?.profilePicUrl,
+    chat?.contact?.profilePictureUrl,
+    chat?.contact?.pictureUrl,
+    chat?.contact?.avatarUrl,
+  ];
+  for (const c of candidates) {
+    const s = safeString(c);
+    if (s && s.startsWith("http")) return s;
+  }
+  return null;
+}
+
 export async function GET() {
   const envApiUrl = String(
     process.env.EVOLUTION_API_URL ??
@@ -157,6 +175,7 @@ export async function GET() {
           number,
           name: extractChatName(c),
           lastMessage: extractLastMessagePreview(c),
+          avatarUrl: extractAvatarUrl(c),
           raw: c,
         };
       })

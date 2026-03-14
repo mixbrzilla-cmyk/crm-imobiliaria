@@ -180,7 +180,13 @@ export async function POST(req: Request) {
     const res = await fetch(url, {
       method: "POST",
       headers,
-      body: JSON.stringify({ number: normalizeWhatsapp(phone), text: message }),
+      body: JSON.stringify({
+        number: normalizeWhatsapp(phone),
+        text: message,
+        textMessage: {
+          text: message,
+        },
+      }),
       cache: "no-store",
     });
 
