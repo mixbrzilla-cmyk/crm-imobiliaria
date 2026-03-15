@@ -91,7 +91,7 @@ export default function CorretorHomePage() {
             {errorMessage}
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <Link
               href="/corretor/leads"
               className="rounded-xl border border-zinc-200 bg-white p-6 transition-colors hover:bg-zinc-50"
@@ -112,13 +112,6 @@ export default function CorretorHomePage() {
             >
               <div className="text-sm font-semibold text-[color:var(--imob-red)]">Imóveis Enviados pela Imobiliária Moderna</div>
               <div className="mt-1 text-xs text-zinc-700">Atribuídos a você para atendimento (com WhatsApp do proprietário).</div>
-            </Link>
-            <Link
-              href="/corretor/whatsapp"
-              className="rounded-xl border border-zinc-200 bg-white p-6 transition-colors hover:bg-zinc-50"
-            >
-              <div className="text-sm font-semibold text-[color:var(--imob-navy)]">Central WhatsApp</div>
-              <div className="mt-1 text-xs text-zinc-600">Conversas auditáveis no painel da Imobiliária Moderna.</div>
             </Link>
           </div>
         )}

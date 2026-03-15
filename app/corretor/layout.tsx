@@ -141,7 +141,6 @@ export default function CorretorLayout({ children }: { children: React.ReactNode
     { href: "/corretor/leads", label: "Leads p/ Qualificar" },
     { href: "/corretor/inventario", label: "Meus Imóveis" },
     { href: "/corretor/enviados", label: "Imóveis Enviados" },
-    { href: "/corretor/whatsapp", label: "Central WhatsApp" },
   ];
 
   return (

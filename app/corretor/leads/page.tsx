@@ -86,12 +86,6 @@ export default function CorretorLeadsPage() {
       <div className="rounded-xl border border-zinc-200 bg-white">
         <div className="flex items-center justify-between gap-4 border-b border-zinc-200 px-5 py-3">
           <div className="text-sm font-semibold text-zinc-900">Fila</div>
-          <Link
-            href="/corretor/whatsapp"
-            className="inline-flex h-10 items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 text-sm font-semibold text-[color:var(--imob-navy)] hover:bg-zinc-50"
-          >
-            Abrir Central WhatsApp
-          </Link>
         </div>
 
         {isLoading ? (
@@ -114,18 +108,6 @@ export default function CorretorLeadsPage() {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    <Link
-                      href={phone ? `/corretor/whatsapp?phone=${encodeURIComponent(phone)}` : "/corretor/whatsapp"}
-                      className={
-                        "inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold " +
-                        (phone
-                          ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                          : "bg-zinc-100 text-zinc-500")
-                      }
-                      aria-disabled={!phone}
-                    >
-                      WhatsApp
-                    </Link>
                     <Link
                       href="/corretor/inventario"
                       className="inline-flex h-10 items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 text-sm font-semibold text-[color:var(--imob-navy)] hover:bg-zinc-50"

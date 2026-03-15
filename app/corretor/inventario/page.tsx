@@ -598,23 +598,6 @@ export default function CorretorInventarioPage() {
                     <div className="text-xs font-medium text-zinc-500">
                       {ownerWhatsapp ? `WhatsApp do proprietário: ${ownerWhatsapp}` : "WhatsApp não informado"}
                     </div>
-                    <Link
-                      href={
-                        ownerWhatsapp
-                          ? `/corretor/whatsapp?phone=${encodeURIComponent(ownerWhatsapp)}`
-                          : "/corretor/whatsapp"
-                      }
-                      className={
-                        "inline-flex h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold shadow-sm transition-all duration-300 " +
-                        (ownerWhatsapp
-                          ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                          : "bg-zinc-100 text-zinc-400")
-                      }
-                      aria-disabled={!ownerWhatsapp}
-                    >
-                      <span aria-hidden="true">💬</span>
-                      WhatsApp
-                    </Link>
                   </div>
                 </div>
               );

@@ -1053,19 +1053,6 @@ export default function EmpreendimentosClient() {
                     <button
                       type="button"
                       onClick={() => {
-                        if (!ownerWhatsapp) return;
-                        const url = `/admin/whatsapp?phone=${encodeURIComponent(ownerWhatsapp)}`;
-                        window.location.href = url;
-                      }}
-                      disabled={!ownerWhatsapp}
-                      className="inline-flex h-9 items-center justify-center rounded-xl bg-white px-3 text-xs font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all duration-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                      title="Iniciar conversa com o proprietário"
-                    >
-                      WhatsApp
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
                         setSelectedId(r.id);
                         setDispatchSelectionById((c) => ({ ...c, [r.id]: r.broker_id ?? r.corretor_id ?? "" }));
                         setIsModalOpen(true);

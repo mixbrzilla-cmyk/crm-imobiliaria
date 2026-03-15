@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { CheckCircle2, FileDown, FileText, Gavel, MessageCircle, PenLine, RefreshCw, Send, Signature, User, X } from "lucide-react";
+import { CheckCircle2, FileDown, FileText, Gavel, PenLine, RefreshCw, Send, Signature, User, X } from "lucide-react";
 
 import { getSupabaseClient } from "@/lib/supabaseClient";
 
@@ -689,47 +689,6 @@ export default function ContractsPipelineClient() {
     win.document.close();
   }
 
-  async function sendWhatsApp() {
-    if (!selectedContract) return;
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    const lead = selectedContract.client_id ? leadById.get(selectedContract.client_id) ?? null : null;
-    const clientPhone = normalizeWhatsapp(lead?.phone ?? "");
-    const ownerPhone = normalizeWhatsapp(selectedOwnerWhats);
-
-    const title = contractTitleFallback(selectedContract);
-    const message = `*${title}*\n\n${selectedRenderedOrPreview || ""}`;
-
-    if (!clientPhone && !ownerPhone) {
-      setErrorMessage("Sem WhatsApp do cliente e sem WhatsApp do proprietário.");
-      return;
-    }
-
-    try {
-      const targets = [
-        clientPhone ? { label: "cliente", phone: clientPhone } : null,
-        ownerPhone ? { label: "proprietário", phone: ownerPhone } : null,
-      ].filter(Boolean) as Array<{ label: string; phone: string }>;
-
-      for (const t of targets) {
-        // eslint-disable-next-line no-await-in-loop
-        const res = await fetch("/api/whatsapp/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone: t.phone, message, as_boss: true }),
-        });
-        if (!res.ok) {
-          const data = await res.json().catch(() => null);
-          throw new Error(data?.error ?? `Falha ao enviar WhatsApp para ${t.label}.`);
-        }
-      }
-
-      setSuccessMessage("WhatsApp enviado.");
-    } catch (e: any) {
-      setErrorMessage(e?.message ?? "Não foi possível enviar WhatsApp.");
-    }
-  }
-
   return (
     <div className="flex w-full flex-col gap-8">
       <header className="flex flex-col gap-2">
@@ -846,15 +805,6 @@ export default function ContractsPipelineClient() {
               >
                 <FileDown className="h-4 w-4" />
                 Gerar PDF (Exportar)
-              </button>
-
-              <button
-                type="button"
-                onClick={() => void sendWhatsApp()}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-semibold text-slate-900 ring-1 ring-slate-200/70 transition-all hover:bg-slate-50"
-              >
-                <MessageCircle className="h-4 w-4" />
-                Enviar WhatsApp
               </button>
 
               <button
